@@ -53,8 +53,8 @@ export function isInternational(f: Pick<Flight, 'from' | 'to'>): boolean | undef
  * Fills in derived fields: airline codes from flight number/name, canonical airport idents,
  * distance and duration. Never overwrites values the user supplied (except normalizing).
  */
-export function enrichFlight<T extends FlightInput | Flight>(f: T): T {
-  const out: T = { ...f };
+export function enrichFlight<T extends FlightInput | Flight>(f: T): T & FlightInput {
+  const out: T & FlightInput = { ...f };
   const from = getAirport(out.from);
   const to = getAirport(out.to);
   if (from) out.from = from.ident;

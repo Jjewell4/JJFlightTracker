@@ -1,0 +1,24 @@
+.airline-logo {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 28%;
+  overflow: hidden;
+}
+.airline-logo--img {
+  background: #fff;
+  border: 1px solid var(--border);
+}
+.airline-logo--img img {
+  width: 86%;
+  height: 86%;
+  object-fit: contain;
+}
+.airline-logo--mono {
+  background: hsl(var(--logo-hue) 55% 42% / 0.22);
+  color: hsl(var(--logo-hue) 80% 72%);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.8em;
+  letter-spacing: 0.02em;
+}
