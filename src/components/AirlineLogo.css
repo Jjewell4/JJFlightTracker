@@ -1,24 +1,50 @@
 .airline-logo {
+  position: relative;
   flex: none;
   display: inline-grid;
   place-items: center;
   border-radius: 28%;
   overflow: hidden;
+  background: hsl(var(--logo-hue) 55% 45% / 0.2);
+  transition: background var(--dur);
 }
-.airline-logo--img {
-  background: #fff;
-  border: 1px solid var(--border);
-}
-.airline-logo--img img {
-  width: 86%;
-  height: 86%;
-  object-fit: contain;
-}
-.airline-logo--mono {
-  background: hsl(var(--logo-hue) 55% 42% / 0.22);
+.airline-logo__mono {
   color: hsl(var(--logo-hue) 80% 72%);
   font-family: var(--font-mono);
   font-weight: 700;
-  font-size: 0.8em;
   letter-spacing: 0.02em;
+  line-height: 1;
+}
+.airline-logo img {
+  position: absolute;
+  inset: 7%;
+  width: 86%;
+  height: 86%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity var(--dur);
+}
+.airline-logo--loaded {
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.airline-logo--loaded img {
+  opacity: 1;
+}
+.airline-logo--loaded .airline-logo__mono {
+  visibility: hidden;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) .airline-logo__mono {
+    color: hsl(var(--logo-hue) 65% 34%);
+  }
+  :root:not([data-theme='dark']) .airline-logo:not(.airline-logo--loaded) {
+    background: hsl(var(--logo-hue) 60% 50% / 0.16);
+  }
+}
+:root[data-theme='light'] .airline-logo__mono {
+  color: hsl(var(--logo-hue) 65% 34%);
+}
+:root[data-theme='light'] .airline-logo:not(.airline-logo--loaded) {
+  background: hsl(var(--logo-hue) 60% 50% / 0.16);
 }

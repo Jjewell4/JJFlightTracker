@@ -155,14 +155,16 @@ export default function MapPage() {
     if (!root) return { top: 40, bottom: 40, left: 24, right: 24 };
     const wide = root.width >= 720;
     const top = (topRef.current?.getBoundingClientRect().bottom ?? root.top) - root.top + 20;
-    const sheet = withSheet ? sheetRef.current?.getBoundingClientRect() : undefined;
+    // Layout box of the sheet (offset* ignore its entrance transform animation).
+    const el = withSheet ? sheetRef.current : null;
+    const sheet = el && el.offsetHeight > 0 ? { top: root.top + el.offsetTop, right: root.left + el.offsetLeft + el.offsetWidth } : undefined;
     const tabbar = document.querySelector('.tabbar')?.getBoundingClientRect();
     const tabbarTop = tabbar && tabbar.height > 0 ? tabbar.top : root.bottom;
     let bottomEdge = Math.min(bottomRef.current?.getBoundingClientRect().top ?? root.bottom, tabbarTop);
     // Side padding leaves room for IATA labels drawn beside edge airports.
     const side = wide ? 64 : 36;
     let left = side;
-    if (sheet && sheet.height > 0) {
+    if (sheet) {
       if (wide) left = sheet.right - root.left + side;
       else bottomEdge = Math.min(bottomEdge, sheet.top);
     }
@@ -267,7 +269,7 @@ export default function MapPage() {
   // Keep the selected feature visible above the sheet.
   useEffect(() => {
     const fm = mapRef.current;
-    if (!fm || !mapLoaded) return;
+    if (!fm || !mapLoaded || (!airportAgg && !routeAgg)) return;
     const id = requestAnimationFrame(() => {
       if (airportAgg) fm.focus([airportAgg.airport.lon, airportAgg.airport.lat], getPadding(true));
       else if (routeAgg) fm.reveal(greatCirclePoints(routeAgg.a, routeAgg.b, 32), getPadding(true));

@@ -1,5 +1,5 @@
 import { startTransition, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
 import { useReferenceReady } from '@/data/reference';
 import { useFlights, useSettings } from '@/lib/db';
@@ -36,6 +36,20 @@ export function FlightsPage() {
   const { distanceUnit: unit, clock } = useSettings();
   const [query, setQuery] = useState(memory.query);
   const [filters, setFilters] = useState<FlightFilters>(memory.filters);
+  // Deep links such as /?airport=KSAN&year=2024 (from the map) apply filters once, then clear the URL.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const linked: FlightFilters = {};
+    for (const key of ['year', 'airline', 'airport'] as const) {
+      const v = searchParams.get(key);
+      if (v) linked[key] = v;
+    }
+    if (Object.keys(linked).length) {
+      setQuery('');
+      setFilters(linked);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   const q = useDeferredValue(query);
   const searchRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
