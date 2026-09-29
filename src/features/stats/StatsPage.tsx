@@ -1,3 +1,204 @@
+import { useEffect, useMemo, useRef } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Icon, type IconName } from '@/components/Icon';
+import { useFlights, useSettings } from '@/lib/db';
+import { useReferenceReady } from '@/data/reference';
+import { availableYears, computeStats, filterByYear, flightYear, summarizeTotals, type Insight, type YearScope } from '@/lib/stats';
+import type { Flight } from '@/lib/types';
+import { Hero } from './Hero';
+import { TimeCharts } from './TimeCharts';
+import { Breakdowns } from './Breakdowns';
+import { TopLists } from './TopLists';
+import { Records } from './Records';
+import { Places } from './Places';
+import { Footprint } from './Footprint';
+import { fmtInt, plural } from './format';
+import './charts/charts.css';
+import './StatsPage.css';
+
 export default function StatsPage() {
-  return <h1>Stats</h1>;
+  const flights = useFlights();
+  const refReady = useReferenceReady();
+  const settings = useSettings();
+
+  if (!flights || !refReady) return <StatsSkeleton />;
+  if (!flights.length) return <StatsEmpty />;
+  return <StatsDashboard flights={flights} unit={settings.distanceUnit} clock={settings.clock} homeCountry={settings.homeCountry} />;
+}
+
+function useScope(years: number[]): [YearScope, (s: YearScope) => void] {
+  const [params, setParams] = useSearchParams();
+  const raw = params.get('year');
+  const n = raw ? Number(raw) : NaN;
+  const scope: YearScope = Number.isFinite(n) && years.includes(n) ? n : 'all';
+  const set = (s: YearScope) =>
+    setParams(
+      (p) => {
+        const next = new URLSearchParams(p);
+        if (s === 'all') next.delete('year');
+        else next.set('year', String(s));
+        return next;
+      },
+      { replace: true },
+    );
+  return [scope, set];
+}
+
+function StatsDashboard({ flights, unit, clock, homeCountry }: { flights: Flight[]; unit: 'mi' | 'km'; clock: '12h' | '24h'; homeCountry: string }) {
+  const years = useMemo(() => availableYears(flights), [flights]);
+  const [scope, setScope] = useScope(years);
+  const scoped = useMemo(() => filterByYear(flights, scope), [flights, scope]);
+  const stats = useMemo(() => computeStats(scoped, { homeCountry }), [scoped, homeCountry]);
+  const prev = useMemo(() => {
+    if (scope === 'all') return undefined;
+    const before = filterByYear(flights, scope - 1);
+    return before.length ? summarizeTotals(before) : undefined;
+  }, [flights, scope]);
+  const countsByYear = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const f of flights) m.set(flightYear(f), (m.get(flightYear(f)) ?? 0) + 1);
+    return m;
+  }, [flights]);
+  const currentYear = new Date().getFullYear();
+  const q = stats.quality;
+  const t = stats.totals;
+
+  return (
+    <div className="stats">
+      <header className="page-header stats-header">
+        <div>
+          <h1 className="page-title">Stats</h1>
+          <p className="page-subtitle">
+            {fmtInt(flights.length)} {plural(flights.length, 'flight')} logged
+            {years.length > 1 ? ` · ${years[years.length - 1]}–${years[0]}` : years.length ? ` · ${years[0]}` : ''}
+          </p>
+        </div>
+      </header>
+
+      <ScopeChips years={years} scope={scope} onChange={setScope} counts={countsByYear} total={flights.length} />
+
+      <div className="stats-body">
+        <div className="stats-top">
+          <Hero stats={stats} scope={scope} unit={unit} prev={prev} firstYear={years[years.length - 1]} />
+        </div>
+
+        {stats.insights.length > 0 && <Insights items={stats.insights} />}
+
+        <TimeCharts stats={stats} scope={scope} unit={unit} clock={clock} currentYear={currentYear} />
+        <Breakdowns stats={stats} unit={unit} />
+        <Records stats={stats} unit={unit} />
+        <TopLists stats={stats} unit={unit} />
+        <Places stats={stats} homeCountry={homeCountry} />
+        <Footprint stats={stats} />
+
+        <footer className="stats-notes">
+          <Icon name="info" size={14} />
+          <p>
+            Distances are great-circle between airports.
+            {t.estimatedDuration - q.implausibleDuration > 0 &&
+              ` ${fmtInt(t.estimatedDuration - q.implausibleDuration)} ${plural(t.estimatedDuration - q.implausibleDuration, 'flight has', 'flights have')} no recorded time, so ${t.estimatedDuration - q.implausibleDuration === 1 ? 'its' : 'their'} time in the air is estimated from distance.`}
+            {q.implausibleDuration > 0 && ` ${fmtInt(q.implausibleDuration)} recorded ${plural(q.implausibleDuration, 'time looks', 'times look')} off for the distance (likely a time-zone mix-up) and ${q.implausibleDuration === 1 ? 'was' : 'were'} replaced by an estimate.`}
+            {q.unknownAirports > 0 && ` ${q.unknownAirports} unrecognized ${plural(q.unknownAirports, 'airport')} ${q.unknownAirports === 1 ? 'is' : 'are'} excluded from distance and places.`}
+            {q.yearPrecision + q.monthPrecision > 0 && ` ${q.yearPrecision + q.monthPrecision} ${plural(q.yearPrecision + q.monthPrecision, 'flight')} without an exact date ${q.yearPrecision + q.monthPrecision === 1 ? 'is' : 'are'} left out of day-of-week charts.`}
+          </p>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function ScopeChips({ years, scope, onChange, counts, total }: { years: number[]; scope: YearScope; onChange: (s: YearScope) => void; counts: Map<number, number>; total: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  // Keep the selected chip in view (e.g. when opened via ?year=).
+  useEffect(() => {
+    const el = ref.current?.querySelector<HTMLElement>('[aria-checked="true"]');
+    el?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  }, [scope]);
+  const opts: { value: YearScope; label: string; count: number }[] = [{ value: 'all', label: 'All time', count: total }, ...years.map((y) => ({ value: y as YearScope, label: String(y), count: counts.get(y) ?? 0 }))];
+  return (
+    <div className="stats-scope">
+      <div ref={ref} className="stats-scope__track" role="radiogroup" aria-label="Time period">
+        {opts.map((o) => (
+          <button key={String(o.value)} type="button" role="radio" aria-checked={scope === o.value} className="stats-scope__chip" onClick={() => onChange(o.value)}>
+            <span className="stats-scope__pill">
+              {o.label}
+              <span className="stats-scope__count">{o.count}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const INSIGHT_ICONS: Record<string, IconName> = { seat: 'seat', weekday: 'calendar', hour: 'clock', reason: 'sparkle', haul: 'globe', cabin: 'sparkle' };
+
+function Insights({ items }: { items: Insight[] }) {
+  return (
+    <section className="stats-insights" aria-label="Highlights">
+      {items.map((i, n) => (
+        <div key={i.id} className="stats-insight animate-in" style={{ animationDelay: `${120 + n * 60}ms` }}>
+          <span className={`stats-insight__icon stats-insight__icon--${n % 2 ? 'amber' : 'sky'}`} aria-hidden>
+            <Icon name={INSIGHT_ICONS[i.id] ?? 'sparkle'} size={18} />
+          </span>
+          <p className="stats-insight__title">{i.title}</p>
+          <p className="stats-insight__detail">{i.detail}</p>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function StatsEmpty() {
+  return (
+    <div className="stats">
+      <header className="page-header">
+        <h1 className="page-title">Stats</h1>
+      </header>
+      <div className="stats-empty card">
+        <div className="stats-empty__art" aria-hidden>
+          <svg viewBox="0 0 200 110" width="200" height="110">
+            <path className="stats-empty__arc" d="M20,95 Q100,-5 180,95" />
+            <circle className="stats-empty__dot" cx="20" cy="95" r="5" />
+            <circle className="stats-empty__dot stats-empty__dot--amber" cx="180" cy="95" r="5" />
+            <g transform="translate(88 32) rotate(62)">
+              <Icon name="plane" size={24} />
+            </g>
+          </svg>
+        </div>
+        <h2 className="empty__title">Your flying story starts here</h2>
+        <p className="muted stats-empty__text">Log a flight or import your history and this page fills up with distances, records, maps of where you’ve been and more.</p>
+        <div className="stats-empty__actions">
+          <Link to="/flights/new" className="btn btn--primary btn--lg">
+            <Icon name="plus" size={18} /> Log a flight
+          </Link>
+          <Link to="/import" className="btn btn--lg">
+            <Icon name="upload" size={18} /> Import history
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatsSkeleton() {
+  return (
+    <div className="stats" aria-busy="true" aria-label="Loading statistics">
+      <header className="page-header">
+        <h1 className="page-title">Stats</h1>
+      </header>
+      <div className="stats-skel-chips">
+        {[80, 56, 56, 56, 56].map((w, i) => (
+          <div key={i} className="skeleton stats-skel-chip" style={{ width: w }} />
+        ))}
+      </div>
+      <div className="skeleton stats-skel-hero" />
+      <div className="stats-tiles">
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className="skeleton stats-skel-tile" />
+        ))}
+      </div>
+      <div className="skeleton stats-skel-chart" />
+    </div>
+  );
 }

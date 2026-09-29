@@ -1,0 +1,349 @@
+/*
+ * Hand-built SVG chart styles. Colors come from design tokens only.
+ *
+ * Categorical slot order (validated with the dataviz palette checker against
+ * --surface in both themes: adjacent CVD ΔE ≥ 21, normal-vision ΔE ≥ 25, and it
+ * also passes as a closed ring for donuts):
+ *   s1 chart-1 (sky) · s2 chart-2 (amber) · s3 chart-3 (violet) · s4 chart-4 (green)
+ *   s5 chart-6 (periwinkle) · s6 chart-7 (gold)
+ * chart-5 (pink) and chart-8 (aqua) are skipped: pink↔green collapses under deutan.
+ */
+.stats {
+  --viz-s1: var(--chart-1);
+  --viz-s2: var(--chart-2);
+  --viz-s3: var(--chart-3);
+  --viz-s4: var(--chart-4);
+  --viz-s5: var(--chart-6);
+  --viz-s6: var(--chart-7);
+  --viz-grid: var(--border);
+  --viz-axis: var(--border-strong);
+}
+
+.viz-s1 { --viz-c: var(--viz-s1); }
+.viz-s2 { --viz-c: var(--viz-s2); }
+.viz-s3 { --viz-c: var(--viz-s3); }
+.viz-s4 { --viz-c: var(--viz-s4); }
+.viz-s5 { --viz-c: var(--viz-s5); }
+.viz-s6 { --viz-c: var(--viz-s6); }
+
+.viz {
+  position: relative;
+  width: 100%;
+  --viz-c: var(--accent);
+}
+.viz--amber {
+  --viz-c: var(--accent-2);
+}
+.viz svg {
+  display: block;
+  overflow: visible;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: pan-y;
+}
+
+/* ---------- axes & grid ---------- */
+.viz-grid line {
+  stroke: var(--viz-grid);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+.viz-baseline {
+  stroke: var(--viz-axis);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+.viz-tick {
+  fill: var(--text-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.viz-tick--strong {
+  fill: var(--text-2);
+  font-weight: 600;
+}
+.viz-xlabel {
+  fill: var(--text-3);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  transition: fill var(--dur-fast);
+}
+.viz-xlabel.is-active {
+  fill: var(--text);
+  font-weight: 700;
+}
+.viz-cap {
+  fill: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.viz-ring {
+  fill: none;
+  stroke: var(--viz-grid);
+  stroke-width: 1;
+}
+
+/* ---------- marks ---------- */
+.viz-col {
+  fill: var(--viz-c);
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: viz-grow var(--dur-slow) var(--ease-out) both;
+  transition:
+    opacity var(--dur-fast),
+    filter var(--dur-fast);
+}
+.viz-col--partial {
+  opacity: 0.5;
+}
+.viz-spoke {
+  fill: none;
+  stroke: var(--viz-c);
+  stroke-linecap: round;
+  animation-name: viz-fade;
+}
+.viz[data-active] .viz-col:not(.is-active) {
+  opacity: 0.32;
+}
+.viz-col.is-active {
+  filter: brightness(1.12);
+}
+@keyframes viz-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes viz-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.viz-hit {
+  fill: transparent;
+  stroke: none;
+  outline: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.viz-hit:focus-visible {
+  fill: var(--accent-soft);
+}
+
+/* ---------- tooltip ---------- */
+.viz-tip {
+  position: absolute;
+  z-index: 3;
+  transform: translate(-50%, calc(-100% + 4px));
+  min-width: 72px;
+  max-width: 160px;
+  padding: 6px 10px 7px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    opacity var(--dur-fast),
+    transform var(--dur-fast) var(--ease-out);
+}
+.viz-tip[data-visible] {
+  opacity: 1;
+  transform: translate(-50%, -100%);
+}
+.viz-tip__value {
+  font-weight: 700;
+  font-size: var(--text-sm);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.viz-tip__label {
+  font-size: 11px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+/* ---------- radial clock ---------- */
+.viz-radial {
+  display: grid;
+  place-items: center;
+}
+.viz-radial__kicker {
+  fill: var(--text-3);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.viz-radial__value {
+  fill: var(--text);
+  font-size: 22px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+.viz-radial__sub {
+  fill: var(--text-2);
+  font-size: 11px;
+}
+
+/* ---------- part-to-whole ---------- */
+.viz-seg__bar {
+  display: flex;
+  gap: 2px;
+  height: 12px;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+.viz-seg__part {
+  min-width: 3px;
+  background: var(--viz-c);
+  transition:
+    opacity var(--dur-fast),
+    flex-grow var(--dur-slow) var(--ease-out);
+  cursor: pointer;
+}
+.viz-seg[data-active] .viz-seg__part:not(.is-active) {
+  opacity: 0.3;
+}
+
+.viz-donut {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.viz-donut svg {
+  flex: none;
+  overflow: visible;
+}
+.viz-donut .viz-legend {
+  flex: 1;
+  min-width: 0;
+  margin-top: 0;
+}
+.viz-arc {
+  fill: var(--viz-c);
+  transition: opacity var(--dur-fast);
+}
+.viz-donut[data-active] .viz-arc:not(.is-active) {
+  opacity: 0.3;
+}
+.viz-donut__value {
+  fill: var(--text);
+  font-size: 22px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+.viz-donut__label {
+  fill: var(--text-2);
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.viz-legend {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.viz-legend__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--space-1);
+  margin: 0 calc(var(--space-1) * -1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  text-align: left;
+  font-size: var(--text-sm);
+  transition:
+    opacity var(--dur-fast),
+    background var(--dur-fast);
+}
+.viz-legend__row[data-active] {
+  background: var(--surface-2);
+}
+.viz-legend__row[data-dim] {
+  opacity: 0.55;
+}
+.viz-swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--viz-c);
+}
+.viz-legend__label {
+  flex: 1;
+  min-width: 0;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.viz-legend__count {
+  color: var(--text);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.viz-legend__pct {
+  width: 2.9em;
+  text-align: right;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.viz-legend__unknown {
+  padding: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+.viz-empty {
+  color: var(--text-3);
+  font-size: var(--text-sm);
+  padding: var(--space-2) 0;
+}
+
+/* ---------- sparkline ---------- */
+.viz-spark svg {
+  display: block;
+  overflow: visible;
+}
+.viz-spark__line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.viz-spark__stop-top {
+  stop-color: var(--accent);
+  stop-opacity: 0.22;
+}
+.viz-spark__stop-bottom {
+  stop-color: var(--accent);
+  stop-opacity: 0;
+}
+.viz-spark__dot {
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viz-col,
+  .viz-spoke {
+    animation: none;
+  }
+  .viz-tip,
+  .viz-seg__part {
+    transition: none;
+  }
+}
