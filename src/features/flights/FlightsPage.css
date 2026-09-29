@@ -56,7 +56,7 @@
     radial-gradient(1px 1px at 82% 62%, color-mix(in srgb, var(--text) 30%, transparent), transparent),
     radial-gradient(1px 1px at 22% 72%, color-mix(in srgb, var(--text) 25%, transparent), transparent),
     radial-gradient(1.5px 1.5px at 92% 18%, color-mix(in srgb, var(--accent) 70%, transparent), transparent);
-  opacity: 0.55;
+  opacity: var(--starfield-opacity);
   pointer-events: none;
 }
 .hero__top {

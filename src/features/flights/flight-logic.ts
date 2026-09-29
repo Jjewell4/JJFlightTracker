@@ -53,19 +53,8 @@ export function tzAbbrev(date: string, time: string | undefined, tz: string | un
 
 // ---------- upcoming ----------
 
-/** Departure instant (UTC ms) — local noon if the time is unknown. */
-export function departureInstant(f: Pick<Flight, 'date' | 'depTime' | 'from'>): number {
-  const tz = getAirport(f.from)?.tz || undefined;
-  return zonedToUtc(f.date, f.depTime ?? '12:00', tz);
-}
-
-/** A flight is upcoming when it departs in the future (day-precision only). */
-export function isUpcoming(f: Flight, now: number, today: string): boolean {
-  if (f.datePrecision !== 'day') return false;
-  if (f.date > today) return true;
-  if (f.date < today) return false;
-  return f.depTime ? departureInstant(f) > now : false;
-}
+export { departureInstant, isUpcoming } from '@/lib/flight-utils';
+import { isUpcoming } from '@/lib/flight-utils';
 
 /** Splits into upcoming (soonest first) and past (newest first; input order preserved). */
 export function splitUpcoming(flights: Flight[], now: number, today: string): { upcoming: Flight[]; past: Flight[] } {

@@ -18,7 +18,7 @@ import {
   isStoragePersisted,
   requestPersistentStorage,
 } from '@/services/import';
-import { ConfirmSheet } from './ConfirmSheet';
+import { ConfirmSheet } from '@/components/Sheet';
 import './settings.css';
 
 function Group({ title, footer, children }: { title?: string; footer?: ReactNode; children: ReactNode }) {
@@ -421,6 +421,7 @@ export default function SettingsPage() {
         open={confirm === 'delete'}
         title="Delete all flights?"
         confirmLabel="Delete everything"
+        icon="trash"
         danger
         requireText="DELETE"
         busy={busy}
@@ -435,6 +436,9 @@ export default function SettingsPage() {
         open={confirm === 'sample'}
         title="Load sample data?"
         confirmLabel="Replace with samples"
+        icon="sparkle"
+        danger={count > 0}
+        requireText={count > 0 ? 'REPLACE' : undefined}
         busy={busy}
         onCancel={() => setConfirm(null)}
         onConfirm={() => void runConfirmed()}

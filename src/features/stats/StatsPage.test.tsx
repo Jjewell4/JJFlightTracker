@@ -58,7 +58,7 @@ describe('StatsPage', () => {
       f({ from: 'LAX', to: 'LHR', date: '2025-06-01', depTime: '17:00', arrTime: '11:30', flightNumber: 'BA282', cabinClass: 'business', seatType: 'aisle' }),
     ]);
     const el = await render();
-    expect(el.textContent).toContain('3 flights logged');
+    expect(el.textContent).toContain('3 flights flown');
     expect(el.querySelector('[role="radiogroup"][aria-label="Time period"]')).not.toBeNull();
     expect(el.textContent).toContain('Records');
     expect(el.textContent).toContain('United Kingdom');

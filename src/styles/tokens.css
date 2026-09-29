@@ -55,7 +55,7 @@
 
   --text: #eef2fa;
   --text-2: #a9b4c9;
-  --text-3: #6f7b93;
+  --text-3: #7c88a0;
   --text-inverse: #0a0e16;
 
   --accent: #5cc8ff; /* sky */
@@ -82,6 +82,8 @@
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
   --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.5);
   --glass: rgba(15, 20, 32, 0.72);
+  /* decorative star field in hero cards (night sky only) */
+  --starfield-opacity: 0.55;
   --scrim: rgba(3, 6, 12, 0.6);
 
   color-scheme: dark;
@@ -98,15 +100,15 @@
     --border-strong: rgba(20, 35, 70, 0.18);
     --text: #0e1524;
     --text-2: #4a566e;
-    --text-3: #7d889e;
+    --text-3: #667085;
     --text-inverse: #ffffff;
-    --accent: #0a84d6;
-    --accent-strong: #0070bd;
-    --accent-soft: rgba(10, 132, 214, 0.1);
-    --accent-2: #e08600;
+    --accent: #0077c2;
+    --accent-strong: #0068ab;
+    --accent-soft: rgba(0, 119, 194, 0.1);
+    --accent-2: #b86e00;
     --accent-2-soft: rgba(224, 134, 0, 0.12);
-    --success: #12a66a;
-    --warning: #c98a00;
+    --success: #0e8a58;
+    --warning: #a36f00;
     --danger: #d63447;
     --danger-soft: rgba(214, 52, 71, 0.1);
     --chart-1: #0a84d6;
@@ -121,6 +123,7 @@
     --shadow-md: 0 8px 24px rgba(16, 24, 40, 0.08);
     --shadow-lg: 0 24px 60px rgba(16, 24, 40, 0.14);
     --glass: rgba(255, 255, 255, 0.78);
+    --starfield-opacity: 0;
     --scrim: rgba(10, 16, 30, 0.35);
     color-scheme: light;
   }
@@ -136,15 +139,15 @@
   --border-strong: rgba(20, 35, 70, 0.18);
   --text: #0e1524;
   --text-2: #4a566e;
-  --text-3: #7d889e;
+  --text-3: #667085;
   --text-inverse: #ffffff;
-  --accent: #0a84d6;
-  --accent-strong: #0070bd;
-  --accent-soft: rgba(10, 132, 214, 0.1);
-  --accent-2: #e08600;
+  --accent: #0077c2;
+  --accent-strong: #0068ab;
+  --accent-soft: rgba(0, 119, 194, 0.1);
+  --accent-2: #b86e00;
   --accent-2-soft: rgba(224, 134, 0, 0.12);
-  --success: #12a66a;
-  --warning: #c98a00;
+  --success: #0e8a58;
+  --warning: #a36f00;
   --danger: #d63447;
   --danger-soft: rgba(214, 52, 71, 0.1);
   --chart-1: #0a84d6;
@@ -159,6 +162,7 @@
   --shadow-md: 0 8px 24px rgba(16, 24, 40, 0.08);
   --shadow-lg: 0 24px 60px rgba(16, 24, 40, 0.14);
   --glass: rgba(255, 255, 255, 0.78);
+  --starfield-opacity: 0;
   --scrim: rgba(10, 16, 30, 0.35);
   color-scheme: light;
 }

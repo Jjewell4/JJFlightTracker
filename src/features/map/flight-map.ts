@@ -339,16 +339,17 @@ export class FlightMap {
 }
 
 function closest(features: MapGeoJSONFeature[], point: { x: number; y: number }, map: maplibregl.Map): MapGeoJSONFeature {
-  let best = features[0];
-  let bestD = Infinity;
-  for (const f of features) {
-    if (f.geometry.type !== 'Point') continue;
-    const p = map.project(f.geometry.coordinates as [number, number]);
-    const d = (p.x - point.x) ** 2 + (p.y - point.y) ** 2;
-    if (d < bestD) {
-      bestD = d;
-      best = f;
-    }
-  }
-  return best;
+  const cands = features
+    .filter((f) => f.geometry.type === 'Point')
+    .map((f) => {
+      const p = map.project((f.geometry as GeoJSON.Point).coordinates as [number, number]);
+      return { f, d: Math.hypot(p.x - point.x, p.y - point.y) };
+    });
+  if (!cands.length) return features[0];
+  // Neighbouring airports (SAN/TIJ, LGA/JFK…) sit within a pixel or two when zoomed out;
+  // among those roughly as close as the nearest, pick the one flown most.
+  const min = Math.min(...cands.map((c) => c.d));
+  const near = cands.filter((c) => c.d <= min + 6);
+  near.sort((a, b) => (Number(b.f.properties?.visits) || 0) - (Number(a.f.properties?.visits) || 0) || a.d - b.d);
+  return near[0].f;
 }

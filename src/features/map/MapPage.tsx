@@ -7,8 +7,10 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { Link } from 'react-router-dom';
 import type { FeatureCollection, LineString, Point } from 'geojson';
 import { Icon } from '@/components/Icon';
+import { useBackDismiss } from '@/components/useBackDismiss';
 import { useReferenceReady } from '@/data/reference';
 import { useFlights, useSettings } from '@/lib/db';
+import { flownFlights } from '@/lib/flight-utils';
 import { greatCirclePoints, kmToMiles } from '@/lib/geo';
 import { loadBasemap, type Basemap } from './basemap';
 import { FlightMap, webglSupported, type PickResult } from './flight-map';
@@ -100,8 +102,10 @@ function FitIcon() {
 }
 
 export default function MapPage() {
-  const flights = useFlights();
   const ready = useReferenceReady();
+  // Only flown flights are drawn and counted (upcoming trips live on the Flights tab).
+  const allFlights = useFlights();
+  const flights = useMemo(() => allFlights && flownFlights(allFlights), [allFlights, ready]);
   const settings = useSettings();
   const theme = useMapTheme();
   const basemap = useBasemap();
@@ -282,6 +286,12 @@ export default function MapPage() {
     const t = setTimeout(() => setToast(null), 4500);
     return () => clearTimeout(t);
   }, [toast]);
+
+  // Android Back closes the detail sheet / style panel instead of leaving the map.
+  const closePick = useCallback(() => setPick(null), []);
+  const closePanel = useCallback(() => setPanelOpen(false), []);
+  useBackDismiss(pick !== null, closePick);
+  useBackDismiss(panelOpen, closePanel);
 
   // Escape closes sheet/panel.
   useEffect(() => {

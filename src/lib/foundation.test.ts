@@ -3,7 +3,7 @@ import { installReference } from '@/test/reference-fixture';
 import { getAirline, getAirport, searchAirlines, searchAirports } from '@/data/reference';
 import { computeDuration, formatDuration } from './time';
 import { distanceKm, kmToMiles } from './geo';
-import { enrichFlight, parseFlightNumber } from './flight-utils';
+import { enrichFlight, flownFlights, isUpcoming, parseFlightNumber } from './flight-utils';
 import { addFlight, getAllFlights } from './db';
 
 beforeAll(installReference);
@@ -33,6 +33,11 @@ describe('time & geo', () => {
     expect(r).toEqual({ durationMin: 335, arrDayOffset: 1 });
     expect(formatDuration(335)).toBe('5h 35m');
   });
+  it('assumes the known zone when one airport has none', () => {
+    // LGB 09:00 PDT -> a strip missing from the dataset, 10:10 local: same day, 1h10
+    const d = computeDuration({ date: '2024-05-04', depTime: '09:00', arrTime: '10:10', fromTz: 'America/Los_Angeles' });
+    expect(d).toEqual({ durationMin: 70, arrDayOffset: 0 });
+  });
   it('computes distance', () => {
     const mi = kmToMiles(distanceKm(getAirport('LAX')!, getAirport('JFK')!));
     expect(mi).toBeGreaterThan(2460);
@@ -53,6 +58,23 @@ describe('flight utils', () => {
     expect(f.flightNumber).toBe('AS1234');
     expect(f.durationMin).toBe(165);
     expect(f.distanceKm).toBeGreaterThan(1600);
+  });
+});
+
+describe('flown vs upcoming', () => {
+  it('keeps only flights that have departed', () => {
+    const now = Date.parse('2026-09-29T20:00:00Z'); // 13:00 in San Diego
+    const today = '2026-09-29';
+    const base = { datePrecision: 'day' as const, from: 'KSAN', to: 'KSEA', source: 'manual' as const, createdAt: 0, updatedAt: 0 };
+    const flights = [
+      { ...base, id: 'past', date: '2026-09-01' },
+      { ...base, id: 'earlier-today', date: today, depTime: '08:00' },
+      { ...base, id: 'later-today', date: today, depTime: '18:00' },
+      { ...base, id: 'future', date: '2026-10-20' },
+      { ...base, id: 'year-only', date: '2027-01-01', datePrecision: 'year' as const },
+    ];
+    expect(isUpcoming(flights[2], now, today)).toBe(true);
+    expect(flownFlights(flights, now, today).map((f) => f.id)).toEqual(['past', 'earlier-today', 'year-only']);
   });
 });
 

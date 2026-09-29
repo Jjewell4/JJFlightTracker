@@ -50,15 +50,17 @@ export function ReviewStep(p: Props) {
 
   const plan = useMemo(() => planImport({ candidates, duplicates, skipped, policy }), [candidates, duplicates, skipped, policy]);
   const ready = plan.add.length + plan.update.length;
-  const attention = rows.filter((r) => r.status !== 'ok' && !r.skipped).length;
+  // A flagged row that is a skipped duplicate won't be imported, so it needs no attention.
+  const needsAttention = (r: (typeof rows)[number]) => r.status !== 'ok' && !r.skipped && !(r.dup && policy === 'skip' && !p.backup?.replace);
+  const attention = rows.filter(needsAttention).length;
   const dupCount = rows.filter((r) => r.dup).length;
   const skippedCount = rows.filter((r) => r.skipped).length;
 
-  const [filter, setFilter] = useState<Filter>(() => (candidates.some((c) => candidateStatus(c) !== 'ok') ? 'attention' : 'all'));
+  const [filter, setFilter] = useState<Filter>(() => (rows.some(needsAttention) ? 'attention' : 'all'));
   const [limit, setLimit] = useState(PAGE);
 
   const shown = rows.filter((r) => {
-    if (filter === 'attention') return r.status !== 'ok' && !r.skipped;
+    if (filter === 'attention') return needsAttention(r);
     if (filter === 'duplicates') return !!r.dup;
     if (filter === 'skipped') return r.skipped;
     return true;
@@ -70,8 +72,10 @@ export function ReviewStep(p: Props) {
     skippedCount ? `${skippedCount} left out` : null,
   ].filter(Boolean);
 
-  const dates = candidates.map((c) => c.flight.date).filter(Boolean).sort();
-  const span = dates.length ? `${formatFlightDate(dates[0], 'day')} – ${formatFlightDate(dates[dates.length - 1], 'day')}` : '';
+  const dated = candidates.filter((c) => c.flight.date).sort((a, b) => a.flight.date.localeCompare(b.flight.date));
+  const first = dated[0]?.flight;
+  const last = dated[dated.length - 1]?.flight;
+  const span = first && last ? `${formatFlightDate(first.date, first.datePrecision)} – ${formatFlightDate(last.date, last.datePrecision)}` : '';
   const replacing = !!p.backup?.replace;
 
   const chip = (id: Filter, label: string, count: number, tone?: 'warn') =>

@@ -296,6 +296,18 @@
   margin: 0 8px;
   color: var(--text-3);
 }
+@media (max-width: 380px) {
+  /* Keep all four figures on one line on small Android phones. */
+  .map-stats {
+    padding-inline: var(--space-3);
+  }
+  .map-stats__row {
+    font-size: 12px;
+  }
+  .map-stats__row > span + span::before {
+    margin: 0 5px;
+  }
+}
 .map-stats__row b {
   color: var(--text);
   font-weight: 700;

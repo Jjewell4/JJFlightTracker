@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Icon, type IconName } from '@/components/Icon';
 import { useFlights, useSettings } from '@/lib/db';
 import { useReferenceReady } from '@/data/reference';
+import { flownFlights } from '@/lib/flight-utils';
 import { availableYears, computeStats, filterByYear, flightYear, summarizeTotals, type Insight, type YearScope } from '@/lib/stats';
 import type { Flight } from '@/lib/types';
 import { Hero } from './Hero';
@@ -17,13 +18,15 @@ import './charts/charts.css';
 import './StatsPage.css';
 
 export default function StatsPage() {
-  const flights = useFlights();
+  const all = useFlights();
   const refReady = useReferenceReady();
   const settings = useSettings();
+  // Stats describe flights already flown; upcoming trips are listed on the Flights tab.
+  const flights = useMemo(() => (all && refReady ? flownFlights(all) : undefined), [all, refReady]);
 
-  if (!flights || !refReady) return <StatsSkeleton />;
-  if (!flights.length) return <StatsEmpty />;
-  return <StatsDashboard flights={flights} unit={settings.distanceUnit} clock={settings.clock} homeCountry={settings.homeCountry} />;
+  if (!flights || !all) return <StatsSkeleton />;
+  if (!flights.length) return <StatsEmpty upcoming={all.length} />;
+  return <StatsDashboard flights={flights} upcoming={all.length - flights.length} unit={settings.distanceUnit} clock={settings.clock} homeCountry={settings.homeCountry} />;
 }
 
 function useScope(years: number[]): [YearScope, (s: YearScope) => void] {
@@ -44,7 +47,7 @@ function useScope(years: number[]): [YearScope, (s: YearScope) => void] {
   return [scope, set];
 }
 
-function StatsDashboard({ flights, unit, clock, homeCountry }: { flights: Flight[]; unit: 'mi' | 'km'; clock: '12h' | '24h'; homeCountry: string }) {
+function StatsDashboard({ flights, upcoming, unit, clock, homeCountry }: { flights: Flight[]; upcoming: number; unit: 'mi' | 'km'; clock: '12h' | '24h'; homeCountry: string }) {
   const years = useMemo(() => availableYears(flights), [flights]);
   const [scope, setScope] = useScope(years);
   const scoped = useMemo(() => filterByYear(flights, scope), [flights, scope]);
@@ -69,8 +72,9 @@ function StatsDashboard({ flights, unit, clock, homeCountry }: { flights: Flight
         <div>
           <h1 className="page-title">Stats</h1>
           <p className="page-subtitle">
-            {fmtInt(flights.length)} {plural(flights.length, 'flight')} logged
+            {fmtInt(flights.length)} {plural(flights.length, 'flight')} flown
             {years.length > 1 ? ` · ${years[years.length - 1]}–${years[0]}` : years.length ? ` · ${years[0]}` : ''}
+            {upcoming > 0 && <span title="Upcoming flights are counted once they depart">{` · ${upcoming} upcoming`}</span>}
           </p>
         </div>
       </header>
@@ -149,7 +153,7 @@ function Insights({ items }: { items: Insight[] }) {
   );
 }
 
-function StatsEmpty() {
+function StatsEmpty({ upcoming = 0 }: { upcoming?: number }) {
   return (
     <div className="stats">
       <header className="page-header">
@@ -167,7 +171,11 @@ function StatsEmpty() {
           </svg>
         </div>
         <h2 className="empty__title">Your flying story starts here</h2>
-        <p className="muted stats-empty__text">Log a flight or import your history and this page fills up with distances, records, maps of where you’ve been and more.</p>
+        <p className="muted stats-empty__text">
+          {upcoming > 0
+            ? `Stats count flights you’ve flown. Your ${upcoming === 1 ? 'upcoming flight' : `${upcoming} upcoming flights`} will show up here once ${upcoming === 1 ? 'it departs' : 'they depart'} — or import your history now.`
+            : 'Log a flight or import your history and this page fills up with distances, records, maps of where you’ve been and more.'}
+        </p>
         <div className="stats-empty__actions">
           <Link to="/flights/new" className="btn btn--primary btn--lg">
             <Icon name="plus" size={18} /> Log a flight

@@ -113,7 +113,7 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.5;
+  opacity: var(--starfield-opacity);
   background-image:
     radial-gradient(1px 1px at 12% 22%, var(--text-3), transparent 60%),
     radial-gradient(1px 1px at 72% 12%, var(--text-2), transparent 60%),

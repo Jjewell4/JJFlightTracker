@@ -56,3 +56,14 @@ export function useBackDismiss(open: boolean, onClose: () => void): void {
     return () => window.removeEventListener('popstate', onPop);
   }, [open]);
 }
+
+/**
+ * Goes back `steps` screens in the app's history (also popping an open overlay's entry),
+ * or runs `fallback` when there isn't that much history (e.g. opened from a deep link).
+ * Used after deleting/saving so Back never lands on a stale screen.
+ */
+export function goBackScreens(steps: number, fallback: () => void): void {
+  const st = window.history.state as { idx?: number; __overlay?: string } | null;
+  if ((st?.idx ?? 0) >= steps) window.history.go(-(steps + (st?.__overlay ? 1 : 0)));
+  else fallback();
+}

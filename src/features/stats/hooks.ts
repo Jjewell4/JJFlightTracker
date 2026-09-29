@@ -84,7 +84,7 @@ export function useCountUp<T extends Element>(target: number, duration = 1100): 
     const dur = from === 0 ? duration : duration * 0.6;
     let raf = 0;
     const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / dur);
+      const t = Math.max(0, Math.min(1, (now - start) / dur));
       const v = from + (target - from) * easeOutExpo(t);
       current.current = v;
       setValue(v);

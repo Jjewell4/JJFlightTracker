@@ -61,8 +61,8 @@ export function PwaPrompts() {
           <Icon name="refresh" size={18} />
         </span>
         <span className="pwa-toast__text">
-          <strong>New version available</strong>
-          <span>Reload to get the latest Flight Log.</span>
+          <strong>Update available</strong>
+          <span>Reload for the latest version.</span>
         </span>
         <button type="button" className="pwa-toast__btn" onClick={() => void updateServiceWorker(true)}>
           Reload

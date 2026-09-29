@@ -1,7 +1,7 @@
 /** Derived information about flights (requires reference data to be loaded). */
 import { getAirline, getAirlineByName, getAircraftType, getAirport } from '@/data/reference';
 import { distanceKm } from './geo';
-import { computeDuration } from './time';
+import { computeDuration, todayLocal, zonedToUtc } from './time';
 import type { Flight, FlightInput } from './types';
 
 /** Splits "UA 123" / "ual123" / "UA0123" into { prefix: "UA", number: "123" }. */
@@ -96,4 +96,26 @@ export function enrichFlight<T extends FlightInput | Flight>(f: T): T & FlightIn
     }
   }
   return out;
+}
+
+/** Departure instant (UTC ms) — local noon if the time is unknown. */
+export function departureInstant(f: Pick<Flight, 'date' | 'depTime' | 'from'>): number {
+  const tz = getAirport(f.from)?.tz || undefined;
+  return zonedToUtc(f.date, f.depTime ?? '12:00', tz);
+}
+
+/** A flight is upcoming when it departs in the future (day-precision only). */
+export function isUpcoming(f: Flight, now: number = Date.now(), today: string = todayLocal()): boolean {
+  if (f.datePrecision !== 'day') return false;
+  if (f.date > today) return true;
+  if (f.date < today) return false;
+  return f.depTime ? departureInstant(f) > now : false;
+}
+
+/**
+ * Flights already flown. Totals everywhere (list summary, stats, map) count only these;
+ * upcoming trips are shown separately.
+ */
+export function flownFlights<T extends Flight>(flights: T[], now: number = Date.now(), today: string = todayLocal()): T[] {
+  return flights.filter((f) => !isUpcoming(f, now, today));
 }

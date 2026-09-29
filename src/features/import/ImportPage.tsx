@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Icon } from '@/components/Icon';
+import { useBackDismiss } from '@/components/useBackDismiss';
 import { loadReference, useReferenceReady } from '@/data/reference';
 import { useFlights, useSettings } from '@/lib/db';
 import { flightDistanceKm } from '@/lib/flight-utils';
@@ -209,6 +210,9 @@ export default function ImportPage() {
     if (step === 'review') setStep(table && !isBackup ? 'mapping' : 'source');
     else if (step === 'mapping') setStep('source');
   };
+
+  // Android Back steps back through the wizard instead of abandoning a reviewed file.
+  useBackDismiss(step === 'mapping' || step === 'review', back);
 
   const steps = ['Choose', ...(table && !isBackup ? ['Columns'] : []), 'Review', 'Import'];
   const currentIdx = step === 'source' ? 0 : step === 'mapping' ? 1 : step === 'review' ? steps.length - 2 : steps.length - 1;

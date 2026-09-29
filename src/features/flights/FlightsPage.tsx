@@ -94,12 +94,22 @@ export function FlightsPage() {
     return () => ro.disconnect();
   });
 
-  // Restore scroll position when coming back from a flight.
+  // Restore scroll position when coming back from a flight. Tracking stops the moment
+  // this screen goes away, so the next screen's scroll-to-top doesn't overwrite it.
+  const alive = useRef(true);
+  useLayoutEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
   const loaded = flights !== undefined && ready && complete;
   useEffect(() => {
     if (!loaded) return;
     if (memory.scrollY) window.scrollTo(0, memory.scrollY);
-    const save = () => (memory.scrollY = window.scrollY);
+    const save = () => {
+      if (alive.current) memory.scrollY = window.scrollY;
+    };
     window.addEventListener('scroll', save, { passive: true });
     return () => window.removeEventListener('scroll', save);
   }, [loaded]);
@@ -111,7 +121,18 @@ export function FlightsPage() {
   const resultCount = shownPast.length + shownUpcoming.length;
 
   return (
-    <div className="flights" ref={pageRef}>
+    <div
+      className="flights"
+      ref={pageRef}
+      onClickCapture={(e) => {
+        // Leaving via a link (flight, stats…): pin the position now — the next screen may
+        // suspend and hide this one, which clamps the scroll to 0 before we unmount.
+        if ((e.target as Element).closest('a[href]')) {
+          memory.scrollY = window.scrollY;
+          alive.current = false;
+        }
+      }}
+    >
       <header className="page-header flights__header">
         <div>
           <h1 className="page-title">Flights</h1>

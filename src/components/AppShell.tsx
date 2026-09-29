@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useEffect, useLayoutEffect, type ReactNode } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Icon, type IconName } from './Icon';
 import './AppShell.css';
 
@@ -25,6 +25,28 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const isForm = pathname.startsWith('/flights/new') || pathname.endsWith('/edit');
   const isMap = pathname === '/map';
+
+  const navigate = useNavigate();
+
+  // Following a link while a sheet is open (a flight in the map sheet, "Log return flight"…)
+  // replaces the sheet's Back entry, so Back returns to the screen, not to a stale copy of it.
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      if (!(window.history.state as { __overlay?: string } | null)?.__overlay) return;
+      const href = (e.target as Element | null)?.closest?.('a[href]')?.getAttribute('href');
+      if (!href?.startsWith('#/')) return;
+      e.preventDefault();
+      navigate(href.slice(1), { replace: true });
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, [navigate]);
+
+  // Every screen opens at the top (the flights list restores its own position).
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
 
   return (
     <div className={`shell${isMap ? ' shell--fullbleed' : ''}`}>

@@ -13,6 +13,7 @@ import { DetailsSection } from './DetailsSection';
 import { LookupCard } from './LookupCard';
 import { RouteCard } from './RouteCard';
 import { ConfirmSheet } from '@/components/Sheet';
+import { goBackScreens } from '@/components/useBackDismiss';
 import { TimesCard } from './TimesCard';
 import { AircraftSheet, AirlineSheet, AirportSheet } from './pickers';
 import {
@@ -285,7 +286,9 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
       const input = enrichFlight(valuesToInput(v, { source, base }));
       if (base) {
         await updateFlight(base.id, input);
-        navigate(`/flights/${base.id}`, { replace: true });
+        // Back to the detail screen we came from (it updates live), rather than stacking a copy.
+        if (location.key !== 'default') goBackScreens(1, () => navigate(`/flights/${base.id}`, { replace: true }));
+        else navigate(`/flights/${base.id}`, { replace: true });
       } else {
         const saved = await addFlight(input);
         saveEntryDefaults({ cabinClass: v.cabinClass, reason: v.reason });
@@ -300,9 +303,10 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
 
   const onDelete = async () => {
     if (!base) return;
-    setConfirmDelete(false);
     await deleteFlight(base.id);
-    navigate('/', { replace: true });
+    // Skip the (now deleted) flight's detail screen too.
+    if (location.key !== 'default') goBackScreens(2, () => navigate('/', { replace: true }));
+    else navigate('/', { replace: true });
   };
 
   const toggleDetails = () => {

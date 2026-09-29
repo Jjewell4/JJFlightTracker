@@ -12,6 +12,7 @@ import { cabinLabel, flightHistory, formatDistance, ordinal, reasonLabel, tzAbbr
 import { prettyFlightNumber, rowDate, shortCity } from './FlightRow';
 import { RouteMap } from './RouteMap';
 import { ConfirmSheet, Sheet } from '@/components/Sheet';
+import { goBackScreens } from '@/components/useBackDismiss';
 import './FlightDetailPage.css';
 
 const SOURCE_LABEL: Record<FlightSource, string> = {
@@ -86,7 +87,8 @@ function FlightDetail({ flight: f, all, settings, onBack }: { flight: Flight; al
   const remove = async () => {
     setDeleting(true);
     await deleteFlight(f.id);
-    navigate('/', { replace: true });
+    // Return to wherever the flight was opened from, so Back never shows the deleted flight.
+    goBackScreens(1, () => navigate('/', { replace: true }));
   };
 
   return (

@@ -70,7 +70,11 @@ export function computeDuration(opts: {
   fromTz?: string;
   toTz?: string;
 }): { durationMin: number; arrDayOffset: number } | undefined {
-  const { date, depTime, arrTime, fromTz, toTz } = opts;
+  const { date, depTime, arrTime } = opts;
+  // One unknown zone (e.g. a small strip missing from the dataset): assume the other
+  // airport's zone rather than UTC, which would skew the duration by hours.
+  const fromTz = opts.fromTz || opts.toTz;
+  const toTz = opts.toTz || opts.fromTz;
   if (!isValidTime(depTime) || !isValidTime(arrTime) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return undefined;
   const dep = zonedToUtc(date, depTime, fromTz);
   const tryOffset = (off: number) => (zonedToUtc(addDays(date, off), arrTime, toTz) - dep) / 60000;
