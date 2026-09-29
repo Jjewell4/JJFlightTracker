@@ -211,9 +211,13 @@ export function buildRoutesGeoJSON(
   const maxY = yearRange?.max ?? Math.max(...routes.map((r) => flightYear({ date: r.lastDate })));
   // Draw rarely-flown routes first so busy routes sit on top.
   const ordered = [...routes].sort((x, y) => x.count - y.count);
-  const features: Feature<LineString, RouteProps>[] = ordered.map((r) => {
+  const features: Feature<LineString, RouteProps>[] = [];
+  for (const r of ordered) {
+    const coordinates = greatCirclePoints(r.a, r.b, arcSegments(r.distanceKm));
+    // Same-airport "routes" and bad coordinates can't be drawn as a line (MapLibre rejects them).
+    if (coordinates.length < 2 || !coordinates.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y))) continue;
     const year = flightYear({ date: r.lastDate });
-    return {
+    features.push({
       type: 'Feature',
       properties: {
         id: r.key,
@@ -224,9 +228,9 @@ export function buildRoutesGeoJSON(
         r: maxY > minY ? round3((year - minY) / (maxY - minY)) : 1,
         year,
       },
-      geometry: { type: 'LineString', coordinates: greatCirclePoints(r.a, r.b, arcSegments(r.distanceKm)) },
-    };
-  });
+      geometry: { type: 'LineString', coordinates },
+    });
+  }
   return { type: 'FeatureCollection', features };
 }
 

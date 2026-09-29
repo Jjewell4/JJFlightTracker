@@ -144,6 +144,33 @@ describe('generic parsing', () => {
     expect(p.candidates[2].flight).toMatchObject({ date: '2018-01-01', datePrecision: 'year' });
   });
 
+  it('reads HHMM numbers, decimal-hour durations and flags durations over 24h', () => {
+    const sheet = sheetFromRows([
+      ['Date', 'From', 'To', 'Dep time', 'Arr time', 'Duration'],
+      ['2019-03-14', 'SAN', 'SFO', 735, 905, 1.5],
+      ['2019-03-15', 'SAN', 'SFO', null, null, '26:10'],
+    ]);
+    const [a, b] = parseSheet(sheet).candidates;
+    expect(a.flight).toMatchObject({ depTime: '07:35', arrTime: '09:05', durationMin: 90 });
+    expect(candidateStatus(a)).toBe('ok');
+    expect(b.flight.durationMin).toBeUndefined();
+    expect(b.issues).toContainEqual(expect.objectContaining({ level: 'warn', field: 'duration', message: expect.stringContaining('longer than 24 hours') }));
+  });
+
+  it('warns when origin and destination are the same airport', () => {
+    const p = parseSheet(parseCsvText('Date,From,To\n2019-03-14,LAX,KLAX\n2019-03-14,SAN,LAX'));
+    expect(p.candidates[0].issues).toContainEqual(expect.objectContaining({ level: 'warn', message: expect.stringContaining('same airport') }));
+    expect(candidateStatus(p.candidates[1])).toBe('ok');
+  });
+
+  it('keeps a genuine midnight arrival when there is no duration', () => {
+    const p = parseSheet(parseCsvText('Date,From,To,Dep time,Arr time\n2019-03-14,LAX,SFO,22:40,00:00'));
+    expect(p.candidates[0].flight).toMatchObject({ depTime: '22:40', arrTime: '00:00', arrDayOffset: 1, durationMin: 80 });
+    // With a duration column, 00:00 is Flightradar24's "unknown" and the arrival comes from the duration.
+    const q = parseSheet(parseCsvText('Date,From,To,Dep time,Arr time,Duration\n2019-03-14,LAX,SFO,10:00,00:00,01:20'));
+    expect(q.candidates[0].flight).toMatchObject({ depTime: '10:00', arrTime: '11:20', durationMin: 80 });
+  });
+
   it('reports rows with missing dates or airports', () => {
     const p = parseSheet(parseCsvText('Date,From,To\n,SAN,LAX\n2021-01-01,,LAX\nlater,SAN,LAX'));
     expect(p.candidates.map(candidateStatus)).toEqual(['error', 'error', 'error']);
@@ -162,6 +189,27 @@ describe('fixCandidate', () => {
     expect(fixed.flight).toMatchObject({ date: '2020-08-01', datePrecision: 'month', to: 'KLAX', from: 'KSAN' });
     expect(fixed.flight.distanceKm).toBeGreaterThan(100);
     expect(candidateStatus(fixed)).toBe('ok');
+  });
+
+  it('drops clock times (and the duration worked out from them) when the date becomes month/year only', () => {
+    const p = parseSheet(parseCsvText('Date,From,To,Dep time,Arr time\nsometime,SAN,SFO,07:35,09:05'));
+    expect(p.candidates[0].flight).toMatchObject({ depTime: '07:35', arrTime: '09:05' });
+    const fixed = fixCandidate(p.candidates[0], { date: '2019-03' });
+    expect(fixed.flight).toMatchObject({ date: '2019-03-01', datePrecision: 'month' });
+    expect(fixed.flight.depTime).toBeUndefined();
+    expect(fixed.flight.arrTime).toBeUndefined();
+    expect(fixed.flight.arrDayOffset).toBeUndefined();
+    expect(fixed.flight.durationMin).toBeUndefined();
+    // A duration from the file's own column is kept.
+    const withDur = parseSheet(parseCsvText('Date,From,To,Dep time,Arr time,Duration\nsometime,SAN,SFO,07:35,09:05,1:30'));
+    expect(fixCandidate(withDur.candidates[0], { date: '2019' }).flight).toMatchObject({ datePrecision: 'year', durationMin: 90 });
+  });
+
+  it('re-checks for same-airport flights after a fix', () => {
+    const p = parseSheet(parseCsvText('Date,From,To\n2019-03-14,SAN,LAX'));
+    const same = fixCandidate(p.candidates[0], { to: 'SAN' });
+    expect(candidateStatus(same)).toBe('warning');
+    expect(candidateStatus(fixCandidate(same, { from: 'SFO' }))).toBe('ok');
   });
 
   it('keeps other issues and reports new ones', () => {

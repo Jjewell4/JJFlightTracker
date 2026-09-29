@@ -208,6 +208,10 @@ select.input {
   color: var(--text);
   box-shadow: var(--shadow-sm);
 }
+.seg__opt:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 /* ---------- chips & badges ---------- */
 .chip {

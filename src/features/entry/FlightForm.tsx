@@ -7,18 +7,20 @@ import { addFlight, deleteFlight, updateFlight, useSettings } from '@/lib/db';
 import { enrichFlight, parseFlightNumber } from '@/lib/flight-utils';
 import { todayLocal } from '@/lib/time';
 import type { DatePrecision, Flight, SeatType } from '@/lib/types';
+import { requestPersistentStorageOnce } from '@/services/import/storage';
 import { inferAirline, type LookupOutcome } from '@/services/lookup';
 import { DateField } from './DateField';
 import { DetailsSection } from './DetailsSection';
 import { LookupCard } from './LookupCard';
 import { RouteCard } from './RouteCard';
 import { ConfirmSheet } from '@/components/Sheet';
-import { goBackScreens } from '@/components/useBackDismiss';
+import { goBackScreens, popOverlayEntries, useBackDismiss } from '@/components/useBackDismiss';
 import { TimesCard } from './TimesCard';
 import { AircraftSheet, AirlineSheet, AirportSheet } from './pickers';
 import {
   applyLookup,
   clearFields,
+  formEquals,
   inferSeatType,
   isEmptyField,
   lookupDiff,
@@ -75,6 +77,17 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
   const [saveError, setSaveError] = useState('');
   const [sheet, setSheet] = useState<SheetName>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  /** Set once the form is being left on purpose (saved, deleted, discarded): Back pops are expected. */
+  const leavingRef = useRef(false);
+  const dirty = useMemo(() => !formEquals(v, initial), [v, initial]);
+
+  // While there are unsaved edits, Back (Android back or the header/Cancel buttons) asks
+  // before throwing them away. The guard owns one history entry; popping it opens the sheet.
+  useBackDismiss(dirty && !confirmDiscard && !leaving, () => {
+    if (!leavingRef.current) setConfirmDiscard(true);
+  });
   const [detailsOpen, setDetailsOpen] = useState(() => {
     const hasDetails = !!(initial.aircraftType || initial.aircraftName || initial.seatNumber || initial.registration || initial.note || initial.datePrecision !== 'day');
     return getDetailsOpen() || (mode === 'edit' && hasDetails);
@@ -209,19 +222,21 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
     });
   };
 
+  // A new route or new times change which arrival day makes sense: go back to inferring it
+  // (only a tap on the day chip pins it).
   const pickAirport = (role: 'from' | 'to', ident: string) => {
-    patch({ [role]: ident });
+    patch({ [role]: ident, arrDayOffset: undefined });
     touch(role);
     setSheet(null);
   };
 
   const swap = () => {
-    setV((cur) => ({ ...cur, from: cur.to, to: cur.from }));
+    setV((cur) => ({ ...cur, from: cur.to, to: cur.from, arrDayOffset: undefined }));
     touch('from', 'to');
   };
 
   const setTimes = (p: Partial<FormValues>) => {
-    patch(p);
+    patch('arrDayOffset' in p ? p : { ...p, arrDayOffset: undefined });
     touch('times');
   };
 
@@ -251,9 +266,23 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
 
   // ---------- save / delete / back ----------
 
-  const goBack = () => {
+  const leave = () => {
     if (location.key !== 'default') navigate(-1);
     else navigate(base ? `/flights/${base.id}` : '/', { replace: true });
+  };
+
+  const goBack = () => {
+    if (!dirty || saving) return leave();
+    // Pop the guard's history entry (same path as the system Back); it opens the confirm sheet.
+    if ((window.history.state as { __overlay?: string } | null)?.__overlay) window.history.back();
+    else setConfirmDiscard(true);
+  };
+
+  const discard = async () => {
+    leavingRef.current = true;
+    setLeaving(true);
+    await popOverlayEntries(); // the confirm sheet's own entry
+    leave();
   };
 
   const focusFirstError = (errs: FormErrors) => {
@@ -286,16 +315,24 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
       const input = enrichFlight(valuesToInput(v, { source, base }));
       if (base) {
         await updateFlight(base.id, input);
+        void requestPersistentStorageOnce();
+        leavingRef.current = true;
+        await popOverlayEntries(); // the unsaved-changes guard's entry
         // Back to the detail screen we came from (it updates live), rather than stacking a copy.
         if (location.key !== 'default') goBackScreens(1, () => navigate(`/flights/${base.id}`, { replace: true }));
         else navigate(`/flights/${base.id}`, { replace: true });
       } else {
         const saved = await addFlight(input);
+        // Now there's data worth keeping: ask the browser not to evict it (fire-and-forget).
+        void requestPersistentStorageOnce();
+        leavingRef.current = true;
+        await popOverlayEntries(); // the unsaved-changes guard's entry
         saveEntryDefaults({ cabinClass: v.cabinClass, reason: v.reason });
         navigate(`/flights/${saved.id}`, { replace: true });
       }
     } catch (err) {
       console.error(err);
+      leavingRef.current = false;
       setSaving(false);
       setSaveError("Couldn't save this flight. Please try again.");
     }
@@ -304,6 +341,8 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
   const onDelete = async () => {
     if (!base) return;
     await deleteFlight(base.id);
+    leavingRef.current = true;
+    await popOverlayEntries(); // this sheet's entry and the unsaved-changes guard's
     // Skip the (now deleted) flight's detail screen too.
     if (location.key !== 'default') goBackScreens(2, () => navigate('/', { replace: true }));
     else navigate('/', { replace: true });
@@ -508,6 +547,17 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
         danger
         onConfirm={onDelete}
         onCancel={() => setConfirmDelete(false)}
+      />
+      <ConfirmSheet
+        open={confirmDiscard}
+        title="Discard changes?"
+        message={mode === 'edit' ? 'Your edits to this flight won’t be saved.' : 'This flight hasn’t been saved yet.'}
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+        icon="warning"
+        danger
+        onConfirm={() => void discard()}
+        onCancel={() => setConfirmDiscard(false)}
       />
     </div>
   );

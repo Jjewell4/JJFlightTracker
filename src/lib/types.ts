@@ -122,6 +122,8 @@ export interface Settings {
   aeroDataBoxKey?: string;
   /** Enable free adsbdb.com route lookups. */
   enableAdsbdb: boolean;
+  /** Load airline logos from pics.avs.io (false = letter badges only). Missing = true. */
+  showAirlineLogos?: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -130,4 +132,5 @@ export const DEFAULT_SETTINGS: Settings = {
   clock: '12h',
   theme: 'system',
   enableAdsbdb: true,
+  showAirlineLogos: true,
 };

@@ -6,6 +6,10 @@ import { useFlights, useSettings } from '@/lib/db';
 import { flightDistanceKm } from '@/lib/flight-utils';
 import {
   analyzeSheet,
+  backupFileName,
+  backupToJson,
+  buildBackup,
+  downloadText,
   candidatesFromSheet,
   commitImport,
   findDuplicates,
@@ -206,6 +210,11 @@ export default function ImportPage() {
     }
   }, [candidates, duplicates, skipped, policy, isBackup, replace, restoreSettings, backup]);
 
+  const downloadCurrent = useCallback(() => {
+    const now = new Date();
+    downloadText(backupFileName(now), backupToJson(buildBackup(existing ?? [], settings, now)), 'application/json');
+  }, [existing, settings]);
+
   const back = () => {
     if (step === 'review') setStep(table && !isBackup ? 'mapping' : 'source');
     else if (step === 'mapping') setStep('source');
@@ -267,7 +276,7 @@ export default function ImportPage() {
           fileName={table?.fileName ?? backup?.fileName}
           formatLabel={backup ? 'Flight Log backup' : table?.format === 'fr24' ? 'Flightradar24 export' : table?.xlsx ? 'Excel spreadsheet' : 'Spreadsheet'}
           onChangeColumns={table && !isBackup ? () => setStep('mapping') : undefined}
-          backup={backup ? { data: backup.data, replace, onReplace: setReplace, restoreSettings, onRestoreSettings: setRestoreSettings, currentCount: existing?.length ?? 0 } : undefined}
+          backup={backup ? { data: backup.data, replace, onReplace: setReplace, restoreSettings, onRestoreSettings: setRestoreSettings, currentCount: existing?.length ?? 0, onDownloadCurrent: downloadCurrent } : undefined}
         />
       )}
 

@@ -113,6 +113,16 @@ describe('parseTimeOfDay', () => {
     expect(parseTimeOfDay(new Date(Date.UTC(1899, 11, 30, 7, 35)))).toBe(455);
     expect(parseTimeOfDay(-1)).toBeNull();
   });
+  it('reads HHMM numbers and 3–4 digit strings', () => {
+    expect(parseTimeOfDay(735)).toBe(455);
+    expect(parseTimeOfDay(1435)).toBe(875);
+    expect(parseTimeOfDay(2359)).toBe(1439);
+    expect(parseTimeOfDay('735')).toBe(455);
+    expect(parseTimeOfDay('1435')).toBe(875);
+    expect(parseTimeOfDay(760)).toBeNull();
+    expect(parseTimeOfDay(2400)).toBeNull();
+    expect(parseTimeOfDay('2460')).toBeNull();
+  });
 });
 
 describe('parseDurationMinutes', () => {
@@ -132,6 +142,16 @@ describe('parseDurationMinutes', () => {
     expect(parseDurationMinutes(145)).toBe(145);
     expect(parseDurationMinutes(new Date(Date.UTC(1899, 11, 30, 2, 25)))).toBe(145);
     expect(parseDurationMinutes(new Date(Date.UTC(1899, 11, 31, 2, 10)))).toBe(1570);
+  });
+  it('reads decimal and small whole numbers as hours, not days', () => {
+    expect(parseDurationMinutes(2.5)).toBe(150);
+    expect(parseDurationMinutes('2.5')).toBe(150);
+    expect(parseDurationMinutes(1.25)).toBe(75);
+    expect(parseDurationMinutes(2)).toBe(120);
+    expect(parseDurationMinutes('3')).toBe(180);
+    expect(parseDurationMinutes(0.5)).toBe(720); // < 1: an Excel fraction of a day
+    expect(parseDurationMinutes(95)).toBe(95);
+    expect(parseDurationMinutes('145.5')).toBe(146);
   });
   it('blank vs unreadable', () => {
     expect(parseDurationMinutes('')).toBeUndefined();

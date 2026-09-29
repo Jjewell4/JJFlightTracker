@@ -67,3 +67,24 @@ export function goBackScreens(steps: number, fallback: () => void): void {
   if ((st?.idx ?? 0) >= steps) window.history.go(-(steps + (st?.__overlay ? 1 : 0)));
   else fallback();
 }
+
+/**
+ * Pops overlay history entries (pushed by useBackDismiss) until the screen's own entry is
+ * current, resolving once the browser has done so. Call before navigating away from a
+ * screen that may still own one (e.g. an unsaved-changes guard), so Back never lands on a
+ * leftover duplicate of the screen.
+ */
+export async function popOverlayEntries(max = 5): Promise<void> {
+  for (let i = 0; i < max && (window.history.state as { __overlay?: string } | null)?.__overlay; i++) {
+    await new Promise<void>((resolve) => {
+      const done = () => {
+        window.removeEventListener('popstate', done);
+        clearTimeout(timer);
+        resolve();
+      };
+      const timer = setTimeout(done, 500);
+      window.addEventListener('popstate', done);
+      window.history.back();
+    });
+  }
+}

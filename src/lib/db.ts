@@ -99,8 +99,11 @@ export async function getSettings(): Promise<Settings> {
 }
 
 export async function saveSettings(patch: Partial<Settings>): Promise<void> {
-  const current = await getSettings();
-  await db.kv.put({ key: 'settings', value: { ...current, ...patch } });
+  // Read-modify-write in one transaction so concurrent saves can't drop each other's fields.
+  await db.transaction('rw', db.kv, async () => {
+    const current = await getSettings();
+    await db.kv.put({ key: 'settings', value: { ...current, ...patch } });
+  });
 }
 
 /** Live settings; returns defaults while loading so callers never deal with undefined. */

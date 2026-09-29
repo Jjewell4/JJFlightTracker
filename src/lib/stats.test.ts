@@ -346,7 +346,12 @@ describe('computeStats', () => {
   it('derives insights', () => {
     expect(s.insights.find((i) => i.id === 'seat')?.title).toBe('Window seat person');
     expect(s.insights.find((i) => i.id === 'hour')?.title).toBe('Early bird');
-    expect(s.insights.find((i) => i.id === 'haul')).toBeDefined();
+    expect(s.insights.find((i) => i.id === 'haul')?.detail).toMatch(/over 4,000 km$/);
+  });
+
+  it('quotes insight distances in the chosen unit', () => {
+    const mi = computeStats(fs, { homeCountry: 'US', distanceUnit: 'mi' });
+    expect(mi.insights.find((i) => i.id === 'haul')?.detail).toMatch(/over 2,485 mi$/);
   });
 
   it('handles empty input', () => {

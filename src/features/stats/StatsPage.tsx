@@ -51,7 +51,7 @@ function StatsDashboard({ flights, upcoming, unit, clock, homeCountry }: { fligh
   const years = useMemo(() => availableYears(flights), [flights]);
   const [scope, setScope] = useScope(years);
   const scoped = useMemo(() => filterByYear(flights, scope), [flights, scope]);
-  const stats = useMemo(() => computeStats(scoped, { homeCountry }), [scoped, homeCountry]);
+  const stats = useMemo(() => computeStats(scoped, { homeCountry, distanceUnit: unit }), [scoped, homeCountry, unit]);
   const prev = useMemo(() => {
     if (scope === 'all') return undefined;
     const before = filterByYear(flights, scope - 1);

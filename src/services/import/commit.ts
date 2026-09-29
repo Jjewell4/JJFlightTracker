@@ -79,6 +79,8 @@ export async function commitImport(plan: ImportPlan, opts: CommitOptions = {}): 
   report();
 
   let removed = 0;
+  // Never wipe the log for an empty (or entirely unreadable) backup.
+  if (opts.replace && plan.add.length === 0) throw new Error('Nothing to restore — your log was left unchanged.');
   if (opts.replace) {
     // One transaction: never leave the log half-replaced.
     const flights = plan.add.map((f, i) => toFlight(f, i, now));

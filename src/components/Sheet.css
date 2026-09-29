@@ -243,6 +243,9 @@
 .confirm__body strong {
   color: var(--text);
 }
+.confirm__body > .btn {
+  margin-top: var(--space-4);
+}
 .confirm__field {
   width: 100%;
   margin-top: var(--space-5);

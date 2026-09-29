@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Icon } from '@/components/Icon';
+import { ConfirmSheet } from '@/components/Sheet';
 import { formatFlightDate } from '@/lib/time';
 import { candidateStatus, planImport, type CandidateFix, type DuplicatePolicy, type ImportCandidate, type ParsedBackup } from '@/services/import';
 import { CandidateRow } from './CandidateRow';
@@ -14,6 +15,8 @@ interface BackupProps {
   restoreSettings: boolean;
   onRestoreSettings: (v: boolean) => void;
   currentCount: number;
+  /** Saves a backup of the current log (offered before replacing it). */
+  onDownloadCurrent: () => void;
 }
 
 interface Props {
@@ -50,6 +53,13 @@ export function ReviewStep(p: Props) {
 
   const plan = useMemo(() => planImport({ candidates, duplicates, skipped, policy }), [candidates, duplicates, skipped, policy]);
   const ready = plan.add.length + plan.update.length;
+  // Replace ignores duplicates: everything importable is added after the log is cleared.
+  const replaceCount = useMemo(
+    () => planImport({ candidates, duplicates: new Map(), skipped, policy }).add.length,
+    [candidates, skipped, policy],
+  );
+  const [confirmReplace, setConfirmReplace] = useState(false);
+  const [downloaded, setDownloaded] = useState(false);
   // A flagged row that is a skipped duplicate won't be imported, so it needs no attention.
   const needsAttention = (r: (typeof rows)[number]) => r.status !== 'ok' && !r.skipped && !(r.dup && policy === 'skip' && !p.backup?.replace);
   const attention = rows.filter(needsAttention).length;
@@ -123,10 +133,11 @@ export function ReviewStep(p: Props) {
             <button type="button" className="seg__opt" aria-pressed={!p.backup.replace} onClick={() => p.backup!.onReplace(false)}>
               Merge with my log
             </button>
-            <button type="button" className="seg__opt" aria-pressed={p.backup.replace} onClick={() => p.backup!.onReplace(true)}>
+            <button type="button" className="seg__opt" aria-pressed={p.backup.replace} disabled={replaceCount === 0} onClick={() => p.backup!.onReplace(true)}>
               Replace everything
             </button>
           </div>
+          {replaceCount === 0 && <p className="field__hint">This backup has no flights to restore, so it can’t replace your log.</p>}
           {p.backup.replace ? (
             <div className="import__warn">
               <Icon name="warning" size={18} />
@@ -198,10 +209,52 @@ export function ReviewStep(p: Props) {
       )}
 
       <div className="import__bar">
-        <button type="button" className="btn btn--primary btn--lg btn--block" disabled={ready === 0 && !replacing} onClick={p.onImport}>
+        <button
+          type="button"
+          className="btn btn--primary btn--lg btn--block"
+          disabled={ready === 0}
+          onClick={() => {
+            if (!replacing) return p.onImport();
+            setDownloaded(false);
+            setConfirmReplace(true);
+          }}
+        >
           {replacing ? `Replace log with ${ready.toLocaleString()} ${ready === 1 ? 'flight' : 'flights'}` : ready === 0 ? 'Nothing to import' : `Import ${ready.toLocaleString()} ${ready === 1 ? 'flight' : 'flights'}`}
         </button>
       </div>
+
+      {p.backup && (
+        <ConfirmSheet
+          open={confirmReplace && replacing}
+          title="Replace your whole log?"
+          icon="warning"
+          danger
+          confirmLabel={`Replace with ${ready.toLocaleString()} ${ready === 1 ? 'flight' : 'flights'}`}
+          onCancel={() => setConfirmReplace(false)}
+          onConfirm={() => {
+            setConfirmReplace(false);
+            p.onImport();
+          }}
+        >
+          <p>
+            This deletes your <strong>{p.backup.currentCount.toLocaleString()}</strong> current {p.backup.currentCount === 1 ? 'flight' : 'flights'} and adds{' '}
+            <strong>{ready.toLocaleString()}</strong> from the backup. It can’t be undone.
+          </p>
+          {p.backup.currentCount > 0 && (
+            <button
+              type="button"
+              className="btn btn--block"
+              onClick={() => {
+                p.backup!.onDownloadCurrent();
+                setDownloaded(true);
+              }}
+            >
+              <Icon name={downloaded ? 'check' : 'download'} size={18} />
+              {downloaded ? 'Backup downloaded' : 'Download a backup of my current log first'}
+            </button>
+          )}
+        </ConfirmSheet>
+      )}
     </div>
   );
 }

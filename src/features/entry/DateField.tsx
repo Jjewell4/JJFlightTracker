@@ -19,6 +19,17 @@ function relativeLabel(date: string): string | undefined {
   return undefined;
 }
 
+/** First powered flight — the earliest year the picker offers by default. */
+const FIRST_YEAR = 1903;
+
+/** Year choices, newest first: next year down to 1903, or further down to the flight's own year. */
+export function yearOptions(thisYear: number, date: string): number[] {
+  const own = Number(date.slice(0, 4));
+  const first = Number.isInteger(own) && own > 0 ? Math.min(FIRST_YEAR, own) : FIRST_YEAR;
+  const last = Math.max(thisYear + 1, Number.isInteger(own) ? own : 0);
+  return Array.from({ length: last - first + 1 }, (_, i) => last - i);
+}
+
 function openPicker(el: HTMLInputElement | HTMLSelectElement) {
   try {
     (el as HTMLInputElement).showPicker?.();
@@ -49,7 +60,7 @@ export function DateField({
   const text = displayDate(date, precision);
   const rel = precision === 'day' ? relativeLabel(date) : undefined;
   const thisYear = Number(today.slice(0, 4));
-  const years = Array.from({ length: thisYear + 2 - 1930 }, (_, i) => thisYear + 1 - i);
+  const years = yearOptions(thisYear, date);
 
   return (
     <div className="entry-field">

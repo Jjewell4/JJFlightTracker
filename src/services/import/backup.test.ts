@@ -47,8 +47,24 @@ describe('backup format', () => {
     expect(parsed.version).toBe(1);
     expect(parsed.rejected).toBe(0);
     expect(parsed.candidates.map((c) => c.flight)).toEqual(flights);
-    expect(parsed.settings).toEqual(settings);
+    const { aeroDataBoxKey: _key, ...withoutKey } = settings;
+    expect(parsed.settings).toEqual(withoutKey);
     expect(parsed.candidates.every((c) => candidateStatus(c) === 'ok')).toBe(true);
+  });
+
+  it('never writes the AeroDataBox key into a backup, and restoring keeps the current key', async () => {
+    await db.flights.clear();
+    const json = backupToJson(buildBackup(flights, settings));
+    expect(json).not.toContain('secret');
+    expect(json).not.toContain('aeroDataBoxKey');
+    await saveSettings({ aeroDataBoxKey: 'mine' });
+    const parsed = parseBackup(json);
+    await commitImport(planImport({ candidates: parsed.candidates, duplicates: new Map(), skipped: new Set(), policy: 'skip' }), { settings: parsed.settings });
+    expect((await getSettings()).aeroDataBoxKey).toBe('mine');
+    await db.flights.clear();
+    await db.kv.clear();
+    // An older backup with an empty key doesn't clear it either.
+    expect(parseBackup(JSON.stringify({ flights: [], settings: { aeroDataBoxKey: '', clock: '24h' } })).settings).toEqual({ clock: '24h' });
   });
 
   it('rejects things that are not backups with friendly errors', () => {
@@ -75,6 +91,30 @@ describe('backup format', () => {
     expect(p.settings).toEqual({ clock: '24h' });
   });
 
+  it('rejects impossible dates and cleans times/day offsets that could crash the app', () => {
+    const p = parseBackup(
+      JSON.stringify({
+        flights: [
+          { ...flights[0], date: '2024-13-45' },
+          { ...flights[0], date: '2023-02-29' },
+          { ...flights[0], id: 'ok', depTime: '25:99', arrTime: 'soon', arrDayOffset: 1e9 },
+          { ...flights[0], id: 'neg', arrDayOffset: -40 },
+        ],
+      }),
+    );
+    expect(p.rejected).toBe(2);
+    const [ok, neg] = p.candidates.map((c) => c.flight);
+    expect(ok.depTime).toBeUndefined();
+    expect(ok.arrTime).toBeUndefined();
+    expect(ok.arrDayOffset).toBe(3);
+    expect(neg.arrDayOffset).toBe(-2);
+  });
+
+  it('warns about same-airport flights', () => {
+    const p = parseBackup(JSON.stringify({ flights: [{ ...flights[0], to: flights[0].from }] }));
+    expect(p.candidates[0].issues).toContainEqual(expect.objectContaining({ level: 'warn', message: expect.stringContaining('same airport') }));
+  });
+
   it('warns about unknown airports without rejecting the flight', () => {
     const p = parseBackup(JSON.stringify({ flights: [{ ...flights[0], to: 'ZZZZ' }] }));
     expect(candidateStatus(p.candidates[0])).toBe('warning');
@@ -83,6 +123,19 @@ describe('backup format', () => {
 
 describe('findDuplicates', () => {
   const existing = [mk({ id: 'e1', flightNumber: 'UA1' }), mk({ id: 'e2', date: '2021-05-02' }), mk({ id: 'e3', date: '2021-05-03', flightNumber: 'UA9' })];
+
+  it('pairs rows without flight numbers by departure time (same-day shuttles)', () => {
+    const saved = [mk({ id: 'evening', from: 'KLAX', to: 'KSFO', depTime: '19:00', arrTime: '20:20' })];
+    const d = findDuplicates(
+      [cand('morning', { from: 'KLAX', to: 'KSFO', depTime: '07:00' }), cand('evening', { from: 'KLAX', to: 'KSFO', depTime: '19:00' })],
+      saved,
+    );
+    expect([...d]).toEqual([['evening', 'evening']]);
+    // Only the morning row: times too far apart to be the same flight.
+    expect(findDuplicates([cand('morning', { from: 'KLAX', to: 'KSFO', depTime: '07:00' })], saved).size).toBe(0);
+    // Within an hour (scheduled vs actual) still counts.
+    expect(findDuplicates([cand('late', { from: 'KLAX', to: 'KSFO', depTime: '19:45' })], saved).get('late')).toBe('evening');
+  });
 
   it('matches on date + route + flight number, or date + route when a number is missing', () => {
     const d = findDuplicates(
@@ -176,6 +229,14 @@ describe('planImport + commitImport', () => {
     const all = await db.flights.toArray();
     expect(all).toEqual([expect.objectContaining({ id: 'new1', createdAt: 42, updatedAt: 43 })]);
     expect((await getSettings()).theme).toBe('light');
+  });
+
+  it('replace mode refuses an empty backup and leaves the log alone', async () => {
+    await db.flights.bulkPut([mk({ id: 'old1' }), mk({ id: 'old2' })]);
+    const empty = parseBackup(JSON.stringify({ app: 'flight-log', version: 1, flights: [], settings: {} }));
+    const plan = planImport({ candidates: empty.candidates, duplicates: new Map(), skipped: new Set(), policy: 'skip' });
+    await expect(commitImport(plan, { replace: true })).rejects.toThrow(/Nothing to restore/);
+    expect(await db.flights.count()).toBe(2);
   });
 
   it('full backup export → wipe → import → identical flights (merge into empty log)', async () => {

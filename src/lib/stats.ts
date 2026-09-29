@@ -28,6 +28,7 @@
  * - **CO₂**: see {@link co2PerPassengerKg}.
  */
 import { getAircraftType, getAirline, getAirport, getCountry, normalize } from '@/data/reference';
+import { airlineKey } from './flight-utils';
 import { EARTH_CIRCUMFERENCE_KM, distanceKm as greatCircleKm, estimateDurationMin, kmToMiles } from './geo';
 import type { Airport, CabinClass, Continent, Flight, FlightReason, SeatType } from './types';
 
@@ -220,16 +221,7 @@ export function filterByYear(flights: Flight[], scope: YearScope): Flight[] {
 // Keys & labels
 // ---------------------------------------------------------------------------
 
-/** Stable airline key: ICAO, else IATA, else normalized name. undefined when unknown. */
-export function airlineKey(f: Pick<Flight, 'airlineIcao' | 'airlineIata' | 'airlineName'>): string | undefined {
-  if (f.airlineIcao) return f.airlineIcao.toUpperCase();
-  if (f.airlineIata) {
-    const a = getAirline(f.airlineIata);
-    return a?.icao || f.airlineIata.toUpperCase();
-  }
-  if (f.airlineName?.trim()) return `name:${normalize(f.airlineName)}`;
-  return undefined;
-}
+export { airlineKey };
 
 /** Stable aircraft key: ICAO type designator, else normalized name. */
 export function aircraftKey(f: Pick<Flight, 'aircraftType' | 'aircraftName'>): string | undefined {
@@ -817,7 +809,10 @@ export interface Insight {
   detail: string;
 }
 
-export function computeInsights(s: Pick<FlightStats, 'totals' | 'seat' | 'weekday' | 'hour' | 'cabin' | 'reason' | 'haul'>): Insight[] {
+export function computeInsights(
+  s: Pick<FlightStats, 'totals' | 'seat' | 'weekday' | 'hour' | 'cabin' | 'reason' | 'haul'>,
+  unit: 'mi' | 'km' = 'km',
+): Insight[] {
   const out: Insight[] = [];
   const pct = (x: number) => `${Math.round(x * 100)}%`;
   const topOf = <K extends string>(b: Breakdown<K>) => [...b.items].sort((a, c) => c.count - a.count)[0];
@@ -852,7 +847,7 @@ export function computeInsights(s: Pick<FlightStats, 'totals' | 'seat' | 'weekda
   }
   if (s.haul.known >= 3) {
     const long = s.haul.items.find((i) => i.key === 'long')!;
-    if (long.count > 0) out.push({ id: 'haul', title: `${long.count} long-haul ${long.count === 1 ? 'flight' : 'flights'}`, detail: `${pct(long.share)} of flights over 4,000 km` });
+    if (long.count > 0) out.push({ id: 'haul', title: `${long.count} long-haul ${long.count === 1 ? 'flight' : 'flights'}`, detail: `${pct(long.share)} of flights over ${unit === 'mi' ? '2,485 mi' : '4,000 km'}` });
   }
   const premium = s.cabin.items.filter((i) => i.key !== 'economy').reduce((a, b) => a + b.count, 0);
   if (s.cabin.known >= 3 && premium > 0) out.push({ id: 'cabin', title: `${premium} up front`, detail: `${pct(premium / s.cabin.known)} of flights above economy` });
@@ -877,6 +872,8 @@ export function emissionsSplit(rs: ResolvedFlight[]): FlightStats['emissions'] {
 export interface StatsOptions {
   /** ISO country code of the user's home (Settings.homeCountry). */
   homeCountry?: string;
+  /** Unit for distances quoted in insight sentences (default km). */
+  distanceUnit?: 'mi' | 'km';
 }
 
 export interface FlightStats {
@@ -958,7 +955,7 @@ export function computeStats(flights: Flight[], opts: StatsOptions = {}): Flight
     byYear: flightsByYear(rs),
     byMonth: flightsByMonth(rs),
     records: computeRecords(rs, { routes, airports }),
-    insights: computeInsights(partial),
+    insights: computeInsights(partial, opts.distanceUnit),
     emissions: emissionsSplit(rs),
     quality: {
       unknownAirports: unknownAirportKeys.size,

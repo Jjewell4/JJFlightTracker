@@ -1,5 +1,5 @@
 /** Derived information about flights (requires reference data to be loaded). */
-import { getAirline, getAirlineByName, getAircraftType, getAirport } from '@/data/reference';
+import { getAirline, getAirlineByName, getAircraftType, getAirport, normalize } from '@/data/reference';
 import { distanceKm } from './geo';
 import { computeDuration, todayLocal, zonedToUtc } from './time';
 import type { Flight, FlightInput } from './types';
@@ -118,4 +118,18 @@ export function isUpcoming(f: Flight, now: number = Date.now(), today: string = 
  */
 export function flownFlights<T extends Flight>(flights: T[], now: number = Date.now(), today: string = todayLocal()): T[] {
   return flights.filter((f) => !isUpcoming(f, now, today));
+}
+
+/**
+ * Stable airline key shared by the list filters, summary and stats: ICAO, else the ICAO an
+ * IATA code maps to, else the IATA code, else normalized name. undefined when unknown.
+ */
+export function airlineKey(f: Pick<Flight, 'airlineIcao' | 'airlineIata' | 'airlineName'>): string | undefined {
+  if (f.airlineIcao) return f.airlineIcao.toUpperCase();
+  if (f.airlineIata) {
+    const a = getAirline(f.airlineIata);
+    return a?.icao || f.airlineIata.toUpperCase();
+  }
+  if (f.airlineName?.trim()) return `name:${normalize(f.airlineName)}`;
+  return undefined;
 }

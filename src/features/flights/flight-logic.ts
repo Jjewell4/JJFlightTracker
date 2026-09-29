@@ -5,7 +5,7 @@
  * re-run these once `useReferenceReady()` flips.
  */
 import { getAirline, getAirport, getCountry, normalize } from '@/data/reference';
-import { airportCode, flightAircraftName, flightAirlineName, flightDistanceKm, parseFlightNumber } from '@/lib/flight-utils';
+import { airlineKey, airportCode, flightAircraftName, flightAirlineName, flightDistanceKm, parseFlightNumber } from '@/lib/flight-utils';
 import { estimateDurationMin, kmToMiles } from '@/lib/geo';
 import { zonedToUtc } from '@/lib/time';
 import type { CabinClass, Flight, FlightReason, Settings } from '@/lib/types';
@@ -84,10 +84,8 @@ export function countdownLabel(date: string, today: string): string {
 
 // ---------- search & filters ----------
 
-/** Stable key for grouping/filtering by airline. */
-export function airlineKey(f: Pick<Flight, 'airlineIcao' | 'airlineIata' | 'airlineName'>): string | undefined {
-  return f.airlineIcao || f.airlineIata || (f.airlineName ? `name:${normalize(f.airlineName)}` : undefined);
-}
+/** Stable key for grouping/filtering by airline (same normalization as stats). */
+export { airlineKey };
 
 // "United States"/"United Kingdom" would make "united" match every flight there, not United Airlines.
 const COUNTRY_ALIASES: Record<string, string> = { US: 'USA America', GB: 'UK Britain England Scotland', AE: 'UAE Emirates' };
@@ -282,11 +280,12 @@ export function computeSummary(flights: Flight[], today: string): FlightSummary 
   for (const f of flights) {
     distanceKm += flightDistanceKm(f) ?? 0;
     minutes += flightMinutes(f);
-    airports.add(f.from);
-    airports.add(f.to);
     for (const id of [f.from, f.to]) {
-      const c = getAirport(id)?.country;
-      if (c) countries.add(c);
+      const a = getAirport(id);
+      // Same identity as stats: "LAX" and "KLAX" are one airport.
+      const key = a?.ident ?? (id || '').toUpperCase();
+      if (key) airports.add(key);
+      if (a?.country) countries.add(a.country);
     }
     const ak = airlineKey(f);
     if (ak) airlines.add(ak);

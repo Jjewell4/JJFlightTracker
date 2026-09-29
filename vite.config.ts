@@ -24,21 +24,35 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
-            // Airline logos: show cached ones offline, refresh in the background.
+            // Airline logos: show cached ones offline, refresh in the background. The <img> is
+            // no-cors, so responses are opaque (status 0) and browsers pad each one heavily
+            // against the storage quota — keep the cache small.
             urlPattern: ({ url }) => url.hostname === 'pics.avs.io',
             handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'airline-logos',
-              expiration: { maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 90 },
+              expiration: { maxEntries: 150, maxAgeSeconds: 60 * 60 * 24 * 60, purgeOnQuotaError: true },
               cacheableResponse: { statuses: [0, 200] },
             },
           },
           {
-            urlPattern: ({ url }) => url.hostname.endsWith('openfreemap.org'),
+            // Map tiles, glyphs and sprites are immutable for a given URL: cache first.
+            urlPattern: ({ url }) => url.hostname.endsWith('openfreemap.org') && /\.(pbf|mvt|png|jpe?g|webp)$/i.test(url.pathname),
             handler: 'CacheFirst',
             options: {
               cacheName: 'map-tiles',
-              expiration: { maxEntries: 2000, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              expiration: { maxEntries: 2000, maxAgeSeconds: 60 * 60 * 24 * 30, purgeOnQuotaError: true },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // Style JSON / TileJSON point at versioned tile URLs that change when the map data
+            // is rebuilt: serve the cached copy (offline) but always refresh it.
+            urlPattern: ({ url }) => url.hostname.endsWith('openfreemap.org'),
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'map-styles',
+              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },

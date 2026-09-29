@@ -48,10 +48,11 @@ export function zonedToUtc(date: string, time: string, tz: string | undefined): 
   return utc;
 }
 
+/** YYYY-MM-DD shifted by `days`. Never throws: malformed input comes back unchanged. */
 export function addDays(date: string, days: number): string {
-  const [y, m, d] = date.split('-').map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d + days));
-  return dt.toISOString().slice(0, 10);
+  const [y, m, d] = String(date).split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + (Number.isFinite(days) ? days : 0)));
+  return Number.isNaN(dt.getTime()) ? date : dt.toISOString().slice(0, 10);
 }
 
 export function isValidTime(t: string | undefined): t is string {
@@ -59,8 +60,17 @@ export function isValidTime(t: string | undefined): t is string {
 }
 
 /**
+ * Longest duration an explicit day offset may produce. The longest scheduled flights are ~19h,
+ * so anything a day or more is a stale/mistaken offset (e.g. a +1 left over after editing the
+ * times of a red-eye into a day flight), not a real flight.
+ */
+export const MAX_FLIGHT_MIN = 24 * 60;
+
+/**
  * Duration in minutes between local departure and local arrival, accounting for time zones.
  * If arrDayOffset is undefined, infers the smallest non-negative offset (0 or +1 day).
+ * An explicit offset that yields a non-positive or implausibly long (≥ MAX_FLIGHT_MIN) duration
+ * returns undefined.
  */
 export function computeDuration(opts: {
   date: string;
@@ -80,11 +90,11 @@ export function computeDuration(opts: {
   const tryOffset = (off: number) => (zonedToUtc(addDays(date, off), arrTime, toTz) - dep) / 60000;
   if (opts.arrDayOffset !== undefined) {
     const dur = tryOffset(opts.arrDayOffset);
-    return dur > 0 ? { durationMin: Math.round(dur), arrDayOffset: opts.arrDayOffset } : undefined;
+    return dur > 0 && dur < MAX_FLIGHT_MIN ? { durationMin: Math.round(dur), arrDayOffset: opts.arrDayOffset } : undefined;
   }
   for (const off of [0, 1, -1, 2]) {
     const dur = tryOffset(off);
-    if (dur > 0 && dur < 24 * 60) return { durationMin: Math.round(dur), arrDayOffset: off };
+    if (dur > 0 && dur < MAX_FLIGHT_MIN) return { durationMin: Math.round(dur), arrDayOffset: off };
   }
   return undefined;
 }

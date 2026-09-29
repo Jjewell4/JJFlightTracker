@@ -1,7 +1,9 @@
 /** JSON backup: versioned export of all flights + settings, and a validating parser. */
 import { getAirport } from '@/data/reference';
+import { isValidTime } from '@/lib/time';
 import type { Flight, Settings } from '@/lib/types';
-import type { ImportCandidate, ImportFlight, ImportIssue } from './candidates';
+import { daysInMonth } from './cells';
+import { sameAirportIssue, type ImportCandidate, type ImportFlight, type ImportIssue } from './candidates';
 
 export const BACKUP_APP = 'flight-log';
 export const BACKUP_VERSION = 1;
@@ -11,11 +13,13 @@ export interface Backup {
   version: number;
   exportedAt: string;
   flights: Flight[];
-  settings: Settings;
+  /** Settings minus secrets (the AeroDataBox API key never leaves the device). */
+  settings: Omit<Settings, 'aeroDataBoxKey'>;
 }
 
 export function buildBackup(flights: Flight[], settings: Settings, now: Date = new Date()): Backup {
-  return { app: BACKUP_APP, version: BACKUP_VERSION, exportedAt: now.toISOString(), flights, settings };
+  const { aeroDataBoxKey: _secret, ...safeSettings } = settings;
+  return { app: BACKUP_APP, version: BACKUP_VERSION, exportedAt: now.toISOString(), flights, settings: safeSettings };
 }
 
 export function backupToJson(backup: Backup): string {
@@ -40,8 +44,10 @@ const SETTING_TYPES: { [K in keyof Settings]-?: (v: unknown) => boolean } = {
   distanceUnit: (v) => v === 'mi' || v === 'km',
   clock: (v) => v === '12h' || v === '24h',
   theme: (v) => v === 'system' || v === 'dark' || v === 'light',
-  aeroDataBoxKey: (v) => typeof v === 'string',
+  // Only in backups made by older versions. Never restore an empty key over the current one.
+  aeroDataBoxKey: (v) => typeof v === 'string' && v.trim() !== '',
   enableAdsbdb: (v) => typeof v === 'boolean',
+  showAirlineLogos: (v) => typeof v === 'boolean',
 };
 
 function sanitizeSettings(raw: unknown): Partial<Settings> | undefined {
@@ -56,16 +62,26 @@ function sanitizeSettings(raw: unknown): Partial<Settings> | undefined {
 
 const isStr = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '';
 
+/** A real calendar date in YYYY-MM-DD form (rejects 2024-13-45 and 2023-02-29). */
+function isCalendarDate(v: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  return mo >= 1 && mo <= 12 && d >= 1 && d <= daysInMonth(y, mo);
+}
+
 /** Validates one flight object. Known fields are type-checked; unknown extras are kept. */
 export function sanitizeFlight(raw: unknown): ImportFlight | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const r = raw as Record<string, unknown>;
-  if (!isStr(r.from) || !isStr(r.to) || !isStr(r.date) || !/^\d{4}-\d{2}-\d{2}$/.test(r.date)) return undefined;
+  if (!isStr(r.from) || !isStr(r.to) || !isStr(r.date) || !isCalendarDate(r.date)) return undefined;
   const f: Record<string, unknown> = { ...r };
   const strings = ['flightNumber', 'airlineIcao', 'airlineIata', 'airlineName', 'depTime', 'arrTime', 'aircraftType', 'aircraftName', 'registration', 'seatNumber', 'note'];
   for (const k of strings) if (f[k] !== undefined && typeof f[k] !== 'string') delete f[k];
   const numbers = ['arrDayOffset', 'durationMin', 'distanceKm', 'createdAt', 'updatedAt'];
   for (const k of numbers) if (f[k] !== undefined && (typeof f[k] !== 'number' || !Number.isFinite(f[k]))) delete f[k];
+  for (const k of ['depTime', 'arrTime']) if (f[k] !== undefined && !isValidTime(f[k] as string)) delete f[k];
+  if (typeof f.arrDayOffset === 'number') f.arrDayOffset = Math.max(-2, Math.min(3, Math.round(f.arrDayOffset)));
   const enums: [string, string[]][] = [
     ['datePrecision', ['day', 'month', 'year']],
     ['seatType', ['window', 'middle', 'aisle']],
@@ -110,6 +126,8 @@ export function parseBackup(text: string): ParsedBackup {
     for (const which of ['from', 'to'] as const) {
       if (!getAirport(flight[which])) issues.push({ level: 'warn', field: which, message: `Unknown ${which === 'from' ? 'origin' : 'destination'} airport “${flight[which]}”` });
     }
+    const same = sameAirportIssue(flight);
+    if (same) issues.push(same);
     candidates.push({ key: `row-${i + 1}`, rowNumber: i + 1, flight, issues, fromRaw: flight.from, toRaw: flight.to });
   });
   return {

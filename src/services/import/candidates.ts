@@ -9,6 +9,7 @@ import type { Flight, FlightInput, FlightSource } from '@/lib/types';
 import {
   cellText,
   isBlank,
+  MAX_IMPORT_DURATION_MIN,
   minutesToHHmm,
   parseCabinClass,
   parseDateValue,
@@ -45,6 +46,15 @@ export interface ImportCandidate {
   /** Original airport text, shown when the code could not be resolved. */
   fromRaw?: string;
   toRaw?: string;
+  /** The duration came from the file's own duration column (not worked out from the times). */
+  durationFromFile?: boolean;
+}
+
+const SAME_AIRPORT = 'Origin and destination are the same airport';
+
+/** Warns about a flight that starts and ends at the same airport (usually a typo). */
+export function sameAirportIssue(f: Pick<Flight, 'from' | 'to'>): ImportIssue | undefined {
+  return f.from && f.from === f.to ? { level: 'warn', field: 'to', message: SAME_AIRPORT } : undefined;
 }
 
 export type CandidateStatus = 'ok' | 'warning' | 'error';
@@ -128,6 +138,8 @@ export function candidateFromFields(raw: RawFields, rowNumber: number, opts: Bui
   };
   airportIssue('from', from, fromRef);
   airportIssue('to', to, toRef);
+  const same = from?.airport && to?.airport ? sameAirportIssue({ from: from.ident, to: to.ident }) : undefined;
+  if (same) issues.push(same);
 
   // ---- times
   let dep = parseTimeOfDay(raw.depTime);
@@ -147,6 +159,10 @@ export function candidateFromFields(raw: RawFields, rowNumber: number, opts: Bui
     dur = undefined;
   }
   if (dur !== undefined && dur <= 0) dur = undefined;
+  if (dur !== undefined && dur > MAX_IMPORT_DURATION_MIN) {
+    issues.push({ level: 'warn', field: 'duration', message: `Ignored duration “${cellText(raw.duration)}” — longer than 24 hours` });
+    dur = undefined;
+  }
 
   // Flightradar24 writes 00:00:00 for "unknown" (both times, and often just the arrival).
   if (dep === 0 && arr === 0) {
@@ -157,7 +173,9 @@ export function candidateFromFields(raw: RawFields, rowNumber: number, opts: Bui
   const toAirport = to?.airport ?? getAirport(to?.ident);
   let arrDayOffset: number | undefined;
   let derivedArrival = false;
-  if (arr === 0 && dep !== undefined && dep !== 0) {
+  // A lone 00:00 arrival is FR24's "unknown" when the row also has a duration (work the arrival
+  // out from that instead); with no duration value at all it's a genuine midnight arrival.
+  if (arr === 0 && dep !== undefined && dep !== 0 && !isBlank(raw.duration)) {
     arr = undefined;
     if (dur !== undefined && pd && precision === 'day') {
       const d = addMinutes(date, dep, dur, fromAirport?.tz, toAirport?.tz);
@@ -232,6 +250,7 @@ export function candidateFromFields(raw: RawFields, rowNumber: number, opts: Bui
     issues,
     fromRaw: fromRef?.raw,
     toRaw: toRef?.raw,
+    durationFromFile: dur !== undefined || undefined,
   };
 }
 
@@ -269,6 +288,13 @@ export function fixCandidate(c: ImportCandidate, fix: CandidateFix, dateOrder: D
     const pd = parseDateValue(fix.date, dateOrder);
     if (pd) {
       flight = { ...flight, date: pd.date, datePrecision: pd.precision };
+      // Month/year-only flights have no clock times, so nothing derived from them either.
+      if (pd.precision !== 'day') {
+        const hadTimes = !!(flight.depTime && flight.arrTime);
+        flight = { ...flight, depTime: undefined, arrTime: undefined, arrDayOffset: undefined };
+        if (hadTimes && !c.durationFromFile) flight.durationMin = undefined;
+        issues = issues.filter((i) => i.field !== 'depTime' && i.field !== 'arrTime');
+      }
     } else {
       issues.push({ level: 'error', field: 'date', message: fix.date.trim() ? `Can't read the date “${fix.date}”` : 'Missing date' });
       flight = { ...flight, date: '' };
@@ -296,5 +322,8 @@ export function fixCandidate(c: ImportCandidate, fix: CandidateFix, dateOrder: D
   const { distanceKm: _old, ...rest } = flight;
   void _old;
   flight = stripUndefined(enrichFlight(rest as ImportFlight)) as ImportFlight;
+  issues = issues.filter((i) => i.message !== SAME_AIRPORT);
+  const same = getAirport(flight.from) && getAirport(flight.to) ? sameAirportIssue(flight) : undefined;
+  if (same) issues.push(same);
   return { ...c, flight, issues, fromRaw, toRaw };
 }

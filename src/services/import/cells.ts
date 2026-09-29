@@ -225,7 +225,8 @@ export function minutesToHHmm(min: number): string {
 /**
  * Parses a clock time to minutes after midnight.
  * Returns undefined for blank cells and null when the cell is present but unreadable.
- * Accepts "07:35:00", "7:35", "7:35 PM", "0735", Excel fractions (0.3159) and Dates.
+ * Accepts "07:35:00", "7:35", "7:35 PM", "0735"/"735", HHMM numbers (735, 1435), Excel
+ * fractions (0.3159) and Dates.
  */
 export function parseTimeOfDay(v: Cell): number | null | undefined {
   if (isBlank(v)) return undefined;
@@ -237,7 +238,12 @@ export function parseTimeOfDay(v: Cell): number | null | undefined {
   if (typeof v === 'number') {
     if (v < 0) return null;
     const frac = v - Math.floor(v);
-    if (v >= 1 && frac === 0) return null;
+    if (v >= 1 && frac === 0) {
+      // A time typed as a number: 735 → 07:35, 1435 → 14:35.
+      const hh = Math.floor(v / 100);
+      const mm = v % 100;
+      return hh <= 23 && mm <= 59 ? hh * 60 + mm : null;
+    }
     return Math.round(frac * 1440) % 1440;
   }
   if (typeof v !== 'string') return null;
@@ -251,7 +257,7 @@ export function parseTimeOfDay(v: Cell): number | null | undefined {
     const r = parseTimeSuffix(m[1], '0', m[2].replace(/\./g, ''));
     return r === undefined ? null : r;
   }
-  if ((m = /^(\d{2})(\d{2})$/.exec(s))) {
+  if ((m = /^(\d{1,2})(\d{2})$/.exec(s))) {
     const r = parseTimeSuffix(m[1], m[2], undefined);
     return r === undefined ? null : r;
   }
@@ -264,9 +270,23 @@ export function parseTimeOfDay(v: Cell): number | null | undefined {
   return null;
 }
 
+/** Longest duration read from a file without a warning. */
+export const MAX_IMPORT_DURATION_MIN = 24 * 60;
+
+/** Whole numbers up to this are hours ("2" → 2h); bigger ones are minutes ("145" → 2h25). */
+const MAX_WHOLE_HOURS = 15;
+
+/** A bare number from a duration column: <1 is an Excel fraction of a day, small numbers are hours, big ones minutes. */
+function numberToDurationMinutes(n: number): number {
+  if (n < 1) return Math.round(n * 1440);
+  if (Number.isInteger(n)) return n <= MAX_WHOLE_HOURS ? n * 60 : n;
+  return n <= 24 ? Math.round(n * 60) : Math.round(n);
+}
+
 /**
  * Parses a duration to minutes. Accepts "02:25:00", "2:25", "2h 25m", "145" (minutes),
- * "2.5h", Excel fractions of a day and Dates. undefined = blank, null = unreadable.
+ * "2.5" / "2.5h" / "3" (hours), Excel fractions of a day (< 1) and Dates.
+ * undefined = blank, null = unreadable. Callers should flag results over MAX_IMPORT_DURATION_MIN.
  */
 export function parseDurationMinutes(v: Cell): number | null | undefined {
   if (isBlank(v)) return undefined;
@@ -276,8 +296,7 @@ export function parseDurationMinutes(v: Cell): number | null | undefined {
   }
   if (typeof v === 'number') {
     if (v < 0) return null;
-    // Excel stores durations as fractions of a day; bare bigger numbers are minutes.
-    return v < 10 && !Number.isInteger(v) ? Math.round(v * 1440) : Math.round(v);
+    return numberToDurationMinutes(v);
   }
   if (typeof v !== 'string') return null;
   const s = cellText(v).toLowerCase();
@@ -287,11 +306,7 @@ export function parseDurationMinutes(v: Cell): number | null | undefined {
     return Math.round(Number(m[1]) * 60 + Number(m[2] ?? 0));
   }
   if ((m = /^(\d+)\s*(?:m|min|mins|minute|minutes)$/.exec(s))) return Number(m[1]);
-  if (/^\d+$/.test(s)) return Number(s);
-  if (/^\d*\.\d+$/.test(s)) {
-    const n = Number(s);
-    return n < 10 ? Math.round(n * 1440) : Math.round(n);
-  }
+  if (/^\d+$/.test(s) || /^\d*\.\d+$/.test(s)) return numberToDurationMinutes(Number(s));
   return null;
 }
 

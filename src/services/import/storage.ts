@@ -10,6 +10,17 @@ export async function requestPersistentStorage(): Promise<boolean> {
   }
 }
 
+let askedOnce: Promise<boolean> | undefined;
+
+/**
+ * Asks for persistent storage the first time it's called in this session (e.g. after the
+ * first flight is saved) so the browser doesn't evict the log; later calls reuse the answer.
+ */
+export function requestPersistentStorageOnce(): Promise<boolean> {
+  askedOnce ??= requestPersistentStorage();
+  return askedOnce;
+}
+
 export async function isStoragePersisted(): Promise<boolean | undefined> {
   try {
     return await navigator.storage?.persisted?.();

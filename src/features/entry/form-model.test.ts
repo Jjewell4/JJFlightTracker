@@ -20,6 +20,7 @@ import {
 import { routePartners, usageStats } from './history-stats';
 import { boostUsed } from './pickers';
 import { flagEmoji, tzAbbr } from './format';
+import { yearOptions } from './DateField';
 
 beforeAll(installReference);
 
@@ -172,6 +173,26 @@ describe('form ⇄ flight', () => {
     const d = duplicateValues(flight());
     expect(d).toMatchObject({ from: 'KSAN', to: 'KEWR', flightNumber: 'UA 123', registration: '', seatNumber: '', depTime: '06:05' });
   });
+  it('re-infers the day offset when an overnight flight is edited to a day flight', () => {
+    const f = { ...flight(), ...enrichFlight({ ...flight(), from: 'KLAX', to: 'KJFK', depTime: '22:00', arrTime: '06:00' }) } as Flight;
+    expect(f).toMatchObject({ arrDayOffset: 1, durationMin: 300 });
+    const v = flightToValues(f);
+    expect(v.arrDayOffset).toBeUndefined();
+    const edited = { ...v, depTime: '08:00', arrTime: '16:30' };
+    expect(validate(edited)).toEqual({});
+    expect(enrichFlight(valuesToInput(edited, { source: 'manual', base: f }))).toMatchObject({ arrDayOffset: 0, durationMin: 330 });
+  });
+  it('re-infers the day offset when a same-day flight is edited to overnight', () => {
+    const f = { ...flight(), ...enrichFlight(flight()) } as Flight;
+    expect(f.arrDayOffset).toBe(0);
+    const edited = { ...flightToValues(f), depTime: '22:30', arrTime: '07:05' };
+    expect(validate(edited)).toEqual({});
+    expect(enrichFlight(valuesToInput(edited, { source: 'manual', base: f }))).toMatchObject({ arrDayOffset: 1 });
+  });
+  it('rejects an explicit day offset that makes the flight implausibly long', () => {
+    const v = emptyValues({ date: '2024-03-04', from: 'KLAX', to: 'KJFK', depTime: '08:00', arrTime: '16:30', arrDayOffset: 1 });
+    expect(validate(v).times).toMatch(/too long/);
+  });
   it('pretty-prints flight numbers', () => {
     expect(prettyFlightNumber('ua0123')).toBe('UA 123');
     expect(prettyFlightNumber('n123ab')).toBe('N123AB');
@@ -198,6 +219,18 @@ describe('usage stats & ranking', () => {
     const items = ['X', 'Y', 'Z'];
     expect(boostUsed(items, ['Z'], (i) => i, () => false)).toEqual(['Z', 'X', 'Y']);
     expect(boostUsed(items, ['Z'], (i) => i, (i) => i === 'X')).toEqual(items);
+  });
+});
+
+describe('year picker', () => {
+  it('reaches back to 1903 and to an older imported year', () => {
+    const y = yearOptions(2026, '2024-01-01');
+    expect(y[0]).toBe(2027);
+    expect(y[y.length - 1]).toBe(1903);
+    expect(yearOptions(2026, '1925-01-01')).toContain(1925);
+    const old = yearOptions(2026, '1890-01-01');
+    expect(old[old.length - 1]).toBe(1890);
+    expect(yearOptions(2026, '')).toContain(1903);
   });
 });
 

@@ -4,6 +4,16 @@ import type { ImportCandidate } from './candidates';
 
 const routeKey = (f: Pick<Flight, 'date' | 'from' | 'to'>) => `${f.date}|${f.from}|${f.to}`;
 
+const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+/** Both sides have a departure time and it is the same. */
+const sameDep = (a?: string, b?: string) => !!a && !!b && a === b;
+/** Departure times don't rule a match out: one is missing, or they are within an hour (e.g. scheduled vs actual). */
+const closeDep = (a?: string, b?: string) => {
+  if (!a || !b) return true;
+  const d = Math.abs(toMin(a) - toMin(b));
+  return Math.min(d, 24 * 60 - d) <= 60;
+};
+
 /**
  * Returns candidate key → existing flight id for every candidate that duplicates a saved flight.
  *
@@ -24,11 +34,18 @@ export function findDuplicates(candidates: ImportCandidate[], existing: Flight[]
   const claimed = new Set<string>();
   const result = new Map<string, string>();
 
-  // Pass 1: same id (restoring a backup onto itself) — Pass 2: exact flight number — Pass 3: loose.
+  // Pass 1: same id (restoring a backup onto itself) — then exact flight number, then loose
+  // (a number is missing). Within each, an identical departure time is claimed first so a
+  // 07:00 row can't take the saved 19:00 flight from the 19:00 row; loose matches never pair
+  // departure times more than an hour apart.
+  const sameNumber = (c: ImportCandidate, f: Flight) => !!c.flight.flightNumber && c.flight.flightNumber === f.flightNumber;
+  const loose = (c: ImportCandidate, f: Flight) => !c.flight.flightNumber || !f.flightNumber;
   const passes: ((c: ImportCandidate, f: Flight) => boolean)[] = [
     (c, f) => !!c.flight.id && c.flight.id === f.id,
-    (c, f) => !!c.flight.flightNumber && c.flight.flightNumber === f.flightNumber,
-    (c, f) => !c.flight.flightNumber || !f.flightNumber,
+    (c, f) => sameNumber(c, f) && sameDep(c.flight.depTime, f.depTime),
+    (c, f) => sameNumber(c, f),
+    (c, f) => loose(c, f) && sameDep(c.flight.depTime, f.depTime),
+    (c, f) => loose(c, f) && closeDep(c.flight.depTime, f.depTime),
   ];
   for (const [i, match] of passes.entries()) {
     for (const c of candidates) {

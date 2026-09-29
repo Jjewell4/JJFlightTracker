@@ -55,6 +55,17 @@ export function prettyFlightNumber(raw: string | undefined): string {
   return p ? `${p.prefix} ${p.number}` : raw.toUpperCase();
 }
 
+/**
+ * The stored day offset is loaded as "auto" whenever inference reproduces it, so editing the
+ * times re-infers it instead of carrying a stale offset. Only offsets inference can't produce
+ * (e.g. flights over 24h) stay explicit.
+ */
+function loadedDayOffset(f: Flight): number | undefined {
+  if (f.arrDayOffset === undefined || !f.depTime || !f.arrTime) return undefined;
+  const inferred = timing({ date: f.date, depTime: f.depTime, arrTime: f.arrTime, from: f.from, to: f.to });
+  return inferred?.arrDayOffset === f.arrDayOffset ? undefined : f.arrDayOffset;
+}
+
 export function flightToValues(f: Flight): FormValues {
   const hasAirline = f.airlineIcao || f.airlineIata || f.airlineName;
   return {
@@ -66,7 +77,7 @@ export function flightToValues(f: Flight): FormValues {
     to: f.to ?? '',
     depTime: f.depTime ?? '',
     arrTime: f.arrTime ?? '',
-    arrDayOffset: f.arrDayOffset,
+    arrDayOffset: loadedDayOffset(f),
     aircraftType: f.aircraftType ?? '',
     aircraftName: f.aircraftName ?? getAircraftType(f.aircraftType)?.name ?? '',
     registration: f.registration ?? '',
@@ -258,7 +269,10 @@ export function validate(v: FormValues): FormErrors {
   if ((v.depTime && !isValidTime(v.depTime)) || (v.arrTime && !isValidTime(v.arrTime))) e.times = 'Use a valid time';
   else if (v.datePrecision === 'day' && v.depTime && v.arrTime && v.arrDayOffset !== undefined) {
     const d = timing(v);
-    if (!d) e.times = 'Arrival is before departure — adjust the day';
+    if (!d)
+      e.times = timing({ ...v, arrDayOffset: v.arrDayOffset - 1 })
+        ? 'That makes the flight too long — adjust the day'
+        : 'Arrival is before departure — adjust the day';
   }
   return e;
 }
@@ -330,6 +344,13 @@ export function groupEquals(a: FormValues, b: FormValues, key: FillKey): boolean
     case 'registration':
       return a.registration === b.registration;
   }
+}
+
+/** Same form contents (key order and explicit-undefined keys don't matter). Drives the unsaved-changes guard. */
+export function formEquals(a: FormValues, b: FormValues): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)] as (keyof FormValues)[]);
+  for (const k of keys) if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) return false;
+  return true;
 }
 
 /** Groups with a user-supplied value (used to protect prefilled/edited flights from lookups). */

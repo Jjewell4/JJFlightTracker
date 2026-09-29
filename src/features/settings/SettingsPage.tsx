@@ -225,16 +225,20 @@ export default function SettingsPage() {
             ]}
           />
         </div>
+        <div className="list__row srow">
+          <RowText title="Show airline logos" sub="Loaded from pics.avs.io, which sees which airlines you view. Off shows letter badges instead." />
+          <Switch checked={settings.showAirlineLogos !== false} onChange={(v) => set({ showAirlineLogos: v })} label="Show airline logos" />
+        </div>
       </Group>
 
       {/* ---------------------------------------------------------------- */}
       <Group
         title="Flight data lookup"
-        footer="Lookups fill in airline, route and aircraft when you log a flight. They only send the flight number or tail number you typed, and quietly do nothing when you’re offline."
+        footer="Lookups fill in airline, route and aircraft when you log a flight. adsbdb.com receives only the flight’s callsign (e.g. UAL123); AeroDataBox, if you add a key, receives only the flight number and date. Nothing else from your log is sent, and lookups quietly do nothing when you’re offline."
       >
         <div className="list__row srow">
           <Tile icon="search" tone="accent" />
-          <RowText title="adsbdb route lookup" sub="Free, no account. Finds routes by flight number." />
+          <RowText title="adsbdb route lookup" sub="Free, no account. Sends the flight number you type to adsbdb.com to find its route." />
           <Switch checked={settings.enableAdsbdb} onChange={(v) => set({ enableAdsbdb: v })} label="Enable adsbdb route lookup" />
         </div>
         <div className="list__row srow srow--stack">

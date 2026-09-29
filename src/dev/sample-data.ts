@@ -3,7 +3,7 @@
  * screenshots and demos. Exposed as window.__seedSampleFlights() in dev builds and
  * reachable from Settings ("Load sample data") in all builds.
  */
-import { addFlights, deleteAllFlights } from '@/lib/db';
+import { addFlights, db, deleteAllFlights } from '@/lib/db';
 import { enrichFlight } from '@/lib/flight-utils';
 import { getAirport, loadReference } from '@/data/reference';
 import { tzOffsetMinutes, zonedToUtc } from '@/lib/time';
@@ -109,8 +109,11 @@ export async function generateSampleFlights(): Promise<FlightInput[]> {
 
 export async function seedSampleFlights({ replace = true } = {}): Promise<number> {
   const flights = await generateSampleFlights();
-  if (replace) await deleteAllFlights();
-  await addFlights(flights);
+  // One transaction: a failure never leaves the log wiped but not re-filled.
+  await db.transaction('rw', db.flights, async () => {
+    if (replace) await deleteAllFlights();
+    await addFlights(flights);
+  });
   return flights.length;
 }
 
@@ -120,4 +123,5 @@ declare global {
   }
 }
 
-if (typeof window !== 'undefined') window.__seedSampleFlights = () => seedSampleFlights();
+// Dev-only console/screenshot hook (scripts/screenshot.mjs --seed); never in production builds.
+if (import.meta.env.DEV && typeof window !== 'undefined') window.__seedSampleFlights = () => seedSampleFlights();

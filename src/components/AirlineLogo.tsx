@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useShowAirlineLogos } from './airline-logo-prefs';
 import './AirlineLogo.css';
 
 /**
@@ -8,13 +9,14 @@ import './AirlineLogo.css';
  */
 export function AirlineLogo({ iata, icao, name, size = 36 }: { iata?: string; icao?: string; name?: string; size?: number }) {
   const [state, setState] = useState<'loading' | 'loaded' | 'failed'>('loading');
+  const allowRemote = useShowAirlineLogos();
   const label = (iata || icao || name || '?').slice(0, 2).toUpperCase();
   const hue = hashHue(icao || iata || name || '');
   const style = { width: size, height: size, fontSize: size * 0.36, '--logo-hue': hue } as React.CSSProperties;
-  const showImg = !!iata && state !== 'failed';
+  const showImg = allowRemote && !!iata && state !== 'failed';
 
   return (
-    <span className={`airline-logo${state === 'loaded' ? ' airline-logo--loaded' : ''}`} style={style} title={name} role="img" aria-label={name ? `${name} logo` : `${label} logo`}>
+    <span className={`airline-logo${showImg && state === 'loaded' ? ' airline-logo--loaded' : ''}`} style={style} title={name} role="img" aria-label={name ? `${name} logo` : `${label} logo`}>
       <span className="airline-logo__mono" aria-hidden>
         {label}
       </span>
@@ -26,6 +28,7 @@ export function AirlineLogo({ iata, icao, name, size = 36 }: { iata?: string; ic
           height={size}
           loading="lazy"
           decoding="async"
+          referrerPolicy="no-referrer"
           onLoad={(e) => setState(e.currentTarget.naturalWidth > 1 ? 'loaded' : 'failed')}
           onError={() => setState('failed')}
         />

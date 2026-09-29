@@ -104,6 +104,13 @@ describe('GeoJSON builders', () => {
     expect(sea.properties.r).toBe(0.8);
   });
 
+  it('skips arcs that cannot be drawn (same-airport flights)', () => {
+    const res = analyzeFlights([flight('KSAN', 'KSAN', '2024-01-01'), flight('KSAN', 'KSFO', '2024-01-02')]);
+    const fc = buildRoutesGeoJSON(res.routes);
+    expect(fc.features.map((f) => f.properties.id)).toEqual(['KSAN|KSFO']);
+    expect(fc.features.every((f) => f.geometry.coordinates.length >= 2)).toBe(true);
+  });
+
   it('builds airport points with sqrt visit weights and label ranks', () => {
     const res = analyzeFlights(FLIGHTS);
     const fc = buildAirportsGeoJSON(res.airports);

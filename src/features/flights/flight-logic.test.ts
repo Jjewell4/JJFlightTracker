@@ -214,10 +214,23 @@ describe('summary', () => {
     expect(s.perYear.map((p) => p.count)).toEqual([1, 0, 1, 0, 1]);
     expect(s.firstYear).toBe('2022');
   });
+  it('counts an airport once whether it was saved as IATA or ICAO', () => {
+    const s = computeSummary([fl({ from: 'KLAX', to: 'KSFO' }), fl({ from: 'LAX', to: 'SFO' })], '2026-09-29');
+    expect(s.airports).toBe(2);
+  });
   it('handles no flights', () => {
     const s = computeSummary([], '2026-09-29');
     expect(s.flights).toBe(0);
     expect(s.perYear).toEqual([]);
+  });
+});
+
+describe('airline filter chips', () => {
+  it('uses the same airline normalization as stats (IATA-only and ICAO flights share a chip)', () => {
+    const flights = [fl({ airlineIcao: 'UAL', airlineIata: 'UA' }), fl({ airlineIcao: undefined, airlineIata: 'UA', airlineName: undefined })];
+    const opts = filterOptions(flights);
+    expect(opts.airlines).toEqual([expect.objectContaining({ value: 'UAL', count: 2 })]);
+    expect(flights.every((f) => matchesFilters(f, { airline: 'UAL' }))).toBe(true);
   });
 });
 
