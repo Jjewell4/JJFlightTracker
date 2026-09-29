@@ -1,0 +1,8 @@
+﻿Date,Flight number,From,To,Dep time,Arr time,Duration,Airline,Aircraft,Registration,Seat number,Seat type,Flight class,Flight reason,Note,Dep_id,Arr_id,Airline_id,Aircraft_id
+3/14/2019,UA1234,San Diego / San Diego International (SAN/KSAN),San Francisco / San Francisco International (SFO/KSFO),7:35,9:05,1:30,United Airlines (UA/UAL),Boeing 737-900 (B739),N12345,12A,1,1,2,"Client meeting, then dinner",,,,
+7/2/2018,BA286,San Francisco / San Francisco International (SFO/KSFO),London / London Heathrow (LHR/EGLL),17:25,11:30,10:05,British Airways (BA/BAW),Airbus A350-1000 (A35K),G-XWBA,33K,3,4,1,Overnight to London,,,,
+Mar-19,,San Diego / San Diego International (SAN/KSAN),Los Angeles / Los Angeles International (LAX/KLAX),0:00,0:00,0:00, (/), (),,,0,0,0,Month only (Excel turned 2019-03 into Mar-19),,,,
+2017,,San Diego / San Diego International (SAN/KSAN),San Francisco / San Francisco International (SFO/KSFO),0:00,0:00,0:00,United Airlines (UA/UAL),Airbus A320 (A320),,,0,0,0,Year only,,,,
+11/5/2021,AS340,San Francisco / San Francisco International (SFO/KSFO),New York / John F. Kennedy International (JFK/KJFK),8:10,0:00,5:10,Alaska Airlines (AS/ASA),Airbus A321neo (A21N),N926VA,8F,2,2,2,,,,,
+12/24/2016,AA100,New York / John F. Kennedy International (JFK/KJFK),London / London Heathrow (LHR/EGLL),22:30,10:25,6:55,American Airlines (AA/AAL),Boeing 777-200 (B772),N754AN,9A,1,3,1,,,,,
+1/20/2022,,San Diego / San Diego International (SAN/KSAN),Los Angeles / Los Angeles International (LAX/KLAX),12:00,12:55,0:55, (/), (),,,2,3,3,,,,,

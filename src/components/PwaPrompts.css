@@ -1,0 +1,99 @@
+.pwa-toast {
+  position: fixed;
+  z-index: 200;
+  left: 50%;
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + var(--space-4));
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: min(calc(100vw - 2 * var(--space-4)), 440px);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--glass);
+  backdrop-filter: saturate(160%) blur(20px);
+  -webkit-backdrop-filter: saturate(160%) blur(20px);
+  box-shadow: var(--shadow-lg);
+  transform: translateX(-50%);
+  animation: pwa-toast-in var(--dur-slow) var(--ease-spring) both;
+}
+@keyframes pwa-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+@media (min-width: 960px) {
+  .pwa-toast {
+    bottom: var(--space-6);
+    left: auto;
+    right: var(--space-6);
+    transform: none;
+    animation-name: pwa-toast-in-wide;
+  }
+}
+@keyframes pwa-toast-in-wide {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.pwa-toast__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.pwa-toast--ok .pwa-toast__icon {
+  background: color-mix(in srgb, var(--success) 16%, transparent);
+  color: var(--success);
+}
+.pwa-toast__text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  color: var(--text-2);
+}
+.pwa-toast__text strong {
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+.pwa-toast__btn {
+  flex: none;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: var(--text-inverse);
+  font-weight: 650;
+  font-size: var(--text-sm);
+}
+.pwa-toast__close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  margin-left: calc(var(--space-2) * -1);
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-3);
+}

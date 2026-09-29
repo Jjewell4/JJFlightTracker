@@ -3,6 +3,7 @@ import { HashRouter, Route, Routes } from 'react-router-dom';
 import { AppShell } from '@/components/AppShell';
 import { ThemeController } from '@/components/ThemeController';
 import { PageLoader } from '@/components/PageLoader';
+import { PwaPrompts } from '@/components/PwaPrompts';
 import { FlightsPage } from '@/features/flights/FlightsPage';
 
 // Heavier screens are code-split; the flights list is the landing screen.
@@ -17,6 +18,7 @@ export function App() {
   return (
     <HashRouter>
       <ThemeController />
+      <PwaPrompts />
       <AppShell>
         <Suspense fallback={<PageLoader />}>
           <Routes>

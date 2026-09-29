@@ -1,0 +1,30 @@
+[
+  {
+    "departure": {
+      "airport": { "icao": "KSFO", "iata": "SFO", "name": "San Francisco", "municipalityName": "San Francisco", "countryCode": "US", "timeZone": "America/Los_Angeles" },
+      "scheduledTime": { "utc": "2024-01-10 06:30Z", "local": "2024-01-09 22:30-08:00" }
+    },
+    "arrival": {
+      "airport": { "icao": "PHNL", "iata": "HNL", "name": "Honolulu", "municipalityName": "Honolulu", "countryCode": "US", "timeZone": "Pacific/Honolulu" },
+      "scheduledTime": { "utc": "2024-01-10 11:50Z", "local": "2024-01-10 01:50-10:00" }
+    },
+    "number": "UA 1",
+    "status": "Expected",
+    "aircraft": { "model": "Boeing 777-200" },
+    "airline": { "name": "United", "iata": "UA", "icao": "UAL" }
+  },
+  {
+    "departure": {
+      "airport": { "icao": "PHNL", "iata": "HNL", "name": "Honolulu", "municipalityName": "Honolulu", "countryCode": "US", "timeZone": "Pacific/Honolulu" },
+      "scheduledTime": { "utc": "2024-01-10 13:30Z", "local": "2024-01-10 03:30-10:00" }
+    },
+    "arrival": {
+      "airport": { "icao": "RJAA", "iata": "NRT", "name": "Tokyo", "municipalityName": "Tokyo", "countryCode": "JP", "timeZone": "Asia/Tokyo" },
+      "scheduledTime": { "utc": "2024-01-10 22:10Z", "local": "2024-01-11 07:10+09:00" }
+    },
+    "number": "UA 1",
+    "status": "Unknown",
+    "aircraft": { "reg": "n78001", "model": "Boeing 777-200" },
+    "airline": { "name": "United", "iata": "UA", "icao": "UAL" }
+  }
+]

@@ -1,0 +1,26 @@
+[
+  {
+    "greatCircleDistance": { "meter": 3906000, "km": 3906, "mile": 2427, "nm": 2109, "feet": 12814960 },
+    "departure": {
+      "airport": { "icao": "KSAN", "iata": "SAN", "name": "San Diego", "shortName": "San Diego", "municipalityName": "San Diego", "location": { "lat": 32.7336, "lon": -117.19 }, "countryCode": "US", "timeZone": "America/Los_Angeles" },
+      "scheduledTime": { "utc": "2024-03-04 14:05Z", "local": "2024-03-04 06:05-08:00" },
+      "revisedTime": { "utc": "2024-03-04 14:12Z", "local": "2024-03-04 06:12-08:00" },
+      "terminal": "2",
+      "quality": ["Basic", "Live"]
+    },
+    "arrival": {
+      "airport": { "icao": "KEWR", "iata": "EWR", "name": "Newark", "shortName": "Newark", "municipalityName": "Newark", "location": { "lat": 40.6925, "lon": -74.1687 }, "countryCode": "US", "timeZone": "America/New_York" },
+      "scheduledTime": { "utc": "2024-03-04 19:30Z", "local": "2024-03-04 14:30-05:00" },
+      "terminal": "C",
+      "quality": ["Basic"]
+    },
+    "lastUpdatedUtc": "2024-03-04 20:01Z",
+    "number": "UA 123",
+    "callSign": "UAL123",
+    "status": "Arrived",
+    "codeshareStatus": "IsOperator",
+    "isCargo": false,
+    "aircraft": { "reg": "N37470", "modeS": "A48E4B", "model": "Boeing 737-900" },
+    "airline": { "name": "United", "iata": "UA", "icao": "UAL" }
+  }
+]

@@ -1,0 +1,509 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { AirlineLogo } from '@/components/AirlineLogo';
+import { Icon } from '@/components/Icon';
+import { getAirline } from '@/data/reference';
+import { addFlight, deleteFlight, updateFlight, useSettings } from '@/lib/db';
+import { enrichFlight, parseFlightNumber } from '@/lib/flight-utils';
+import { todayLocal } from '@/lib/time';
+import type { DatePrecision, Flight, SeatType } from '@/lib/types';
+import { inferAirline, type LookupOutcome } from '@/services/lookup';
+import { DateField } from './DateField';
+import { DetailsSection } from './DetailsSection';
+import { LookupCard } from './LookupCard';
+import { RouteCard } from './RouteCard';
+import { ConfirmSheet } from './Sheet';
+import { TimesCard } from './TimesCard';
+import { AircraftSheet, AirlineSheet, AirportSheet } from './pickers';
+import {
+  applyLookup,
+  clearFields,
+  inferSeatType,
+  isEmptyField,
+  lookupDiff,
+  prettyFlightNumber,
+  validate,
+  valuesToInput,
+  type FillKey,
+  type FormErrors,
+  type FormValues,
+} from './form-model';
+import { usageStats } from './history-stats';
+import { getDetailsOpen, saveDetailsOpen, saveEntryDefaults } from './prefs';
+import { useFlightLookup } from './useFlightLookup';
+
+/** Results at or above this confidence auto-fill empty fields; below it they are offered with "Use these details". */
+const AUTO_FILL_MIN = 0.6;
+const PREFIX = 'prefix';
+
+type SheetName = 'from' | 'to' | 'airline' | 'aircraft' | null;
+/** Fill group → origin: 'prefix' (airline inferred from flight number) or the lookup result key. */
+type AutoMap = Map<FillKey, string>;
+
+export interface FlightFormProps {
+  mode: 'new' | 'edit';
+  initial: FormValues;
+  /** Groups treated as user-entered from the start (edit / duplicate / return prefill). */
+  initialEdited: string[];
+  /** Flight being edited. */
+  base?: Flight;
+  flights: Flight[] | undefined;
+  note?: string;
+}
+
+const reduceMotion = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+export function FlightForm({ mode, initial, initialEdited, base, flights, note }: FlightFormProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const settings = useSettings();
+  const stats = useMemo(() => usageStats(flights), [flights]);
+
+  const [v, setV] = useState<FormValues>(initial);
+  const [edited, setEdited] = useState<Set<string>>(() => new Set(initialEdited));
+  const [auto, setAuto] = useState<AutoMap>(() => {
+    const m: AutoMap = new Map();
+    if (!initialEdited.includes('airline') && initial.airline) m.set('airline', PREFIX);
+    return m;
+  });
+  const [armed, setArmed] = useState(false);
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState<LookupOutcome | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [sheet, setSheet] = useState<SheetName>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(() => {
+    const hasDetails = !!(initial.aircraftType || initial.aircraftName || initial.seatNumber || initial.registration || initial.note || initial.datePrecision !== 'day');
+    return getDetailsOpen() || (mode === 'edit' && hasDetails);
+  });
+
+  // Hash routing keeps the previous screen's scroll position; a form always starts at the top.
+  useEffect(() => window.scrollTo(0, 0), []);
+
+  const fromRef = useRef<HTMLButtonElement>(null);
+  const toRef = useRef<HTMLButtonElement>(null);
+  const fnRef = useRef<HTMLInputElement>(null);
+
+  // Latest state for async callbacks.
+  const state = useRef({ v, edited, auto });
+  state.current = { v, edited, auto };
+
+  const errors: FormErrors = useMemo(() => {
+    const all = validate(v);
+    if (submitted) return all;
+    // Before the first save attempt only show errors that are unambiguous mistakes.
+    const early: FormErrors = {};
+    if (all.to && v.to && v.from) early.to = all.to;
+    if (all.times && v.depTime && v.arrTime) early.times = all.times;
+    return early;
+  }, [v, submitted]);
+
+  /** Records a manual edit: the group is now the user's and lookups will never overwrite it. */
+  const touch = useCallback((...keys: string[]) => {
+    setEdited((s) => {
+      const n = new Set(s);
+      keys.forEach((k) => n.add(k));
+      return n;
+    });
+    setAuto((m) => {
+      if (!keys.some((k) => m.has(k as FillKey))) return m;
+      const n = new Map(m);
+      keys.forEach((k) => n.delete(k as FillKey));
+      return n;
+    });
+  }, []);
+
+  const patch = useCallback((p: Partial<FormValues>) => setV((cur) => ({ ...cur, ...p })), []);
+
+  // ---------- lookup ----------
+
+  /** Replaces all lookup-filled groups with `result` (or clears them when null). */
+  const fillFrom = useCallback((result: LookupOutcome['results'][number] | null, fallbackAirline?: LookupOutcome['airline']) => {
+    const { v: cur, edited: ed, auto: au } = state.current;
+    const lookupKeys = [...au].filter(([, src]) => src !== PREFIX).map(([k]) => k);
+    let next = clearFields(cur, lookupKeys);
+    const nextAuto: AutoMap = new Map([...au].filter(([, src]) => src === PREFIX));
+    // Airline falls back to the flight-number prefix when nothing better is known.
+    if (!ed.has('airline') && isEmptyField(next, 'airline') && fallbackAirline) {
+      next = { ...next, airline: fallbackAirline };
+      nextAuto.set('airline', PREFIX);
+    }
+    if (result) {
+      const replaceable = new Set<FillKey>(nextAuto.has('airline') ? ['airline'] : []);
+      const applied = applyLookup(next, result, { edited: ed, replaceable });
+      next = applied.values;
+      for (const k of applied.filled) nextAuto.set(k, result.key);
+    }
+    if (next.seatNumber && !ed.has('seatType')) next.seatType = inferSeatType(next.seatNumber, next.aircraftType) ?? next.seatType;
+    setV(next);
+    setAuto(nextAuto);
+  }, []);
+
+  const onOutcome = useCallback(
+    (o: LookupOutcome) => {
+      // Transient failures keep whatever is already filled.
+      if (o.status === 'error' || o.status === 'offline' || o.status === 'invalid') return;
+      const best = o.results[0];
+      setActiveKey(best?.key ?? null);
+      setDismissed(null);
+      fillFrom(best && best.confidence >= AUTO_FILL_MIN ? best : null, o.airline);
+    },
+    [fillFrom],
+  );
+
+  const lookup = useFlightLookup({
+    enabled: armed,
+    flightNumber: v.flightNumber,
+    date: v.datePrecision === 'day' ? v.date : '',
+    settings,
+    flights,
+    excludeId: base?.id,
+    onOutcome,
+  });
+
+  const outcome = lookup.outcome;
+  const showCard = armed && outcome?.status === 'found' && dismissed !== outcome && !lookup.loading;
+  const active = showCard ? (outcome.results.find((r) => r.key === activeKey) ?? outcome.results[0]) : undefined;
+  const filledFromActive = active ? [...auto].filter(([, src]) => src === active.key).map(([k]) => k) : [];
+  const isFilled = (k: FillKey) => {
+    const src = auto.get(k);
+    return !!src && src !== PREFIX;
+  };
+
+  // ---------- field handlers ----------
+
+  const setFlightNumber = (raw: string) => {
+    const cleaned = raw.toUpperCase().replace(/[^A-Z0-9 ]/g, '');
+    setArmed(true);
+    const { v: cur, edited: ed, auto: au } = state.current;
+    const next = { ...cur, flightNumber: cleaned };
+    if (!ed.has('airline')) {
+      const inferred = inferAirline(cleaned);
+      const src = au.get('airline');
+      if (inferred && (isEmptyField(cur, 'airline') || src)) {
+        next.airline = inferred;
+        setAuto(new Map(au).set('airline', PREFIX));
+      } else if (!inferred && src === PREFIX) {
+        next.airline = undefined;
+        const n = new Map(au);
+        n.delete('airline');
+        setAuto(n);
+      }
+    }
+    setV(next);
+  };
+
+  const setDate = (date: string) => {
+    patch({ date });
+    setArmed(true);
+  };
+
+  const setPrecision = (p: DatePrecision) => {
+    setV((cur) => {
+      const d = /^\d{4}-\d{2}-\d{2}$/.test(cur.date) ? cur.date : todayLocal();
+      const date = p === 'year' ? `${d.slice(0, 4)}-01-01` : p === 'month' ? `${d.slice(0, 7)}-01` : d;
+      return { ...cur, datePrecision: p, date };
+    });
+  };
+
+  const pickAirport = (role: 'from' | 'to', ident: string) => {
+    patch({ [role]: ident });
+    touch(role);
+    setSheet(null);
+  };
+
+  const swap = () => {
+    setV((cur) => ({ ...cur, from: cur.to, to: cur.from }));
+    touch('from', 'to');
+  };
+
+  const setTimes = (p: Partial<FormValues>) => {
+    patch(p);
+    touch('times');
+  };
+
+  const setSeatNumber = (seatNumber: string) => {
+    setV((cur) => ({
+      ...cur,
+      seatNumber,
+      seatType: state.current.edited.has('seatType') ? cur.seatType : inferSeatType(seatNumber, cur.aircraftType),
+    }));
+  };
+
+  const setSeatType = (seatType: SeatType | undefined) => {
+    patch({ seatType });
+    touch('seatType');
+  };
+
+  const pickAircraft = (a: { icao?: string; name: string }) => {
+    setV((cur) => ({
+      ...cur,
+      aircraftType: a.icao ?? '',
+      aircraftName: a.name,
+      seatType: state.current.edited.has('seatType') ? cur.seatType : (inferSeatType(cur.seatNumber, a.icao) ?? cur.seatType),
+    }));
+    touch('aircraft');
+    setSheet(null);
+  };
+
+  // ---------- save / delete / back ----------
+
+  const goBack = () => {
+    if (location.key !== 'default') navigate(-1);
+    else navigate(base ? `/flights/${base.id}` : '/', { replace: true });
+  };
+
+  const focusFirstError = (errs: FormErrors) => {
+    const target =
+      (errs.date && document.getElementById('entry-date')) ||
+      (errs.flightNumber && fnRef.current) ||
+      (errs.from && fromRef.current) ||
+      (errs.to && toRef.current) ||
+      (errs.times && document.getElementById('entry-dep'));
+    if (target instanceof HTMLElement) {
+      target.scrollIntoView({ block: 'center', behavior: reduceMotion() ? 'auto' : 'smooth' });
+      target.focus({ preventScroll: true });
+    }
+  };
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (saving) return;
+    setSubmitted(true);
+    setSaveError('');
+    const errs = validate(v);
+    if (Object.keys(errs).length) {
+      focusFirstError(errs);
+      return;
+    }
+    setSaving(true);
+    const usedLookup = [...auto.values()].some((src) => src !== PREFIX);
+    const source = usedLookup ? 'lookup' : (base?.source ?? 'manual');
+    try {
+      const input = enrichFlight(valuesToInput(v, { source, base }));
+      if (base) {
+        await updateFlight(base.id, input);
+        navigate(`/flights/${base.id}`, { replace: true });
+      } else {
+        const saved = await addFlight(input);
+        saveEntryDefaults({ cabinClass: v.cabinClass, reason: v.reason });
+        navigate(`/flights/${saved.id}`, { replace: true });
+      }
+    } catch (err) {
+      console.error(err);
+      setSaving(false);
+      setSaveError("Couldn't save this flight. Please try again.");
+    }
+  };
+
+  const onDelete = async () => {
+    if (!base) return;
+    setConfirmDelete(false);
+    await deleteFlight(base.id);
+    navigate('/', { replace: true });
+  };
+
+  const toggleDetails = () => {
+    setDetailsOpen((o) => {
+      saveDetailsOpen(!o);
+      return !o;
+    });
+  };
+
+  // ---------- render ----------
+
+  const airline = getAirline(v.airline?.icao) ?? getAirline(v.airline?.iata);
+  const airlineName = airline?.name ?? v.airline?.name;
+  const prefix = parseFlightNumber(v.flightNumber)?.prefix;
+  const airlineSrc = auto.get('airline');
+
+  let status: { kind: 'loading' | 'quiet' | 'warn'; text: string } | null = null;
+  if (armed && lookup.loading) status = { kind: 'loading', text: `Looking up ${prettyFlightNumber(v.flightNumber)}…` };
+  else if (armed && outcome && outcome.status !== 'found' && outcome.status !== 'invalid')
+    status = { kind: outcome.status === 'none' ? 'quiet' : 'warn', text: outcome.message };
+  else if (armed && outcome?.status === 'found' && outcome.message.startsWith('Offline')) status = { kind: 'warn', text: outcome.message };
+
+  return (
+    <div className="entry">
+      <header className="entry-header">
+        <button type="button" className="entry-header__btn" onClick={goBack} aria-label={mode === 'edit' ? 'Back' : 'Close'}>
+          <Icon name={mode === 'edit' ? 'back' : 'close'} size={22} />
+        </button>
+        <div className="entry-header__titles">
+          <h1 className="entry-header__title">{mode === 'edit' ? 'Edit flight' : 'Log a flight'}</h1>
+          {note && <p className="entry-header__note">{note}</p>}
+        </div>
+        <span className="entry-header__btn" aria-hidden="true" />
+      </header>
+
+      <form className="entry-form" onSubmit={onSubmit} noValidate>
+        <section className="entry-card flight-card" aria-label="Date and flight number">
+          <DateField id="entry-date" date={v.date} precision={v.datePrecision} onChange={setDate} error={errors.date} />
+
+          <div className="entry-field">
+            <label className="field__label" htmlFor="entry-fn">
+              Flight number <span className="subtle">· optional</span>
+            </label>
+            <div className={`fn-input${errors.flightNumber ? ' has-error' : ''}`}>
+              <input
+                ref={fnRef}
+                id="entry-fn"
+                className="fn-input__field"
+                value={v.flightNumber}
+                onChange={(e) => setFlightNumber(e.target.value)}
+                onBlur={() => parseFlightNumber(v.flightNumber) && patch({ flightNumber: prettyFlightNumber(v.flightNumber) })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.currentTarget.blur();
+                  }
+                }}
+                placeholder="UA 123"
+                autoCapitalize="characters"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="done"
+                maxLength={9}
+                aria-invalid={!!errors.flightNumber}
+                aria-describedby="entry-fn-status"
+              />
+              <span className="fn-input__state" aria-hidden="true">
+                {lookup.loading && armed ? <span className="spinner" /> : showCard ? <Icon name="sparkle" size={18} className="fn-input__found" /> : null}
+              </span>
+            </div>
+            <p id="entry-fn-status" className={`fn-status${status ? ` fn-status--${status.kind}` : ''}`} aria-live="polite">
+              {errors.flightNumber ? <span className="field__error">{errors.flightNumber}</span> : status?.text}
+            </p>
+          </div>
+
+          <button type="button" className={`picker-row airline-row${isFilled('airline') ? ' is-filled' : ''}`} onClick={() => setSheet('airline')} aria-haspopup="dialog">
+            {v.airline ? (
+              <AirlineLogo iata={airline?.iata || v.airline.iata} icao={v.airline.icao} name={airlineName} size={36} />
+            ) : (
+              <span className="picker-row__icon" aria-hidden="true">
+                <Icon name="plane" size={18} />
+              </span>
+            )}
+            <span className="picker-row__main">
+              <span className="picker-row__label">
+                Airline
+                {airlineSrc === PREFIX && prefix && <span className="subtle"> · from {prefix}</span>}
+                {isFilled('airline') && <Icon name="sparkle" size={12} className="sparkle-icon" />}
+              </span>
+              <span className={`picker-row__value${airlineName ? '' : ' is-placeholder'}`}>{airlineName || 'Choose airline'}</span>
+            </span>
+            <Icon name="chevron" size={18} className="picker-row__chev" />
+          </button>
+        </section>
+
+        {showCard && active && outcome && (
+          <LookupCard
+            key={outcome.flightNumber + outcome.query.date}
+            outcome={outcome}
+            active={active}
+            filledKeys={filledFromActive}
+            diff={lookupDiff(v, active, edited)}
+            clock={settings.clock}
+            onChoose={(key) => {
+              setActiveKey(key);
+              const r = outcome.results.find((x) => x.key === key);
+              if (r) fillFrom(r, outcome.airline);
+            }}
+            onApply={() => fillFrom(active, outcome.airline)}
+            onUndo={() => fillFrom(null, outcome.airline)}
+            onDismiss={() => setDismissed(outcome)}
+          />
+        )}
+
+        <RouteCard
+          from={v.from}
+          to={v.to}
+          errors={{ from: errors.from, to: errors.to }}
+          filled={{ from: isFilled('from'), to: isFilled('to') }}
+          unit={settings.distanceUnit}
+          onPick={(role) => setSheet(role)}
+          onSwap={swap}
+          fromRef={fromRef}
+          toRef={toRef}
+        />
+
+        {v.datePrecision === 'day' && <TimesCard v={v} onChange={setTimes} filled={isFilled('times')} error={errors.times} />}
+
+        <DetailsSection
+          v={v}
+          open={detailsOpen}
+          onToggle={toggleDetails}
+          onPatch={(p, key) => {
+            if (key === 'seat') setSeatNumber(p.seatNumber ?? '');
+            else patch(p);
+            if (key === 'registration') touch('registration');
+          }}
+          onSeatType={setSeatType}
+          onPrecision={setPrecision}
+          onPickAircraft={() => setSheet('aircraft')}
+          filled={{ aircraft: isFilled('aircraft'), registration: isFilled('registration') }}
+        />
+
+        {mode === 'edit' && (
+          <button type="button" className="btn btn--ghost btn--block entry-delete" onClick={() => setConfirmDelete(true)}>
+            <Icon name="trash" size={18} />
+            Delete flight
+          </button>
+        )}
+
+        <div className="entry-actions">
+          {saveError && (
+            <p className="field__error entry-actions__error" role="alert">
+              {saveError}
+            </p>
+          )}
+          <div className="entry-actions__row">
+            {mode === 'edit' && (
+              <button type="button" className="btn btn--lg entry-actions__cancel" onClick={goBack}>
+                Cancel
+              </button>
+            )}
+            <button type="submit" className="btn btn--primary btn--lg btn--block entry-actions__save" disabled={saving}>
+              {saving ? <span className="spinner spinner--inverse" aria-hidden="true" /> : <Icon name="check" size={20} strokeWidth={2.25} />}
+              {mode === 'edit' ? 'Save changes' : 'Save flight'}
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <AirportSheet
+        open={sheet === 'from' || sheet === 'to'}
+        role={sheet === 'to' ? 'to' : 'from'}
+        value={sheet === 'to' ? v.to : v.from}
+        other={sheet === 'to' ? v.from : v.to}
+        stats={stats}
+        onClose={() => setSheet(null)}
+        onSelect={(ident) => pickAirport(sheet === 'to' ? 'to' : 'from', ident)}
+      />
+      <AirlineSheet
+        open={sheet === 'airline'}
+        value={v.airline}
+        stats={stats}
+        onClose={() => setSheet(null)}
+        onSelect={(a) => {
+          patch({ airline: a });
+          touch('airline');
+          setSheet(null);
+        }}
+      />
+      <AircraftSheet open={sheet === 'aircraft'} value={v.aircraftType} stats={stats} onClose={() => setSheet(null)} onSelect={pickAircraft} />
+      <ConfirmSheet
+        open={confirmDelete}
+        title="Delete this flight?"
+        message="It will be removed from your log and stats. This can't be undone."
+        confirmLabel="Delete flight"
+        danger
+        onConfirm={onDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
+    </div>
+  );
+}

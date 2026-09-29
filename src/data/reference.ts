@@ -234,11 +234,19 @@ export function normalize(s: string): string {
 function wordScore(haystack: string, needle: string): number {
   if (!needle) return 0;
   if (haystack === needle) return 100;
+  // Whole-word match ("san" in "san francisco") beats a mere prefix ("sandefjord").
+  if (haystack.startsWith(`${needle} `)) return 80;
+  if (haystack.includes(` ${needle} `) || haystack.endsWith(` ${needle}`)) return 50;
   if (haystack.startsWith(needle)) return 60;
   if (haystack.includes(` ${needle}`)) return 40;
   if (haystack.includes(needle)) return 15;
   return 0;
 }
+
+/** Busiest passenger hubs – small ranking boost so "chicago" → ORD, "london" → LHR. */
+const HUBS = new Set(
+  'ATL DFW DEN ORD LAX JFK LAS MCO MIA CLT SEA PHX EWR SFO IAH BOS FLL MSP LGA DTW PHL SLC BWI IAD SAN DCA TPA BNA AUS HNL ANC YYZ YVR YUL MEX CUN GDL BOG LIM SCL GRU GIG EZE PTY LHR CDG AMS FRA IST MAD BCN MUC FCO LGW DUB ZRH CPH OSL ARN VIE LIS KEF DXB DOH AUH DEL BOM SIN HKG ICN HND NRT PEK PVG CAN BKK KUL CGK MNL TPE SYD MEL AKL JNB CAI'.split(' '),
+);
 
 /**
  * Ranked airport search over IATA, ICAO, city, name and region.
@@ -270,6 +278,7 @@ export function searchAirports(query: string, limit = 8): Airport[] {
     s += textScore;
     if (s === 0) continue;
     s += a.size * 12 + (a.scheduled ? 10 : 0) + (a.iata ? 8 : 0);
+    if (HUBS.has(a.iata)) s += 30;
     scored.push({ a, s });
   }
   scored.sort((x, y) => y.s - x.s);

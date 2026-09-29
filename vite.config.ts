@@ -18,10 +18,21 @@ export default defineConfig({
       includeAssets: ['icons/*.png', 'icons/*.svg', 'favicon.svg'],
       manifest: false, // served from public/manifest.webmanifest
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2,json}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2,json,webmanifest}'],
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         navigateFallback: 'index.html',
+        cleanupOutdatedCaches: true,
         runtimeCaching: [
+          {
+            // Airline logos: show cached ones offline, refresh in the background.
+            urlPattern: ({ url }) => url.hostname === 'pics.avs.io',
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'airline-logos',
+              expiration: { maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 90 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
           {
             urlPattern: ({ url }) => url.hostname.endsWith('openfreemap.org'),
             handler: 'CacheFirst',
