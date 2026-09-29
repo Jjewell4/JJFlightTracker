@@ -95,6 +95,11 @@
   border-color: transparent;
   color: var(--danger);
 }
+.btn--danger-solid {
+  background: var(--danger);
+  border-color: transparent;
+  color: var(--text-inverse);
+}
 .btn--ghost {
   background: transparent;
   border-color: transparent;

@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Icon } from '@/components/Icon';
-import { Sheet } from './Sheet';
+import { Sheet } from '@/components/Sheet';
+import './SearchSheet.css';
 
 export interface SheetSection<T> {
   title: string;
@@ -97,7 +98,7 @@ export function SearchSheet<T>({
   let index = -1;
 
   return (
-    <Sheet open={open} onClose={onClose} labelledBy={`${id}-title`} initialFocus={inputRef} className="search-sheet">
+    <Sheet open={open} onClose={onClose} variant="full" labelledBy={`${id}-title`} initialFocus={inputRef} className="search-sheet">
       <div className="search-sheet__head">
         <div className="search-sheet__bar">
           <h2 id={`${id}-title`} className="search-sheet__title">

@@ -12,7 +12,7 @@ import { DateField } from './DateField';
 import { DetailsSection } from './DetailsSection';
 import { LookupCard } from './LookupCard';
 import { RouteCard } from './RouteCard';
-import { ConfirmSheet } from './Sheet';
+import { ConfirmSheet } from '@/components/Sheet';
 import { TimesCard } from './TimesCard';
 import { AircraftSheet, AirlineSheet, AirportSheet } from './pickers';
 import {
@@ -500,6 +500,7 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
         title="Delete this flight?"
         message="It will be removed from your log and stats. This can't be undone."
         confirmLabel="Delete flight"
+        icon="trash"
         danger
         onConfirm={onDelete}
         onCancel={() => setConfirmDelete(false)}

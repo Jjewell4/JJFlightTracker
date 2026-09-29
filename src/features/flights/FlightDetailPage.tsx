@@ -11,7 +11,7 @@ import type { Airport, Flight, FlightSource, SeatType, Settings } from '@/lib/ty
 import { cabinLabel, flightHistory, formatDistance, ordinal, reasonLabel, tzAbbrev } from './flight-logic';
 import { prettyFlightNumber, rowDate, shortCity } from './FlightRow';
 import { RouteMap } from './RouteMap';
-import { Sheet } from './Sheet';
+import { ConfirmSheet, Sheet } from '@/components/Sheet';
 import './FlightDetailPage.css';
 
 const SOURCE_LABEL: Record<FlightSource, string> = {
@@ -217,26 +217,17 @@ function FlightDetail({ flight: f, all, settings, onBack }: { flight: Flight; al
         </button>
       </Sheet>
 
-      <Sheet open={confirm} onClose={closeConfirm} label="Delete flight">
-        <div className="confirm">
-          <span className="confirm__icon" aria-hidden>
-            <Icon name="trash" size={22} />
-          </span>
-          <h2 className="confirm__title">Delete this flight?</h2>
-          <p className="confirm__text">
-            {fn ? `${fn} · ` : ''}
-            {fromCode} → {toCode} on {formatFlightDate(f.date, f.datePrecision)} will be permanently removed from your log.
-          </p>
-          <div className="confirm__actions">
-            <button type="button" className="btn btn--lg" onClick={closeConfirm}>
-              Cancel
-            </button>
-            <button type="button" className="btn btn--lg btn--danger-solid" onClick={remove} disabled={deleting}>
-              {deleting ? 'Deleting…' : 'Delete'}
-            </button>
-          </div>
-        </div>
-      </Sheet>
+      <ConfirmSheet
+        open={confirm}
+        title="Delete this flight?"
+        icon="trash"
+        danger
+        message={`${fn ? `${fn} · ` : ''}${fromCode} → ${toCode} on ${formatFlightDate(f.date, f.datePrecision)} will be permanently removed from your log.`}
+        confirmLabel="Delete"
+        busy={deleting}
+        onConfirm={remove}
+        onCancel={closeConfirm}
+      />
 
       {toast && (
         <div className="dtoast" role="status">
