@@ -5,7 +5,8 @@
  */
 import { addFlights, deleteAllFlights } from '@/lib/db';
 import { enrichFlight } from '@/lib/flight-utils';
-import { loadReference } from '@/data/reference';
+import { getAirport, loadReference } from '@/data/reference';
+import { tzOffsetMinutes, zonedToUtc } from '@/lib/time';
 import type { CabinClass, FlightInput, FlightReason, SeatType } from '@/lib/types';
 
 // Tiny seeded PRNG (mulberry32) so the sample is stable across runs.
@@ -91,7 +92,13 @@ export async function generateSampleFlights(): Promise<FlightInput[]> {
         const base = enrichFlight({ ...common, date: d, from, to, flightNumber: `${airline}${num}`, aircraftType: pick(aircraft), seatNumber: `${seatRow}${seatLetter}` });
         const km = base.distanceKm ?? 800;
         const block = Math.round(35 + (km / 800) * 60);
-        return enrichFlight({ ...base, depTime: t(depMin), arrTime: t(depMin + block), durationMin: undefined, arrDayOffset: undefined });
+        // Arrival wall-clock time is expressed in the destination's time zone.
+        const fromTz = getAirport(base.from)?.tz;
+        const toTz = getAirport(base.to)?.tz;
+        const arrUtc = zonedToUtc(d, t(depMin), fromTz) + block * 60000;
+        const arrLocal = new Date(arrUtc + (toTz ? tzOffsetMinutes(toTz, new Date(arrUtc)) : 0) * 60000);
+        const arrMin = arrLocal.getUTCHours() * 60 + arrLocal.getUTCMinutes();
+        return enrichFlight({ ...base, depTime: t(depMin), arrTime: t(arrMin), durationMin: undefined, arrDayOffset: undefined });
       };
       out.push(mk(home, dest, date, dep, 100 + Math.floor(r() * 2800)));
       if (out.filter((f) => f.date.startsWith(yearStr)).length < count) out.push(mk(dest, home, back, 7 * 60 + Math.floor(r() * 12 * 60), 100 + Math.floor(r() * 2800)));

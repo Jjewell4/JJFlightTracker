@@ -71,7 +71,7 @@
 @media (min-width: 960px) {
   .shell {
     display: grid;
-    grid-template-columns: 240px 1fr;
+    grid-template-columns: 240px minmax(0, 1fr);
   }
 
   .tabbar {
