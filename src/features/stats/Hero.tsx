@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import type { FlightStats, Totals, YearScope } from '@/lib/stats';
 import { MONTH_LABELS } from '@/lib/stats';
 import { Icon } from '@/components/Icon';
@@ -126,70 +127,61 @@ function Tile({ icon, label, value, unit, approx, children }: { icon: Parameters
   );
 }
 
-/** Earth → Moon illustration with the distance flown as progress along the arc. */
-function Journey({ totals, unit }: { totals: Totals; unit: DistanceUnit }) {
-  const W = 320;
-  const H = 96;
-  const e = { x: 34, y: 66, r: 22 };
-  const m = { x: 292, y: 40, r: 11 };
-  const c = { x: 160, y: -6 };
-  const trips = Math.floor(totals.toMoon);
-  const frac = totals.toMoon >= 1 ? 1 : totals.toMoon;
-  // Point & tangent on the quadratic Bézier at t.
-  const t = Math.max(0.04, Math.min(1, frac));
-  const s = { x: e.x + e.r * 0.8, y: e.y - e.r * 0.6 };
-  const f = { x: m.x - m.r - 2, y: m.y + 2 };
-  const bx = (1 - t) ** 2 * s.x + 2 * (1 - t) * t * c.x + t * t * f.x;
-  const by = (1 - t) ** 2 * s.y + 2 * (1 - t) * t * c.y + t * t * f.y;
-  const dx = 2 * (1 - t) * (c.x - s.x) + 2 * t * (f.x - c.x);
-  const dy = 2 * (1 - t) * (c.y - s.y) + 2 * t * (f.y - c.y);
-  const angle = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
-  const path = `M${s.x},${s.y}Q${c.x},${c.y} ${f.x},${f.y}`;
-  const pathLen = 300; // approximate; used with pathLength for dash progress
-
-  const moonText = totals.toMoon >= 1 ? `${fmtTimes(totals.toMoon)}×` : `${Math.round(totals.toMoon * 100)}%`;
-  const moonLabel = totals.toMoon >= 1 ? 'the distance to the Moon' : 'of the way to the Moon';
-
+/** Distance equivalents, with progress toward the next complete lunar distance. */
+export function Journey({ totals, unit }: { totals: Totals; unit: DistanceUnit }) {
+  const uid = useId().replace(/:/g, '');
+  const trips = Math.max(0, Number.isFinite(totals.toMoon) ? totals.toMoon : 0);
+  const completed = Math.floor(trips);
+  const progress = trips - completed;
+  const remaining = (1 - progress) * 384_400;
   return (
     <section className="stats-journey card" aria-label="Distance comparisons">
-      <div className="stats-journey__nums">
-        <div>
-          <p className="stats-journey__value">
-            <CountUp value={totals.aroundEarth} format={(n) => `${fmtTimes(n)}×`} />
-          </p>
-          <p className="stats-journey__label">around the Earth</p>
+      <header className="journey-heading">
+        <span>Distance, in perspective</span>
+        <span>{fmtInt(toUnit(totals.distanceKm, unit))} {unit} flown</span>
+      </header>
+      <div className="journey-comparisons">
+        <div className="journey-comparison">
+          <svg viewBox="0 0 160 130" className="journey-planet" aria-hidden="true">
+            <defs>
+              <radialGradient id={`${uid}-ocean`} cx="30%" cy="25%" r="85%"><stop stopColor="var(--accent)"/><stop offset="1" stopColor="var(--bg-elevated)"/></radialGradient>
+              <clipPath id={`${uid}-globe`}><circle cx="80" cy="64" r="40"/></clipPath>
+            </defs>
+            <circle cx="80" cy="64" r="49" className="journey-atmosphere"/>
+            <circle cx="80" cy="64" r="40" fill={`url(#${uid}-ocean)`}/>
+            <g clipPath={`url(#${uid}-globe)`} className="journey-land">
+              <path d="M43 36 57 27 76 29 82 38 72 42 69 51 60 54 63 65 71 72 68 78 56 66 49 55 40 53Z"/>
+              <path d="M72 72 87 77 91 88 83 98 78 111 71 105 68 91 64 80Z"/>
+              <path d="M102 30 120 35 128 51 114 55 107 64 100 59 103 49 95 44Z"/>
+            </g>
+            <ellipse cx="80" cy="64" rx="65" ry="19" transform="rotate(-24 80 64)" className="journey-orbit"/>
+            <circle cx="132" cy="36" r="4" className="journey-marker"/>
+          </svg>
+          <p className="journey-number">{fmtTimes(totals.aroundEarth)}<span>×</span></p>
+          <h3>Around the Earth</h3>
+          <p className="journey-reference">{fmtInt(toUnit(40_075, unit))} {unit} per equatorial lap</p>
         </div>
-        <div className="stats-journey__right">
-          <p className="stats-journey__value">{moonText}</p>
-          <p className="stats-journey__label">{moonLabel}</p>
+        <div className="journey-comparison">
+          <svg viewBox="0 0 160 130" className="journey-planet" aria-hidden="true">
+            <defs><radialGradient id={`${uid}-moon`} cx="30%" cy="25%" r="85%"><stop stopColor="var(--text-2)"/><stop offset="1" stopColor="var(--surface-3)"/></radialGradient><clipPath id={`${uid}-lunar`}><circle cx="80" cy="64" r="35"/></clipPath></defs>
+            <circle cx="80" cy="64" r="49" className="journey-lunar-orbit"/>
+            <circle cx="80" cy="64" r="35" fill={`url(#${uid}-moon)`}/>
+            <g clipPath={`url(#${uid}-lunar)`} className="journey-craters">
+              <circle cx="67" cy="51" r="10"/><circle cx="91" cy="78" r="12"/><circle cx="96" cy="42" r="6"/><circle cx="61" cy="80" r="5"/><circle cx="82" cy="60" r="3"/>
+            </g>
+            <path d="M125 28v8m-4-4h8M32 83v6m-3-3h6" className="journey-stars"/>
+          </svg>
+          <p className="journey-number">{fmtTimes(trips)}<span>×</span></p>
+          <h3>Earth to the Moon</h3>
+          <p className="journey-reference">{fmtInt(toUnit(384_400, unit))} {unit} each way</p>
         </div>
       </div>
-      <svg className="stats-journey__art" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" aria-hidden>
-        <defs>
-          <radialGradient id="stats-earth" cx="35%" cy="30%" r="75%">
-            <stop offset="0" className="stats-journey__earth-hi" />
-            <stop offset="1" className="stats-journey__earth-lo" />
-          </radialGradient>
-        </defs>
-        <path d={path} className="stats-journey__track" pathLength={pathLen} />
-        <path d={path} className="stats-journey__flown" pathLength={pathLen} strokeDasharray={`${pathLen * t} ${pathLen}`} />
-        <circle cx={e.x} cy={e.y} r={e.r + 7} className="stats-journey__orbit" />
-        <circle cx={e.x} cy={e.y} r={e.r} fill="url(#stats-earth)" />
-        <circle cx={m.x} cy={m.y} r={m.r} className="stats-journey__moon" />
-        <circle cx={m.x - 3} cy={m.y - 2} r={2.2} className="stats-journey__crater" />
-        <circle cx={m.x + 3.5} cy={m.y + 3} r={1.6} className="stats-journey__crater" />
-        <g transform={`translate(${bx} ${by}) rotate(${angle}) translate(-10 -10)`} className="stats-journey__plane">
-          <Icon name="plane" size={20} />
-        </g>
-        {trips >= 1 && (
-          <text x={m.x} y={m.y + m.r + 16} textAnchor="middle" className="stats-journey__trips">
-            {trips === 1 ? 'made it!' : `${trips} one-way trips`}
-          </text>
-        )}
-      </svg>
-      <p className="stats-journey__foot">
-        {fmtInt(toUnit(40_075, unit))} {unit} per lap of the equator · {fmtInt(toUnit(384_400, unit))} {unit} to the Moon
-      </p>
+      <div className="journey-milestone">
+        <div className="journey-milestone__heading"><span>{completed ? `Next milestone · ${completed + 1}× to the Moon` : 'Your first lunar distance'}</span><strong>{Math.floor(progress * 100)}%</strong></div>
+        <div className="journey-progress" role="progressbar" aria-label="Progress toward next lunar distance" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.floor(progress * 100)}><span style={{width: `${progress * 100}%`}}/></div>
+        <p>{completed > 0 ? `${fmtInt(completed)} complete · ` : ''}{fmtInt(toUnit(remaining, unit))} {unit} to the next milestone</p>
+      </div>
+      <p className="journey-note">Distance equivalents · average Earth–Moon distance · illustration not to scale</p>
     </section>
   );
 }
