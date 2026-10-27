@@ -7,9 +7,17 @@ interface KV {
   value: unknown;
 }
 
+/** Cloud sync bookkeeping: the version of each flight last known to match the cloud. */
+export interface SyncMeta {
+  id: string;
+  /** `updatedAt` of the flight when it was last pushed to / pulled from the cloud. */
+  updatedAt: number;
+}
+
 class FlightDB extends Dexie {
   flights!: EntityTable<Flight, 'id'>;
   kv!: EntityTable<KV, 'key'>;
+  syncMeta!: EntityTable<SyncMeta, 'id'>;
 
   constructor() {
     super('jordan-flight-tracker');
@@ -17,6 +25,7 @@ class FlightDB extends Dexie {
       flights: 'id, date, from, to, airlineIcao, aircraftType, registration, updatedAt',
       kv: 'key',
     });
+    this.version(2).stores({ syncMeta: 'id' });
   }
 }
 

@@ -19,6 +19,8 @@ import {
   requestPersistentStorage,
 } from '@/services/import';
 import { ConfirmSheet } from '@/components/Sheet';
+import { CloudSyncSection } from './CloudSyncSection';
+import { useCloudSync } from '@/services/sync/controller';
 import './settings.css';
 
 function Group({ title, footer, children }: { title?: string; footer?: ReactNode; children: ReactNode }) {
@@ -75,6 +77,8 @@ export default function SettingsPage() {
   const flights = useFlights();
   const refReady = useReferenceReady();
   const install = useInstallPrompt();
+  const cloud = useCloudSync();
+  const syncing = cloud.phase === 'signed-in';
   const count = flights?.length ?? 0;
 
   const [flash, setFlash] = useState<string | undefined>();
@@ -157,6 +161,8 @@ export default function SettingsPage() {
           <Icon name="check" size={16} strokeWidth={2.25} /> {flash}
         </div>
       )}
+
+      <CloudSyncSection Group={Group} say={say} />
 
       {/* ---------------------------------------------------------------- */}
       <Group title="Import & export">
@@ -435,6 +441,7 @@ export default function SettingsPage() {
         <p>
           This permanently removes <strong>{count.toLocaleString()}</strong> {count === 1 ? 'flight' : 'flights'} from this device. It can’t be undone — export a backup first if you might want them back.
         </p>
+        {syncing && <p>Cloud sync is on, so they’ll also be removed from your other devices. The cloud keeps deleted flights as recoverable records.</p>}
       </ConfirmSheet>
       <ConfirmSheet
         open={confirm === 'sample'}
@@ -450,6 +457,7 @@ export default function SettingsPage() {
         <p>
           This replaces your {count ? <><strong>{count.toLocaleString()}</strong> current {count === 1 ? 'flight' : 'flights'}</> : 'log'} with about 250 made-up flights. Export a backup first if you want to keep what you have.
         </p>
+        {syncing && <p>Cloud sync is on — the samples will replace your log on every signed-in device too.</p>}
       </ConfirmSheet>
     </div>
   );

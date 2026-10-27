@@ -101,3 +101,29 @@ Flight Log is an independent project and is not affiliated with Flightradar24.
   An AeroDataBox key, if you add one, is stored only on your device.
 - Airline logos are fetched from pics.avs.io and map tiles from OpenFreeMap; both fall back gracefully offline.
 - Clearing your browser's site data deletes your log — **export a backup** (*More → Export backup*) regularly.
+
+## Cloud sync (Supabase)
+
+Flights always save on the device first (works offline). With sync on, every change is also
+copied to your own Supabase database and to any other device you sign in on.
+
+1. **Create a project** at [supabase.com](https://supabase.com) (free tier is plenty).
+2. **Create the table:** Supabase → SQL Editor → New query → paste [`supabase/schema.sql`](supabase/schema.sql) → Run.
+   It creates a `flights` table with Row Level Security so each account only sees its own rows.
+3. **Auth settings** (Authentication → URL Configuration): set **Site URL** to your production URL
+   (e.g. `https://your-app.vercel.app`) and add it under **Redirect URLs**.
+4. **Show the 6-digit code in the email** (Authentication → Emails → Magic Link template): add
+   `<p>Your code: {{ .Token }}</p>`. The code is the most reliable way to sign in inside the installed app.
+5. **Vercel env vars** (Project → Settings → Environment Variables), for Production (and Preview if you test there):
+   - `VITE_SUPABASE_URL` — Supabase → Project Settings → API → Project URL
+   - `VITE_SUPABASE_ANON_KEY` — the `anon` / publishable key (public by design; RLS protects the data)
+
+   Then **redeploy** — Vite bakes env vars in at build time.
+6. In the app: **More → Cloud sync** → enter your email → type the code. Your existing log uploads automatically.
+7. Optional, recommended: after your first sign-in, turn off **Authentication → Sign In / Providers → Allow new users to sign up**
+   so nobody else can create an account on your project.
+
+Notes: deletes are soft (`deleted = true`, data kept) so a mistaken delete can be recovered from the
+Supabase table editor. Sign in on your main device first; on another device start from an empty log
+(importing the same Flightradar24 file on two devices would create duplicates).
+For local dev, copy `.env.example` to `.env.local`.

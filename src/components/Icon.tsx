@@ -37,6 +37,7 @@ const PATHS = {
   more: 'M12 12.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1ZM19 12.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1ZM5 12.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1Z',
   copy: 'M9 9h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H11a2 2 0 0 1-2-2V9ZM5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1',
   return: 'M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11',
+  cloud: 'M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z',
 } as const;
 
 export type IconName = keyof typeof PATHS;

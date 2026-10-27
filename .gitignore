@@ -6,3 +6,6 @@ dev-dist
 coverage
 *.tsbuildinfo
 .scratch
+.env
+.env.local
+.env.*.local

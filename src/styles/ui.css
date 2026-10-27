@@ -381,3 +381,7 @@ select.input {
     transform: rotate(360deg);
   }
 }
+
+.spin {
+  animation: page-loader-spin 0.9s linear infinite;
+}
