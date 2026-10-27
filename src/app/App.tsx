@@ -6,9 +6,11 @@ import { RouteErrorBoundary } from '@/components/ErrorBoundary';
 import { ThemeController } from '@/components/ThemeController';
 import { PageLoader } from '@/components/PageLoader';
 import { PwaPrompts } from '@/components/PwaPrompts';
+import { publicHandleFromPath } from '@/features/public/profile';
 import { FlightsPage } from '@/features/flights/FlightsPage';
 
 // Heavier screens are code-split; the flights list is the landing screen.
+const PublicProfilePage = lazy(() => import('@/features/public/PublicProfilePage'));
 const FlightDetailPage = lazy(() => import('@/features/flights/FlightDetailPage'));
 const FlightFormPage = lazy(() => import('@/features/entry/FlightFormPage'));
 const MapPage = lazy(() => import('@/features/map/MapPage'));
@@ -20,6 +22,8 @@ const AccountPage = lazy(() => import('@/features/account/AccountPage'));
 const WelcomePage = lazy(() => import('@/features/account/WelcomePage'));
 
 export function App() {
+  const publicHandle = publicHandleFromPath(window.location.pathname);
+  if (publicHandle) return <><ThemeController /><Suspense fallback={<PageLoader />}><PublicProfilePage slug={publicHandle}/></Suspense></>;
   return (
     <HashRouter>
       <ThemeController />

@@ -232,3 +232,4 @@
     bottom: var(--space-8);
   }
 }
+.brand-icon { display:block; flex-shrink:0; border-radius:var(--radius-sm); }

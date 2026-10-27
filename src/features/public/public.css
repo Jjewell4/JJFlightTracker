@@ -1,0 +1,155 @@
+.public-page {
+  max-width: 1000px;
+  margin: auto;
+  padding: var(--space-6) var(--space-5) var(--space-12);
+}
+.public-brand {
+  display: inline-block;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: var(--space-8);
+}
+.public-dashboard {
+  display: grid;
+  gap: var(--space-6);
+}
+.public-hero {
+  padding: var(--space-8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(120deg, var(--surface), var(--accent-soft));
+}
+.public-eyebrow {
+  color: var(--accent);
+  font-size: var(--text-xs);
+  letter-spacing: 0.14em;
+  font-weight: 600;
+}
+.public-hero h1 {
+  font-size: clamp(2rem, 6vw, 3.5rem);
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+  margin: var(--space-3) 0;
+}
+.public-hero > p:last-of-type {
+  color: var(--text-2);
+}
+.public-totals {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-8);
+}
+.public-totals dt {
+  font-size: var(--text-xs);
+  color: var(--text-2);
+}
+.public-totals dd {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  margin-top: var(--space-2);
+}
+.public-map {
+  padding: var(--space-5);
+}
+.public-map .journey-map {
+  height: 320px;
+}
+.public-map p,
+.public-footer {
+  color: var(--text-3);
+  font-size: var(--text-xs);
+}
+.public-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-5);
+}
+.public-section-heading h2 {
+  font-size: var(--text-xl);
+}
+.public-section-heading span {
+  color: var(--text-3);
+  font-size: var(--text-sm);
+}
+.public-flight-list {
+  padding: 0;
+  list-style: none;
+  margin-top: var(--space-4);
+}
+.public-flight-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--border);
+}
+.public-flight-list li div {
+  display: grid;
+  gap: var(--space-2);
+}
+.public-flight-list li span,
+.public-flight-list time {
+  font-size: var(--text-xs);
+  color: var(--text-2);
+}
+.public-flight-list time {
+  white-space: nowrap;
+}
+.public-empty {
+  padding: var(--space-8) 0;
+  color: var(--text-2);
+}
+.public-sharing {
+  padding: var(--space-5);
+  display: grid;
+  gap: var(--space-4);
+}
+.public-sharing .field__hint {
+  overflow-wrap: anywhere;
+}
+.public-sharing__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.public-preview {
+  margin-top: var(--space-5);
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-5);
+}
+@media (max-width: 600px) {
+  .public-totals {
+    grid-template-columns: 1fr 1fr;
+  }
+  .public-hero {
+    padding: var(--space-5);
+  }
+  .public-map .journey-map {
+    height: 220px;
+  }
+}
+.public-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.public-sharing__privacy {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding-block: var(--space-2);
+  cursor: pointer;
+}
+.public-sharing__privacy input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
+.public-totals dd {
+  margin-left: 0;
+}
+.public-flight-list li > div { min-width:0; overflow-wrap:anywhere; }

@@ -8,6 +8,7 @@ import './styles/ui.css';
 import { App } from './app/App';
 import { loadReference } from './data/reference';
 import './dev/sample-data';
+import { publicHandleFromPath } from '@/features/public/profile';
 import { startCloudSync } from './services/sync/controller';
 
 // Start fetching reference data immediately; screens await it via useReferenceReady().
@@ -20,4 +21,4 @@ createRoot(document.getElementById('root')!).render(
 );
 
 // Background cloud sync (no-op unless Supabase env vars are configured).
-startCloudSync();
+if (!publicHandleFromPath(window.location.pathname)) startCloudSync();

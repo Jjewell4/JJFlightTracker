@@ -52,3 +52,23 @@ Before release, configure Supabase's recovery redirect allowlist and production
 SMTP. Existing signed-in users can set a password immediately; signed-out users
 can recover their existing account. Confirmation and recovery remain subject to
 email-service limits even though normal password login sends no email.
+
+## Independent Sol review of public sharing
+
+A separate GPT-6.1 Sol agent reviewed the implementation and exercised the UI.
+Four findings were addressed and then rechecked by that agent at 390px:
+
+1. Retry owner-profile loading after an error, so a transient failure does not
+   permanently hide publishing/unpublishing controls.
+2. Show unpublish errors inside the confirmation dialog; do not claim successful
+   revocation until the request succeeds.
+3. Show cities alongside airport codes; search city/airport names, airlines and
+   formatted dates; supply an accessible “from … to …” route label.
+4. Make the exact-date privacy control at least 44px tall for touch use.
+
+The revised distance story replaces decorative planet tiles with compact
+comparisons and a next-milestone track. Percentages round consistently (e.g.
+2.078 lunar distances displays 2.08× and 8%, rather than 2.08× and 7%).
+FlightDiary branding now uses the favicon artwork in the app header/sidebar,
+onboarding and public journal; existing storage and backup identifiers remain
+unchanged for compatibility.

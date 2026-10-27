@@ -22,6 +22,7 @@ import { ConfirmSheet } from '@/components/Sheet';
 import { CloudSyncSection } from './CloudSyncSection';
 import { useCloudSync } from '@/services/sync/controller';
 import './settings.css';
+import { PublicSharing } from '@/features/public/PublicSharing';
 import { exportSpreadsheetCsv } from '@/services/import/export-csv';
 
 function Group({ title, footer, children }: { title?: string; footer?: ReactNode; children: ReactNode }) {
@@ -118,7 +119,7 @@ export default function SettingsPage() {
 
   async function doInstall() {
     const r = await install.install();
-    if (r === 'accepted') say('Installing Flight Log…');
+    if (r === 'accepted') say('Installing FlightDiary…');
   }
 
   async function protect() {
@@ -164,6 +165,7 @@ export default function SettingsPage() {
       )}
 
       <CloudSyncSection Group={Group} />
+      <PublicSharing />
 
       {/* ---------------------------------------------------------------- */}
       <Group title="Import & export">
@@ -320,12 +322,12 @@ export default function SettingsPage() {
         {install.isStandalone ? (
           <div className="list__row srow">
             <Tile icon="check" tone="green" />
-            <RowText title="Installed" sub="You’re using Flight Log as an app." />
+            <RowText title="Installed" sub="You’re using FlightDiary as an app." />
           </div>
         ) : install.canInstall ? (
           <button type="button" className="list__row srow" onClick={() => void doInstall()}>
             <Tile icon="plus" />
-            <RowText title="Install app" sub="Add Flight Log to your home screen — works offline." />
+            <RowText title="Install app" sub="Add FlightDiary to your home screen — works offline." />
             <span className="badge badge--accent">Install</span>
           </button>
         ) : install.isIosSafari ? (
@@ -395,11 +397,9 @@ export default function SettingsPage() {
         <h2 className="section-title sgroup__title">About</h2>
         <div className="card sabout">
           <div className="sabout__head">
-            <span className="sabout__logo" aria-hidden>
-              <Icon name="plane" size={22} />
-            </span>
+            <img src={`${import.meta.env.BASE_URL}favicon.svg`} width="44" height="44" alt="" />
             <div>
-              <div className="sabout__name">Flight Log</div>
+              <div className="sabout__name">FlightDiary</div>
               <div className="srow__sub">Your flights, kept on your device. Optional account sync.</div>
             </div>
           </div>

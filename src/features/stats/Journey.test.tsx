@@ -9,6 +9,7 @@ describe('distance comparison milestones', () => {
     expect(html).toContain('3× to the Moon');
     expect(html).toContain('aria-valuenow="8"');
     expect(html).toContain('2 complete');
+    expect(render(2.078)).toContain('aria-valuenow="8"');
   });
   it('starts a fresh milestone at an exact lunar distance', () => {
     expect(render(2)).toContain('aria-valuenow="0"');

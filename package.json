@@ -26,6 +26,7 @@
     "read-excel-file": "^6.0.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.12",
     "@types/node": "^22.20.4",
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19.3.0",

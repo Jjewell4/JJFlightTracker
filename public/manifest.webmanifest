@@ -1,6 +1,6 @@
 {
-  "name": "Flight Log",
-  "short_name": "Flights",
+  "name": "FlightDiary",
+  "short_name": "FlightDiary",
   "description": "Your personal flight log — every flight, route and mile.",
   "id": "./",
   "lang": "en",

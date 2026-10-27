@@ -72,11 +72,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className={`shell${isMap ? ' shell--fullbleed' : ''}${isBare ? ' shell--bare' : ''}`}>
       <aside className="shell__sidebar" aria-label="Primary">
-        <Link to="/" className="shell__brand" aria-label="Flight Log — home">
-          <span className="shell__logo" aria-hidden>
-            <Icon name="plane" size={18} />
-          </span>
-          Flight Log
+        <Link to="/" className="shell__brand" aria-label="FlightDiary — home">
+          <img className="brand-icon" src={`${import.meta.env.BASE_URL}favicon.svg`} width="32" height="32" alt="" />
+          FlightDiary
         </Link>
         <NavLink to="/flights/new" className="shell__add-wide">
           <Icon name="plus" size={18} /> Log a flight
@@ -100,11 +98,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main className="shell__main">
         {hasTopbar && (
           <div className="topbar">
-            <Link to="/" className="topbar__brand" aria-label="Flight Log — home">
-              <span className="shell__logo" aria-hidden>
-                <Icon name="plane" size={16} />
-              </span>
-              Flight Log
+            <Link to="/" className="topbar__brand" aria-label="FlightDiary — home">
+              <img className="brand-icon" src={`${import.meta.env.BASE_URL}favicon.svg`} width="32" height="32" alt="" />
+              FlightDiary
             </Link>
             <AccountButton />
           </div>
