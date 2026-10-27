@@ -1,5 +1,8 @@
 import { useEffect, useLayoutEffect, type ReactNode } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { isOnboarded } from '@/features/account/onboarding';
+import { clearNotice, useCloudSync } from '@/services/sync/controller';
+import { AccountButton, SidebarAccount } from './AccountButton';
 import { Icon, type IconName } from './Icon';
 import './AppShell.css';
 
@@ -11,7 +14,7 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { to: '/', label: 'Flights', icon: 'list', end: true },
+  { to: '/', label: 'Home', icon: 'home', end: true },
   { to: '/map', label: 'Map', icon: 'globe' },
   { to: '/stats', label: 'Stats', icon: 'chart' },
   { to: '/settings', label: 'More', icon: 'settings' },
@@ -25,6 +28,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const isForm = pathname.startsWith('/flights/new') || pathname.endsWith('/edit');
   const isMap = pathname === '/map';
+  const isBare = pathname === '/welcome';
+  // Top-level tabs get the slim app bar (logo → home, account avatar) on phones.
+  const hasTopbar = pathname === '/' || pathname === '/stats' || pathname === '/settings';
+  const sync = useCloudSync();
 
   const navigate = useNavigate();
 
@@ -43,20 +50,34 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => document.removeEventListener('click', onClick, true);
   }, [navigate]);
 
+  // First run: offer sign-in or local-only use once the stored session has been checked.
+  useEffect(() => {
+    if (sync.phase === 'signed-out' && !isOnboarded() && !isBare && !isForm && pathname !== '/account') {
+      navigate('/welcome', { replace: true });
+    }
+  }, [sync.phase, pathname, isBare, isForm, navigate]);
+
+  // One-off notices from sync (e.g. "Signed in as …" after opening the email link).
+  useEffect(() => {
+    if (!sync.notice) return;
+    const t = setTimeout(clearNotice, 4500);
+    return () => clearTimeout(t);
+  }, [sync.notice]);
+
   // Every screen opens at the top (the flights list restores its own position).
   useLayoutEffect(() => {
     window.scrollTo(0, 0);
   }, [pathname]);
 
   return (
-    <div className={`shell${isMap ? ' shell--fullbleed' : ''}`}>
+    <div className={`shell${isMap ? ' shell--fullbleed' : ''}${isBare ? ' shell--bare' : ''}`}>
       <aside className="shell__sidebar" aria-label="Primary">
-        <div className="shell__brand">
+        <Link to="/" className="shell__brand" aria-label="Flight Log — home">
           <span className="shell__logo" aria-hidden>
             <Icon name="plane" size={18} />
           </span>
           Flight Log
-        </div>
+        </Link>
         <NavLink to="/flights/new" className="shell__add-wide">
           <Icon name="plus" size={18} /> Log a flight
         </NavLink>
@@ -72,11 +93,31 @@ export function AppShell({ children }: { children: ReactNode }) {
             Import
           </NavLink>
         </nav>
+        <SidebarAccount />
       </aside>
 
-      <main className="shell__main">{children}</main>
+      <main className="shell__main">
+        {hasTopbar && (
+          <div className="topbar">
+            <Link to="/" className="topbar__brand" aria-label="Flight Log — home">
+              <span className="shell__logo" aria-hidden>
+                <Icon name="plane" size={16} />
+              </span>
+              Flight Log
+            </Link>
+            <AccountButton />
+          </div>
+        )}
+        {children}
+      </main>
 
-      {!isForm && (
+      {sync.notice && (
+        <div className="shell__notice" role="status" aria-live="polite" onClick={clearNotice}>
+          <Icon name="check" size={16} strokeWidth={2.25} /> {sync.notice}
+        </div>
+      )}
+
+      {!isForm && !isBare && (
         <nav className="tabbar" aria-label="Primary">
           {NAV.slice(0, 2).map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end} className="tabbar__link">

@@ -1,0 +1,97 @@
+.avatar {
+  position: relative;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  color: var(--text-2);
+  font-weight: 700;
+  line-height: 1;
+}
+.avatar--in {
+  border-color: transparent;
+  color: var(--text-inverse);
+  background: linear-gradient(145deg, var(--accent), var(--accent-strong));
+}
+.avatar__dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 30%;
+  height: 30%;
+  min-width: 9px;
+  min-height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--bg);
+  background: var(--success);
+}
+.avatar__dot--pending {
+  background: var(--warning);
+}
+.avatar__dot--error {
+  background: var(--danger);
+}
+.avatar__dot--syncing {
+  background: var(--accent);
+  animation: avatar-pulse 1.1s ease-in-out infinite;
+}
+@keyframes avatar-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.account-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  min-width: 44px;
+  justify-content: flex-end;
+  color: var(--text);
+  border-radius: var(--radius-pill);
+  -webkit-tap-highlight-color: transparent;
+}
+.account-btn__cta {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--accent);
+}
+.account-btn:active .avatar {
+  transform: scale(0.94);
+}
+
+.side-account {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: auto;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.side-account:hover,
+.side-account.active {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+.side-account__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.side-account__title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.side-account__sub {
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}

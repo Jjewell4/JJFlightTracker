@@ -1,0 +1,286 @@
+/* ---------- account page ---------- */
+.account {
+  max-width: 560px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.account__header {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) var(--space-1);
+}
+.account__title {
+  text-align: center;
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+.account-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+.account-card__title {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.account-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.account-hero__icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  margin-bottom: var(--space-1);
+}
+.account-foot {
+  font-size: var(--text-xs);
+  color: var(--text-3);
+  padding: 0 var(--space-2);
+}
+.account code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.account-profile {
+  flex-direction: row;
+  align-items: center;
+}
+.account-profile__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.account-profile__email {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-sync__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.account-sync__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+}
+.account-sync__icon--pending {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+}
+.account-sync__icon--busy {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.account-sync__icon--error {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+.account-sync__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+.account-sync__status {
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+.account-sync--error .account-sync__status {
+  color: var(--danger);
+}
+
+.account-link {
+  font-weight: 550;
+}
+.account-link__chev {
+  margin-left: auto;
+  color: var(--text-3);
+}
+.account-link--danger {
+  color: var(--danger);
+}
+
+/* ---------- benefits list ---------- */
+.benefits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.benefits li {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+.benefits strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.benefits__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* ---------- sign-in panel ---------- */
+.signin {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.signin--sent {
+  align-items: center;
+  text-align: center;
+  padding: var(--space-2) 0;
+}
+.signin__mail {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  color: var(--accent);
+  background: var(--accent-soft);
+  animation: fade-up var(--dur-slow) var(--ease-out) both;
+}
+.signin__title {
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+.signin__body {
+  color: var(--text-2);
+  max-width: 34ch;
+}
+.signin__body strong {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.signin__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}
+.signin__code-toggle {
+  border: 0;
+  background: none;
+  color: var(--text-3);
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  min-height: 44px;
+}
+.signin__code {
+  display: flex;
+  gap: var(--space-2);
+  width: 100%;
+}
+.signin__code .input {
+  text-align: center;
+  letter-spacing: 0.3em;
+}
+
+/* ---------- welcome / onboarding ---------- */
+.welcome {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: calc(var(--safe-top) + var(--space-6)) var(--space-4) calc(var(--safe-bottom) + var(--space-6));
+  margin: calc(-1 * (var(--safe-top) + var(--space-4))) calc(-1 * var(--space-4)) 0;
+  background:
+    radial-gradient(120% 60% at 50% -10%, var(--accent-soft), transparent 60%),
+    var(--bg);
+}
+.welcome__inner {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.welcome__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-2);
+}
+.welcome__logo {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
+  color: var(--text-inverse);
+  background: linear-gradient(145deg, var(--accent), var(--accent-strong));
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--accent) 40%, transparent);
+  margin-bottom: var(--space-2);
+}
+.welcome__title {
+  font-size: var(--text-3xl);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.welcome__tagline {
+  color: var(--text-2);
+}
+.welcome__card {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+.welcome__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.welcome__note {
+  text-align: center;
+}
+.welcome__lead {
+  margin-top: calc(-1 * var(--space-2));
+}
+.welcome__skip {
+  margin-top: var(--space-1);
+}
+
+@media (min-width: 960px) {
+  .welcome {
+    margin: calc(-1 * var(--space-8));
+    min-height: 100dvh;
+  }
+}

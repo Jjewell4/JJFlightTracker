@@ -19,6 +19,8 @@ export interface CloudSyncState {
   error?: string;
   /** Local changes not yet in the cloud. */
   pending: number;
+  /** One-off message for the app shell to show (e.g. after an email-link sign-in). */
+  notice?: string;
 }
 
 let state: CloudSyncState = { phase: isCloudConfigured ? 'loading' : 'disabled', status: 'idle', pending: 0 };
@@ -87,9 +89,17 @@ function scheduleSync(delay = 1500) {
   debounce = setTimeout(() => void syncNow(), delay);
 }
 
-async function applySession(session: Session | null) {
+export function clearNotice(): void {
+  setState({ notice: undefined });
+}
+
+/** True once the stored session has been restored at startup. */
+let initialized = false;
+
+async function applySession(session: Session | null, announce = initialized) {
   if (session?.user) {
     const prev = state.userId;
+    if (!prev && announce) setState({ notice: `Signed in as ${session.user.email ?? 'your account'} — syncing your flights` });
     const saved = await getSyncState();
     setState({
       phase: 'signed-in',
@@ -120,9 +130,11 @@ export function startCloudSync(): void {
   void getSupabase()
     .then(async (sb) => {
       client = sb;
+      const fromEmailLink = new URLSearchParams(window.location.search).has('code');
       const { data } = await sb.auth.getSession(); // also completes an email-link sign-in (?code=)
       cleanAuthParamsFromUrl();
-      await applySession(data.session);
+      await applySession(data.session, fromEmailLink);
+      initialized = true;
       sb.auth.onAuthStateChange((_event, session) => {
         // Don't call Supabase from inside this callback (it can deadlock); defer.
         setTimeout(() => void applySession(session), 0);

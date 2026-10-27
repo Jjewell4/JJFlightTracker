@@ -162,7 +162,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <CloudSyncSection Group={Group} say={say} />
+      <CloudSyncSection Group={Group} />
 
       {/* ---------------------------------------------------------------- */}
       <Group title="Import & export">

@@ -15,6 +15,8 @@ const MapPage = lazy(() => import('@/features/map/MapPage'));
 const StatsPage = lazy(() => import('@/features/stats/StatsPage'));
 const ImportPage = lazy(() => import('@/features/import/ImportPage'));
 const SettingsPage = lazy(() => import('@/features/settings/SettingsPage'));
+const AccountPage = lazy(() => import('@/features/account/AccountPage'));
+const WelcomePage = lazy(() => import('@/features/account/WelcomePage'));
 
 export function App() {
   return (
@@ -34,6 +36,8 @@ export function App() {
               <Route path="/stats" element={<StatsPage />} />
               <Route path="/import" element={<ImportPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/account" element={<AccountPage />} />
+              <Route path="/welcome" element={<WelcomePage />} />
               <Route path="*" element={<FlightsPage />} />
             </Routes>
           </Suspense>
