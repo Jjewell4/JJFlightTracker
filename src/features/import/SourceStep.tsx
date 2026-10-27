@@ -7,7 +7,7 @@ export type SourceKind = 'fr24' | 'generic' | 'backup';
 
 const SOURCES: { kind: SourceKind; title: string; blurb: string; icon: ReactNode; accept: string }[] = [
   { kind: 'fr24', title: 'Flightradar24', blurb: 'Your My Flights export (CSV or Excel)', icon: <RadarGlyph />, accept: '.csv,.xlsx,.txt,text/csv' },
-  { kind: 'generic', title: 'Spreadsheet', blurb: 'Any CSV or Excel file — you match the columns', icon: <SheetGlyph />, accept: '.csv,.tsv,.txt,.xlsx,text/csv' },
+  { kind: 'generic', title: 'CSV or spreadsheet', blurb: 'Any CSV or Excel file — you match the columns', icon: <SheetGlyph />, accept: '.csv,.tsv,.txt,.xlsx,text/csv' },
   { kind: 'backup', title: 'Flight Log backup', blurb: 'A .json file exported from this app', icon: <BackupGlyph />, accept: '.json,application/json' },
 ];
 
@@ -29,6 +29,7 @@ export function SourceStep({ source, onSource, onLoaded, ready, initialError }: 
   const active = SOURCES.find((s) => s.kind === source)!;
 
   async function run(work: () => Promise<LoadedSource> | LoadedSource) {
+    if (busy) return;
     setBusy(true);
     setError(undefined);
     try {
@@ -43,7 +44,7 @@ export function SourceStep({ source, onSource, onLoaded, ready, initialError }: 
 
   const onFiles = (files: FileList | null) => {
     const file = files?.[0];
-    if (file) void run(() => loadImportFile(file));
+    if (file && ready && !busy) void run(() => loadImportFile(file));
     if (inputRef.current) inputRef.current.value = '';
   };
 
@@ -81,7 +82,7 @@ export function SourceStep({ source, onSource, onLoaded, ready, initialError }: 
       </div>
 
       {source === 'fr24' && (
-        <details className="import__help card" open>
+        <details className="import__help card">
           <summary>
             <span>How to export from my.flightradar24.com</span>
             <Icon name="chevron" size={18} className="import__help-chevron" />

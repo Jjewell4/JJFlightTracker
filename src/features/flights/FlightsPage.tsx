@@ -1,7 +1,7 @@
-import { startTransition, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
-import { useReferenceReady } from '@/data/reference';
+import { getAirport, useReferenceReady } from '@/data/reference';
 import { useFlights, useSettings } from '@/lib/db';
 import { todayLocal } from '@/lib/time';
 import type { Flight } from '@/lib/types';
@@ -25,6 +25,9 @@ import { SearchBar } from './SearchBar';
 import { SummaryHero, SummaryHeroSkeleton } from './SummaryHero';
 import { UpcomingCard } from './UpcomingCard';
 import './FlightsPage.css';
+import { RouteMap } from './RouteMap';
+import './FlightDetailPage.css';
+import './Overview.css';
 
 // Survives navigating to a flight and back (module scope = this browser session).
 const memory = { query: '', filters: {} as FlightFilters, scrollY: 0 };
@@ -77,11 +80,7 @@ export function FlightsPage() {
   // Progressive rendering: paint the first screenful immediately, the rest in a transition.
   const [limit, setLimit] = useState(FIRST_PAINT);
   const complete = limit >= shownPast.length;
-  useEffect(() => {
-    if (complete) return;
-    const t = setTimeout(() => startTransition(() => setLimit(Infinity)), 16);
-    return () => clearTimeout(t);
-  }, [complete]);
+  useEffect(() => { setLimit(FIRST_PAINT); }, [q, filters]);
   const groups = useMemo(() => (complete ? allGroups : limitGroups(allGroups, limit)), [allGroups, limit, complete]);
 
   // Keep sticky year headers tucked under the sticky search bar.
@@ -103,7 +102,7 @@ export function FlightsPage() {
       alive.current = false;
     };
   }, []);
-  const loaded = flights !== undefined && ready && complete;
+  const loaded = flights !== undefined && ready;
   useEffect(() => {
     if (!loaded) return;
     if (memory.scrollY) window.scrollTo(0, memory.scrollY);
@@ -118,6 +117,9 @@ export function FlightsPage() {
   if (flights.length === 0) return <EmptyState />;
   if (!ready) return <FlightsSkeleton />;
 
+  const featured = upcoming[0] ?? past[0];
+  const from = featured && getAirport(featured.from);
+  const to = featured && getAirport(featured.to);
   const resultCount = shownPast.length + shownUpcoming.length;
 
   return (
@@ -135,7 +137,7 @@ export function FlightsPage() {
     >
       <header className="page-header flights__header">
         <div>
-          <h1 className="page-title">Flights</h1>
+          <h1 className="page-title">Your flight journal</h1>
         </div>
         <Link to="/import" className="btn btn--ghost btn--icon flights__import" aria-label="Import flights">
           <Icon name="upload" size={20} />
@@ -144,6 +146,23 @@ export function FlightsPage() {
 
       <SummaryHero summary={summary} unit={unit} upcoming={upcoming.length} />
 
+      {!filtering && featured && from && to && (
+        <section className="overview" aria-label="Travel overview">
+          <Link to="/map" className="overview__map card">
+            <div className="overview__heading"><Icon name="globe" size={20} /><span>{upcoming.length ? 'Your next horizon' : 'Your latest journey'}</span><Icon name="chevron" size={16} /></div>
+            <RouteMap from={from} to={to} fromLabel={from.iata || from.ident} toLabel={to.iata || to.ident} />
+            <div className="overview__caption">{from.city} → {to.city}<span>Explore your map</span></div>
+          </Link>
+          <div className="overview__actions card">
+            <h2>Where to next?</h2><p>Keep your story moving. Start fresh or reuse a familiar journey.</p>
+            <Link className="btn btn--primary" to="/flights/new"><Icon name="plus" size={18} />Log a flight</Link>
+            <Link className="btn" to={`/flights/new?return=${encodeURIComponent(featured.id)}`}><Icon name="swap" size={18} />Add the return</Link>
+            <Link className="btn btn--ghost" to={`/flights/new?duplicate=${encodeURIComponent(featured.id)}`}>Fly this route again</Link>
+            <Link className="btn btn--ghost" to="/import"><Icon name="upload" size={18} />Import a spreadsheet</Link>
+          </div>
+        </section>
+      )}
+      <h2 className="section-title">Your flights</h2>
       <SearchBar ref={searchRef} query={query} onQuery={setQuery} filters={filters} onFilters={setFilters} options={options} />
 
       {filtering && (
@@ -216,6 +235,7 @@ export function FlightsPage() {
           </section>
         ))
       )}
+      {!complete && <button className="btn btn--block" onClick={() => setLimit((n) => n + FIRST_PAINT)}>Show more flights ({shownPast.length - limit} remaining)</button>}
     </div>
   );
 }

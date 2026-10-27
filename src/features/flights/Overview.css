@@ -1,0 +1,11 @@
+.overview { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: var(--space-5); margin-block: var(--space-6); }
+.overview__map { display: block; overflow: hidden; text-decoration: none; color: var(--text); background: var(--bg-elevated); }
+.overview__heading { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-5); color: var(--text-2); font-size: var(--text-sm); }
+.overview__heading span { flex: 1; }
+.overview__map .rmap { width: 100%; height: 200px; }
+.overview__caption { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: space-between; padding: var(--space-5); font-size: var(--text-sm); }
+.overview__caption span { color: var(--accent); }
+.overview__actions { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5); }
+.overview__actions h2 { font-size: var(--text-xl); margin: 0; }
+.overview__actions p { color: var(--text-2); font-size: var(--text-sm); line-height: 1.6; margin: 0 0 var(--space-2); }
+@media(max-width: 640px) { .overview { grid-template-columns: 1fr; } .overview__actions { display: grid; grid-template-columns: 1fr 1fr; } .overview__actions h2,.overview__actions p { grid-column: 1 / -1; } .overview__actions .btn { font-size: var(--text-xs); padding-inline: var(--space-2); } }

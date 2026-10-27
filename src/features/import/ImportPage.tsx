@@ -53,7 +53,7 @@ export default function ImportPage() {
   const settings = useSettings();
 
   const [step, setStep] = useState<Step>('source');
-  const [source, setSource] = useState<SourceKind>('fr24');
+  const [source, setSource] = useState<SourceKind>('generic');
   const [table, setTable] = useState<TableState | null>(null);
   const [backup, setBackup] = useState<{ data: ParsedBackup; fileName?: string } | null>(null);
   const [candidates, setCandidates] = useState<ImportCandidate[]>([]);

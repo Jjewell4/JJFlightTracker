@@ -35,9 +35,9 @@ export function Records({ stats, unit }: { stats: FlightStats; unit: DistanceUni
     recs.push({ id: 'longest', icon: 'globe', label: 'Longest flight', value: fmtDistance(r.longestDistance.value, unit), flight: r.longestDistance.flight, tone: 'amber' });
   if (r.shortestDistance && r.shortestDistance.flight.id !== r.longestDistance?.flight.id)
     recs.push({ id: 'shortest', icon: 'landing', label: 'Shortest flight', value: fmtDistance(r.shortestDistance.value, unit), flight: r.shortestDistance.flight });
-  if (r.longestDuration)
+  if (r.longestDuration && r.longestDuration.flight.id !== r.longestDistance?.flight.id)
     recs.push({ id: 'longest-time', icon: 'clock', label: 'Most time aloft', value: `${r.longestDuration.estimated ? '≈ ' : ''}${formatDuration(r.longestDuration.value)}`, flight: r.longestDuration.flight, tone: 'amber' });
-  if (r.shortestDuration && r.shortestDuration.flight.id !== r.longestDuration?.flight.id)
+  if (r.shortestDuration && r.shortestDuration.flight.id !== r.longestDuration?.flight.id && r.shortestDuration.flight.id !== r.shortestDistance?.flight.id)
     recs.push({ id: 'shortest-time', icon: 'clock', label: 'Quickest hop', value: `${r.shortestDuration.estimated ? '≈ ' : ''}${formatDuration(r.shortestDuration.value)}`, flight: r.shortestDuration.flight });
   if (r.first) recs.push({ id: 'first', icon: 'takeoff', label: 'First flight', value: when(r.first), flight: r.first });
   if (r.latest && r.latest.id !== r.first?.id) recs.push({ id: 'latest', icon: 'landing', label: 'Most recent', value: when(r.latest), flight: r.latest });
