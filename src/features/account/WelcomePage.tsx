@@ -49,7 +49,7 @@ export default function WelcomePage() {
                 Continue without an account
               </button>
             </div>
-            <p className="field__hint welcome__note">No password — we email you a link. You can sign in later from the account button in the top corner.</p>
+            <p className="field__hint welcome__note">Sign in with your email and password. You can sign in later from the account button in the top corner.</p>
           </section>
         ) : (
           <section className="card welcome__card">

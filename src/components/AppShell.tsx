@@ -52,7 +52,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   // First run: offer sign-in or local-only use once the stored session has been checked.
   useEffect(() => {
-    if (sync.phase === 'signed-out' && !isOnboarded() && !isBare && !isForm && pathname !== '/account') {
+    if (sync.phase === 'signed-out' && !isOnboarded() && !isBare && !isForm && pathname !== '/account' && pathname !== '/password') {
       navigate('/welcome', { replace: true });
     }
   }, [sync.phase, pathname, isBare, isForm, navigate]);
@@ -88,6 +88,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               {n.label === 'More' ? 'Settings' : n.label}
             </NavLink>
           ))}
+          <NavLink to="/flights" className="shell__side-link"><Icon name="plane" size={20} />Flight log</NavLink>
           <NavLink to="/import" className="shell__side-link">
             <Icon name="upload" size={20} />
             Import

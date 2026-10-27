@@ -33,6 +33,7 @@ import {
 } from './form-model';
 import { usageStats } from './history-stats';
 import { getDetailsOpen, saveDetailsOpen, saveEntryDefaults } from './prefs';
+import { QuickEntry } from './QuickEntry';
 import { useFlightLookup } from './useFlightLookup';
 
 /** Results at or above this confidence auto-fill empty fields; below it they are offered with "Use these details". */
@@ -94,7 +95,7 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
   });
 
   // Hash routing keeps the previous screen's scroll position; a form always starts at the top.
-  useEffect(() => window.scrollTo(0, 0), []);
+  useEffect(() => { window.scrollTo(0, 0); }, []);
 
   const fromRef = useRef<HTMLButtonElement>(null);
   const toRef = useRef<HTMLButtonElement>(null);
@@ -381,6 +382,7 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
         <span className="entry-header__btn" aria-hidden="true" />
       </header>
 
+      {mode === 'new' && !dirty && <QuickEntry onApply={(values) => { patch(values); touch('from', 'to'); }} />}
       <form className="entry-form" onSubmit={onSubmit} noValidate>
         <section className="entry-card flight-card" aria-label="Date and flight number">
           <DateField id="entry-date" date={v.date} precision={v.datePrecision} onChange={setDate} error={errors.date} />

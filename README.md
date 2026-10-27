@@ -112,8 +112,7 @@ copied to your own Supabase database and to any other device you sign in on.
    It creates a `flights` table with Row Level Security so each account only sees its own rows.
 3. **Auth settings** (Authentication → URL Configuration): set **Site URL** to your production URL
    (e.g. `https://your-app.vercel.app`) and add it under **Redirect URLs**.
-4. **Show the 6-digit code in the email** (Authentication → Emails → Magic Link template): add
-   `<p>Your code: {{ .Token }}</p>`. The code is the most reliable way to sign in inside the installed app.
+4. **Enable email/password authentication** in Authentication → Providers → Email. Configure production SMTP for confirmation and recovery messages; regular password sign-in does not send email. See the password migration instructions below.
 5. **Vercel env vars** (Project → Settings → Environment Variables), for Production (and Preview if you test there):
    - `SUPABASE_URL` — Supabase → Project Settings → API → Project URL
    - `SUPABASE_ANON_KEY` — the `anon` / publishable key (public by design; RLS protects the data)
@@ -122,7 +121,7 @@ copied to your own Supabase database and to any other device you sign in on.
    values are passed to the browser; the service-role key is never used — don't put it in either variable.
 
    Then **redeploy** — Vite bakes env vars in at build time.
-6. In the app: **More → Cloud sync** → enter your email → type the code. Your existing log uploads automatically.
+6. In the app: **Account** → create an account or sign in with email and password. Your existing log uploads automatically.
 7. Optional, recommended: after your first sign-in, turn off **Authentication → Sign In / Providers → Allow new users to sign up**
    so nobody else can create an account on your project.
 
@@ -130,3 +129,37 @@ Notes: deletes are soft (`deleted = true`, data kept) so a mistaken delete can b
 Supabase table editor. Sign in on your main device first; on another device start from an empty log
 (importing the same Flightradar24 file on two devices would create duplicates).
 For local dev, copy `.env.example` to `.env.local`.
+
+### Password sign-in and existing accounts
+
+Sign-in uses email and password; it does not send a magic link on each login.
+Enable the Email provider in Supabase Auth. Existing users who previously used
+magic links can use **Account → Set or change password** while signed in, or
+**Forgot password / previously used email links?** while signed out. This updates
+the same account and preserves its user ID and cloud flights.
+
+Add the application's exact origin/path with `?passwordRecovery=1` to Supabase's
+allowed Redirect URLs, alongside its normal application URL. Recovery links use
+PKCE: request and open the link in the same browser. New-account confirmation
+and password recovery still send email and remain subject to Supabase email
+limits; configure custom SMTP for production delivery. Keep signup enabled only
+if you want new users. Never expose the service-role key.
+
+### Release updates and browser regression checks
+
+Vite fingerprints JavaScript/CSS assets. Vercel revalidates the app shell and
+static data, caches fingerprinted assets immutably, and does not cache `sw.js`.
+The PWA checks for updates at startup, on foreground/reconnect, and every five
+minutes. An update prompt lets people save work before activating the new worker.
+Offline users retain their last downloaded version until they reconnect. Other
+static hosts should use equivalent cache headers.
+
+Run `CHROMIUM_PATH=/path/to/chromium node scripts/smoke.mjs` with the dev server
+running. It uses a fresh browser profile, saves a test flight, downloads CSV,
+and checks key screens at phone, tablet and desktop widths. `SMOKE_URL` can
+select another local server. No personal data or live credentials are required.
+
+Quick entry accepts an explicit line such as `SAN → LAX 2026-11-15 UA123` and
+fills the editable form. It deliberately does not guess dates from arbitrary
+emails. CSV export now offers readable spreadsheet columns plus a separate
+Flightradar24 compatibility option. JSON remains the lossless backup format.

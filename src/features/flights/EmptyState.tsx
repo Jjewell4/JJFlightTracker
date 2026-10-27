@@ -68,7 +68,7 @@ export function EmptyState() {
         </Link>
         <Link to="/import" className="btn btn--lg btn--block">
           <Icon name="upload" size={18} />
-          Import from Flightradar24
+          Import your flight history
         </Link>
         <button type="button" className="btn btn--ghost btn--block" onClick={trySample} disabled={busy}>
           <Icon name="sparkle" size={18} />

@@ -76,9 +76,25 @@ export function flightToFr24Row(f: Flight): string[] {
 /** Oldest-first CSV text (with header, CRLF line ends like FR24). */
 export function exportFr24Csv(flights: Flight[]): string {
   const sorted = [...flights].sort((a, b) => a.date.localeCompare(b.date) || (a.depTime ?? '').localeCompare(b.depTime ?? ''));
-  return Papa.unparse({ fields: [...FR24_HEADERS], data: sorted.map(flightToFr24Row) }, { newline: '\r\n' });
+  return Papa.unparse({ fields: [...FR24_HEADERS], data: sorted.map(flightToFr24Row) }, { newline: '\r\n', escapeFormulae: true });
 }
 
 export function csvFileName(now: Date = new Date()): string {
   return `flight-log-${now.toISOString().slice(0, 10)}.csv`;
+}
+
+/** Portable, readable columns; JSON remains the lossless backup format. */
+export function exportSpreadsheetCsv(flights: Flight[]): string {
+  const sorted = [...flights].sort((a, b) => a.date.localeCompare(b.date) || (a.depTime ?? '').localeCompare(b.depTime ?? ''));
+  if (!sorted.length) return 'Date,From,To,Flight number,Airline,Departure time,Arrival time,Duration,Aircraft,Registration,Seat,Seat type,Cabin class,Reason,Notes';
+  return Papa.unparse(sorted.map((f) => ({
+    Date: f.datePrecision === 'year' ? f.date.slice(0, 4) : f.datePrecision === 'month' ? f.date.slice(0, 7) : f.date,
+    From: f.from, To: f.to, 'Flight number': f.flightNumber ?? '',
+    Airline: f.airlineName || f.airlineIcao || f.airlineIata || '',
+    'Departure time': f.depTime ?? '', 'Arrival time': f.arrTime ?? '',
+    Duration: f.durationMin ? `${pad(f.durationMin / 60)}:${pad(f.durationMin % 60)}` : '',
+    Aircraft: f.aircraftType || f.aircraftName || '', Registration: f.registration ?? '',
+    Seat: f.seatNumber ?? '', 'Seat type': f.seatType ?? '',
+    'Cabin class': f.cabinClass ?? '', Reason: f.reason ?? '', Notes: f.note ?? '',
+  })), { newline: '\r\n', escapeFormulae: true, columns: ['Date','From','To','Flight number','Airline','Departure time','Arrival time','Duration','Aircraft','Registration','Seat','Seat type','Cabin class','Reason','Notes'] });
 }

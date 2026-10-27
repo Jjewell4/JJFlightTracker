@@ -41,16 +41,25 @@ function redirectUrl(): string {
   return `${window.location.origin}${window.location.pathname}`;
 }
 
-/** Emails a sign-in link + 6-digit code (the code needs {{ .Token }} in the email template). */
-export async function sendSignInEmail(email: string): Promise<void> {
+export async function signInPassword(email: string, password: string): Promise<void> {
   const sb = await getSupabase();
-  const { error } = await sb.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: redirectUrl(), shouldCreateUser: true } });
+  const { error } = await sb.auth.signInWithPassword({ email: email.trim(), password });
   if (error) throw error;
 }
-
-export async function verifySignInCode(email: string, code: string): Promise<void> {
+export async function createPasswordAccount(email: string, password: string): Promise<boolean> {
   const sb = await getSupabase();
-  const { error } = await sb.auth.verifyOtp({ email: email.trim(), token: code.replace(/\s+/g, ''), type: 'email' });
+  const { data, error } = await sb.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: redirectUrl() } });
+  if (error) throw error;
+  return !!data.session;
+}
+export async function requestPasswordReset(email: string): Promise<void> {
+  const sb = await getSupabase();
+  const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${redirectUrl()}?passwordRecovery=1` });
+  if (error) throw error;
+}
+export async function updatePassword(password: string): Promise<void> {
+  const sb = await getSupabase();
+  const { error } = await sb.auth.updateUser({ password });
   if (error) throw error;
 }
 
@@ -63,7 +72,7 @@ export async function signOutCloud(): Promise<void> {
 export function cleanAuthParamsFromUrl(): void {
   const u = new URL(window.location.href);
   let changed = false;
-  for (const k of ['code', 'error', 'error_code', 'error_description']) {
+  for (const k of ['code', 'passwordRecovery', 'error', 'error_code', 'error_description']) {
     if (u.searchParams.has(k)) {
       u.searchParams.delete(k);
       changed = true;

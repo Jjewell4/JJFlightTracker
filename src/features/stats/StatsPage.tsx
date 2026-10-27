@@ -81,17 +81,20 @@ function StatsDashboard({ flights, upcoming, unit, clock, homeCountry }: { fligh
 
       <ScopeChips years={years} scope={scope} onChange={setScope} counts={countsByYear} total={flights.length} />
 
-      <div className="stats-body">
+      <nav className="stats-jump" aria-label="Statistics sections">
+        {['Summary', 'Patterns', 'Records', 'Favorites', 'Places'].map((label) => <button key={label} type="button" onClick={() => document.getElementById(`stats-${label.toLowerCase()}`)?.scrollIntoView({block: 'start'})}>{label}</button>)}
+      </nav>
+      <div className="stats-body" id="stats-summary">
         <div className="stats-top">
           <Hero stats={stats} scope={scope} unit={unit} prev={prev} firstYear={years[years.length - 1]} />
         </div>
 
         {stats.insights.length > 0 && <Insights items={stats.insights} />}
 
-        <TimeCharts stats={stats} scope={scope} unit={unit} clock={clock} currentYear={currentYear} />
+        <div id="stats-patterns" /><TimeCharts stats={stats} scope={scope} unit={unit} clock={clock} currentYear={currentYear} />
         <Breakdowns stats={stats} unit={unit} />
         <Records stats={stats} unit={unit} />
-        <TopLists stats={stats} unit={unit} />
+        <div id="stats-favorites" /><TopLists stats={stats} unit={unit} />
         <Places stats={stats} homeCountry={homeCountry} />
         <Footprint stats={stats} />
 

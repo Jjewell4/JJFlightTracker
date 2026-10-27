@@ -132,10 +132,13 @@ export function startCloudSync(): void {
       client = sb;
       const fromEmailLink = new URLSearchParams(window.location.search).has('code');
       const { data } = await sb.auth.getSession(); // also completes an email-link sign-in (?code=)
+      const recovering = new URLSearchParams(window.location.search).get('passwordRecovery') === '1';
       cleanAuthParamsFromUrl();
+      if (recovering && data.session) window.location.hash = '/password';
       await applySession(data.session, fromEmailLink);
       initialized = true;
       sb.auth.onAuthStateChange((_event, session) => {
+        if (_event === 'PASSWORD_RECOVERY') window.location.hash = '/password';
         // Don't call Supabase from inside this callback (it can deadlock); defer.
         setTimeout(() => void applySession(session), 0);
       });

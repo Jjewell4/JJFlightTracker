@@ -22,6 +22,7 @@ import { ConfirmSheet } from '@/components/Sheet';
 import { CloudSyncSection } from './CloudSyncSection';
 import { useCloudSync } from '@/services/sync/controller';
 import './settings.css';
+import { exportSpreadsheetCsv } from '@/services/import/export-csv';
 
 function Group({ title, footer, children }: { title?: string; footer?: ReactNode; children: ReactNode }) {
   return (
@@ -109,9 +110,9 @@ export default function SettingsPage() {
     say(`Backup saved — ${all.length} ${all.length === 1 ? 'flight' : 'flights'}.`);
   }
 
-  async function exportCsv() {
+  async function exportCsv(compatible = false) {
     const all = await getAllFlights();
-    downloadText(csvFileName(), exportFr24Csv(all), 'text/csv', true);
+    downloadText(csvFileName(), compatible ? exportFr24Csv(all) : exportSpreadsheetCsv(all), 'text/csv', true);
     say(`CSV saved — ${all.length} ${all.length === 1 ? 'flight' : 'flights'}.`);
   }
 
@@ -168,7 +169,7 @@ export default function SettingsPage() {
       <Group title="Import & export">
         <Link to="/import" className="list__row srow">
           <Tile icon="upload" />
-          <RowText title="Import flights" sub="Flightradar24, spreadsheet or backup" />
+          <RowText title="Import flights" sub="CSV, Excel, another tracker or JSON backup" />
           <Icon name="chevron" size={18} className="srow__chev" />
         </Link>
         <button type="button" className="list__row srow" onClick={() => void exportBackup()}>
@@ -177,7 +178,10 @@ export default function SettingsPage() {
         </button>
         <button type="button" className="list__row srow" onClick={() => void exportCsv()}>
           <Tile icon="file" tone="amber" />
-          <RowText title="Export CSV" sub="Flightradar24-compatible spreadsheet" />
+          <RowText title="Export CSV" sub="Readable columns for Excel, Sheets and other apps" />
+        </button>
+        <button type="button" className="list__row srow" onClick={() => void exportCsv(true)}>
+          <Tile icon="file" tone="plain" /><RowText title="Export for Flightradar24" sub="Compatibility format for existing tracker workflows" />
         </button>
       </Group>
 
@@ -396,7 +400,7 @@ export default function SettingsPage() {
             </span>
             <div>
               <div className="sabout__name">Flight Log</div>
-              <div className="srow__sub">Your flights, kept on your device. No account, no tracking.</div>
+              <div className="srow__sub">Your flights, kept on your device. Optional account sync.</div>
             </div>
           </div>
           <h3 className="sabout__h">Data & attribution</h3>

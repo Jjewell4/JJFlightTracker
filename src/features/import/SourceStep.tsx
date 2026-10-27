@@ -6,8 +6,8 @@ import { BackupGlyph, LockGlyph, RadarGlyph, SheetGlyph } from './glyphs';
 export type SourceKind = 'fr24' | 'generic' | 'backup';
 
 const SOURCES: { kind: SourceKind; title: string; blurb: string; icon: ReactNode; accept: string }[] = [
-  { kind: 'fr24', title: 'Flightradar24', blurb: 'Your My Flights export (CSV or Excel)', icon: <RadarGlyph />, accept: '.csv,.xlsx,.txt,text/csv' },
   { kind: 'generic', title: 'CSV or spreadsheet', blurb: 'Any CSV or Excel file — you match the columns', icon: <SheetGlyph />, accept: '.csv,.tsv,.txt,.xlsx,text/csv' },
+  { kind: 'fr24', title: 'Flightradar24', blurb: 'Your My Flights export (CSV or Excel)', icon: <RadarGlyph />, accept: '.csv,.xlsx,.txt,text/csv' },
   { kind: 'backup', title: 'Flight Log backup', blurb: 'A .json file exported from this app', icon: <BackupGlyph />, accept: '.json,application/json' },
 ];
 

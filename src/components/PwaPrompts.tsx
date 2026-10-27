@@ -1,5 +1,5 @@
 /// <reference types="vite-plugin-pwa/react" />
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useRef, useSyncExternalStore } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { Icon } from './Icon';
 import './PwaPrompts.css';
@@ -26,19 +26,28 @@ function writeFlag() {
  * "New version available — Reload" and (once ever) "Ready to work offline".
  */
 export function PwaPrompts() {
+  const registrationRef = useRef<ServiceWorkerRegistration | undefined>(undefined);
   const {
     offlineReady: [offlineReady, setOfflineReady],
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(_url, registration) {
-      // Look for a new version hourly while the app stays open.
-      if (registration) setInterval(() => void registration.update().catch(() => undefined), 60 * 60 * 1000);
+      registrationRef.current = registration;
+      if (registration) void registration.update().catch(() => undefined);
     },
     onRegisterError(err) {
       console.warn('Service worker registration failed', err);
     },
   });
+
+  useEffect(() => {
+    const check = () => { if (navigator.onLine && document.visibilityState === 'visible') void registrationRef.current?.update().catch(() => undefined); };
+    const timer = setInterval(check, 5 * 60 * 1000);
+    document.addEventListener('visibilitychange', check);
+    window.addEventListener('online', check);
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', check); window.removeEventListener('online', check); };
+  }, []);
 
   // "Ready to work offline" is only worth announcing the first time ever.
   const [seenBefore] = useState(readFlag);
@@ -62,7 +71,7 @@ export function PwaPrompts() {
         </span>
         <span className="pwa-toast__text">
           <strong>Update available</strong>
-          <span>Reload for the latest version.</span>
+          <span>Save any edits, then reload for the latest version.</span>
         </span>
         <button type="button" className="pwa-toast__btn" onClick={() => void updateServiceWorker(true)}>
           Reload

@@ -12,7 +12,7 @@ import { emptyValues, flightToValues, nonEmptyGroups } from './form-model';
 
 beforeAll(() => {
   installReference();
-  window.scrollTo = () => undefined; // not implemented in jsdom
+  window.scrollTo = (() => Promise.resolve()) as unknown as typeof window.scrollTo; // not implemented in jsdom
 });
 
 let host: HTMLDivElement;

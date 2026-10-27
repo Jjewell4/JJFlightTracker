@@ -100,7 +100,7 @@ export default function AccountPage() {
             <p className="muted">
               {count > 0
                 ? `Your ${count.toLocaleString()} ${count === 1 ? 'flight is' : 'flights are'} only on this device right now.`
-                : 'Create a free account with just your email.'}
+                : 'Create an account with your email and password.'}
             </p>
           </div>
           <Benefits />
@@ -153,6 +153,7 @@ export default function AccountPage() {
         </section>
 
         <section className="list account-links">
+          <Link to="/password" className="list__row account-link"><Icon name="shield" size={20} />Set or change password</Link>
           <Link to="/settings" className="list__row account-link">
             <Icon name="settings" size={18} />
             <span>Settings & backups</span>

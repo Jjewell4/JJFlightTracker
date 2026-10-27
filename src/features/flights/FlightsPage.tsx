@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
 import { getAirport, useReferenceReady } from '@/data/reference';
 import { useFlights, useSettings } from '@/lib/db';
@@ -25,15 +25,17 @@ import { SearchBar } from './SearchBar';
 import { SummaryHero, SummaryHeroSkeleton } from './SummaryHero';
 import { UpcomingCard } from './UpcomingCard';
 import './FlightsPage.css';
-import { RouteMap } from './RouteMap';
+import { JourneyMap } from './JourneyMap';
 import './FlightDetailPage.css';
 import './Overview.css';
 
 // Survives navigating to a flight and back (module scope = this browser session).
-const memory = { query: '', filters: {} as FlightFilters, scrollY: 0 };
+const memory = { limit: 40, query: '', filters: {} as FlightFilters, scrollY: 0 };
 const FIRST_PAINT = 40;
 
 export function FlightsPage() {
+  const { pathname } = useLocation();
+  const archive = pathname === '/flights';
   const flights = useFlights();
   const ready = useReferenceReady();
   const { distanceUnit: unit, clock } = useSettings();
@@ -77,11 +79,16 @@ export function FlightsPage() {
   const shownPast = useMemo(() => (filtering ? past.filter(match) : past), [past, filtering, q, filters, index]);
   const allGroups = useMemo(() => groupFlights(shownPast), [shownPast, ready]);
 
-  // Progressive rendering: paint the first screenful immediately, the rest in a transition.
-  const [limit, setLimit] = useState(FIRST_PAINT);
-  const complete = limit >= shownPast.length;
-  useEffect(() => { setLimit(FIRST_PAINT); }, [q, filters]);
-  const groups = useMemo(() => (complete ? allGroups : limitGroups(allGroups, limit)), [allGroups, limit, complete]);
+  // Keep the overview concise; the full log expands in bounded batches.
+  const [limit, setLimit] = useState(memory.limit);
+  const displayLimit = archive || filtering ? limit : 5;
+  const complete = displayLimit >= shownPast.length;
+  const previousFilter = useRef({ q, filters });
+  useEffect(() => {
+    if (previousFilter.current.q !== q || previousFilter.current.filters !== filters) { setLimit(FIRST_PAINT); memory.limit = FIRST_PAINT; }
+    previousFilter.current = { q, filters };
+  }, [q, filters]);
+  const groups = useMemo(() => (complete ? allGroups : limitGroups(allGroups, displayLimit)), [allGroups, displayLimit, complete]);
 
   // Keep sticky year headers tucked under the sticky search bar.
   useLayoutEffect(() => {
@@ -137,24 +144,25 @@ export function FlightsPage() {
     >
       <header className="page-header flights__header">
         <div>
-          <h1 className="page-title">Your flight journal</h1>
+          <h1 className="page-title">{archive ? 'Flight log' : 'Your flight journal'}</h1>
+          <p className="page-subtitle">{archive ? 'Every journey, easy to find.' : 'The places you’ve been. The journeys still ahead.'}</p>
         </div>
         <Link to="/import" className="btn btn--ghost btn--icon flights__import" aria-label="Import flights">
           <Icon name="upload" size={20} />
         </Link>
       </header>
 
-      <SummaryHero summary={summary} unit={unit} upcoming={upcoming.length} />
+      {!archive && <SummaryHero summary={summary} unit={unit} upcoming={upcoming.length} />}
 
-      {!filtering && featured && from && to && (
+      {!archive && !filtering && featured && from && to && (
         <section className="overview" aria-label="Travel overview">
           <Link to="/map" className="overview__map card">
-            <div className="overview__heading"><Icon name="globe" size={20} /><span>{upcoming.length ? 'Your next horizon' : 'Your latest journey'}</span><Icon name="chevron" size={16} /></div>
-            <RouteMap from={from} to={to} fromLabel={from.iata || from.ident} toLabel={to.iata || to.ident} />
-            <div className="overview__caption">{from.city} → {to.city}<span>Explore your map</span></div>
+            <div className="overview__heading"><Icon name="globe" size={20} /><span>Your world, connected</span><Icon name="chevron" size={16} /></div>
+            <JourneyMap flights={past} />
+            <div className="overview__caption">{summary.airports} airports · {summary.countries} countries<span>Explore your map</span></div>
           </Link>
           <div className="overview__actions card">
-            <h2>Where to next?</h2><p>Keep your story moving. Start fresh or reuse a familiar journey.</p>
+            <h2>Where to next?</h2><p>{upcoming.length ? 'Next up' : 'Last flown'}: {from.iata || from.ident} → {to.iata || to.ident}. Add a new journey or reuse this route.</p>
             <Link className="btn btn--primary" to="/flights/new"><Icon name="plus" size={18} />Log a flight</Link>
             <Link className="btn" to={`/flights/new?return=${encodeURIComponent(featured.id)}`}><Icon name="swap" size={18} />Add the return</Link>
             <Link className="btn btn--ghost" to={`/flights/new?duplicate=${encodeURIComponent(featured.id)}`}>Fly this route again</Link>
@@ -162,7 +170,7 @@ export function FlightsPage() {
           </div>
         </section>
       )}
-      <h2 className="section-title">Your flights</h2>
+      <div className="overview__section-head"><h2 className="section-title">{archive || filtering ? 'Your flights' : 'Recent journeys'}</h2>{!archive && <Link to="/flights">View full log <Icon name="chevron" size={14} /></Link>}</div>
       <SearchBar ref={searchRef} query={query} onQuery={setQuery} filters={filters} onFilters={setFilters} options={options} />
 
       {filtering && (
@@ -235,7 +243,7 @@ export function FlightsPage() {
           </section>
         ))
       )}
-      {!complete && <button className="btn btn--block" onClick={() => setLimit((n) => n + FIRST_PAINT)}>Show more flights ({shownPast.length - limit} remaining)</button>}
+      {!complete && (archive || filtering) && <button className="btn btn--block" onClick={() => setLimit((n) => { memory.limit = n + FIRST_PAINT; return memory.limit; })}>Show more flights ({shownPast.length - limit} remaining)</button>}
     </div>
   );
 }
