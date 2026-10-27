@@ -76,6 +76,7 @@ export function goBackScreens(steps: number, fallback: () => void): void {
  */
 export async function popOverlayEntries(max = 5): Promise<void> {
   for (let i = 0; i < max && (window.history.state as { __overlay?: string } | null)?.__overlay; i++) {
+    const previous = window.history.state?.__overlay;
     await new Promise<void>((resolve) => {
       const done = () => {
         window.removeEventListener('popstate', done);
@@ -86,5 +87,8 @@ export async function popOverlayEntries(max = 5): Promise<void> {
       window.addEventListener('popstate', done);
       window.history.back();
     });
+    // Some standalone browsers ignore a Back request. Do not repeat the timeout
+    // five times after the flight has already been safely saved.
+    if (window.history.state?.__overlay === previous) break;
   }
 }

@@ -44,6 +44,8 @@ let client: SupabaseClient | null = null;
 let running: Promise<void> | null = null;
 let again = false;
 let debounce: ReturnType<typeof setTimeout> | undefined;
+let retry: ReturnType<typeof setTimeout> | undefined;
+let failures = 0;
 
 function errorMessage(e: unknown): string {
   const msg = e instanceof Error ? e.message : typeof e === 'object' && e && 'message' in e ? String((e as { message: unknown }).message) : String(e);
@@ -63,6 +65,7 @@ export function syncNow(): Promise<void> {
     again = true;
     return running;
   }
+  clearTimeout(retry);
   const sb = client;
   const userId = state.userId;
   running = (async () => {
@@ -74,9 +77,14 @@ export function syncNow(): Promise<void> {
         setState({ lastResult: result, lastSyncAt: result.at });
       } while (again);
       setState({ status: 'idle', pending: await countPendingChanges() });
+      failures = 0;
     } catch (e) {
       console.error('Cloud sync failed', e);
       setState({ status: 'error', error: errorMessage(e) });
+      // A flaky connection may never dispatch an `online` event. Retry without
+      // making the user wait on the form or manually reopen the app.
+      const delay = Math.min(30_000 * 2 ** Math.min(failures++, 4), 5 * 60_000);
+      retry = setTimeout(() => void syncNow(), delay);
     } finally {
       running = null;
     }
@@ -91,6 +99,14 @@ function scheduleSync(delay = 1500) {
 
 export function clearNotice(): void {
   setState({ notice: undefined });
+}
+
+/** Called only after the IndexedDB write commits; never waits on the network. */
+export function announceLocalSave(): void {
+  setState({ notice: state.phase === 'signed-in'
+    ? 'Saved on this device. Cloud sync will happen automatically.'
+    : 'Saved on this device.' });
+  if (state.phase === 'signed-in') scheduleSync(300);
 }
 
 /** True once the stored session has been restored at startup. */
@@ -109,6 +125,8 @@ async function applySession(session: Session | null, announce = initialized) {
     });
     if (prev !== session.user.id) scheduleSync(0);
   } else {
+    clearTimeout(retry);
+    failures = 0;
     setState({ phase: 'signed-out', email: undefined, userId: undefined, status: 'idle', error: undefined });
   }
 }

@@ -84,6 +84,17 @@ export function cleanAuthParamsFromUrl(): void {
 const PAGE = 1000;
 const DELETE_CHUNK = 100; // ids go in the URL of the PATCH request
 
+/** Bound a stalled mobile connection so the background controller can retry. */
+async function cloudRequest<T>(request: (signal: AbortSignal) => PromiseLike<T>): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
+  try {
+    return await request(controller.signal);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function supabaseRemote(sb: SupabaseClient, userId: string): SyncRemote {
   return {
     async pull(since) {
@@ -97,7 +108,7 @@ export function supabaseRemote(sb: SupabaseClient, userId: string): SyncRemote {
           .order('id', { ascending: true })
           .range(from, from + PAGE - 1);
         if (since) q = q.gt('server_updated_at', since);
-        const { data, error } = await q;
+        const { data, error } = await cloudRequest((signal) => q.abortSignal(signal));
         if (error) throw error;
         out.push(...((data ?? []) as RemoteRow[]));
         if (!data || data.length < PAGE) break;
@@ -106,16 +117,16 @@ export function supabaseRemote(sb: SupabaseClient, userId: string): SyncRemote {
     },
     async upsert(flights: Flight[]) {
       const rows = flights.map((f) => ({ user_id: userId, id: f.id, data: f, updated_at: f.updatedAt, deleted: false }));
-      const { error } = await sb.from('flights').upsert(rows, { onConflict: 'user_id,id' });
+      const { error } = await cloudRequest((signal) => sb.from('flights').upsert(rows, { onConflict: 'user_id,id' }).abortSignal(signal));
       if (error) throw error;
     },
     async markDeleted(ids, at) {
       for (let i = 0; i < ids.length; i += DELETE_CHUNK) {
-        const { error } = await sb
+        const { error } = await cloudRequest((signal) => sb
           .from('flights')
           .update({ deleted: true, updated_at: at })
           .eq('user_id', userId)
-          .in('id', ids.slice(i, i + DELETE_CHUNK));
+          .in('id', ids.slice(i, i + DELETE_CHUNK)).abortSignal(signal));
         if (error) throw error;
       }
     },

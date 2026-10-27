@@ -106,6 +106,11 @@ Flight Log is an independent project and is not affiliated with Flightradar24.
 
 Flights always save on the device first (works offline). With sync on, every change is also
 copied to your own Supabase database and to any other device you sign in on.
+Saving confirms the committed local write immediately; it never waits for cloud sync.
+Pending changes survive closing/reopening the PWA. Sync retries transient failures after
+30 seconds with backoff up to five minutes, and also runs on reconnection and foregrounding.
+Cloud requests time out after 20 seconds so a stalled connection can retry. Browsers may
+suspend a closed/backgrounded PWA: in that case, queued changes sync when it is reopened.
 
 1. **Create a project** at [supabase.com](https://supabase.com) (free tier is plenty).
 2. **Create the table:** Supabase → SQL Editor → New query → paste [`supabase/schema.sql`](supabase/schema.sql) → Run.

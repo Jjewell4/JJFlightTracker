@@ -56,6 +56,34 @@ beforeEach(async () => {
 });
 
 describe('cloud sync engine', () => {
+  it('commits a local flight while the cloud is stalled, then syncs it after reconnection', async () => {
+    let release!: (rows: RemoteRow[]) => void;
+    const remote = cloud.remote();
+    const stalled = new Promise<RemoteRow[]>((resolve) => { release = resolve; });
+    const syncing = syncOnce({ ...remote, pull: () => stalled }, USER);
+    // The local DB must remain writable even while the network request is pending.
+    const saved = await addFlight({ ...base, id: 'offline', date: '2026-01-01', from: 'KSAN', to: 'KSFO' });
+    expect((await db.flights.get(saved.id))?.from).toBe('KSAN');
+    expect(cloud.rows.size).toBe(0);
+    release([]);
+    await syncing;
+    expect(cloud.rows.get(saved.id)?.data.from).toBe('KSAN');
+    expect(await countPendingChanges()).toBe(0);
+  });
+
+  it('keeps a failed upload pending across a database reopen and retries without duplicates', async () => {
+    const saved = await addFlight({ ...base, id: 'retry', date: '2026-01-01', from: 'KSAN', to: 'KSFO' });
+    await expect(syncOnce({ ...cloud.remote(), upsert: async () => { throw new Error('offline'); } }, USER)).rejects.toThrow('offline');
+    db.close();
+    await db.open();
+    expect(await db.flights.get(saved.id)).toEqual(saved);
+    expect(await countPendingChanges()).toBe(1);
+    await syncOnce(cloud.remote(), USER);
+    await syncOnce(cloud.remote(), USER);
+    expect(cloud.rows.size).toBe(1);
+    expect(await countPendingChanges()).toBe(0);
+  });
+
   it('pushes the existing log on first sync, then is idempotent', async () => {
     await addFlight({ ...base, id: 'a', date: '2024-01-01', from: 'KSAN', to: 'KSFO' });
     await addFlight({ ...base, id: 'b', date: '2024-02-01', from: 'KSFO', to: 'KSAN' });

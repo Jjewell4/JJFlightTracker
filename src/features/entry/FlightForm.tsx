@@ -35,6 +35,7 @@ import { usageStats } from './history-stats';
 import { getDetailsOpen, saveDetailsOpen, saveEntryDefaults } from './prefs';
 import { QuickEntry } from './QuickEntry';
 import { useFlightLookup } from './useFlightLookup';
+import { announceLocalSave } from '@/services/sync/controller';
 
 /** Results at or above this confidence auto-fill empty fields; below it they are offered with "Use these details". */
 const AUTO_FILL_MIN = 0.6;
@@ -75,6 +76,8 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
   const [dismissed, setDismissed] = useState<LookupOutcome | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savedLocally, setSavedLocally] = useState(false);
+  const savingRef = useRef(false);
   const [saveError, setSaveError] = useState('');
   const [sheet, setSheet] = useState<SheetName>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -301,7 +304,7 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (saving) return;
+    if (savingRef.current) return;
     setSubmitted(true);
     setSaveError('');
     const errs = validate(v);
@@ -309,6 +312,7 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
       focusFirstError(errs);
       return;
     }
+    savingRef.current = true;
     setSaving(true);
     const usedLookup = [...auto.values()].some((src) => src !== PREFIX);
     const source = usedLookup ? 'lookup' : (base?.source ?? 'manual');
@@ -316,6 +320,8 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
       const input = enrichFlight(valuesToInput(v, { source, base }));
       if (base) {
         await updateFlight(base.id, input);
+        setSavedLocally(true);
+        announceLocalSave();
         void requestPersistentStorageOnce();
         leavingRef.current = true;
         await popOverlayEntries(); // the unsaved-changes guard's entry
@@ -324,6 +330,8 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
         else navigate(`/flights/${base.id}`, { replace: true });
       } else {
         const saved = await addFlight(input);
+        setSavedLocally(true);
+        announceLocalSave();
         // Now there's data worth keeping: ask the browser not to evict it (fire-and-forget).
         void requestPersistentStorageOnce();
         leavingRef.current = true;
@@ -334,6 +342,8 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
     } catch (err) {
       console.error(err);
       leavingRef.current = false;
+      savingRef.current = false;
+      setSavedLocally(false);
       setSaving(false);
       setSaveError("Couldn't save this flight. Please try again.");
     }
@@ -512,8 +522,8 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
               </button>
             )}
             <button type="submit" className="btn btn--primary btn--lg btn--block entry-actions__save" disabled={saving}>
-              {saving ? <span className="spinner spinner--inverse" aria-hidden="true" /> : <Icon name="check" size={20} strokeWidth={2.25} />}
-              {mode === 'edit' ? 'Save changes' : 'Save flight'}
+              {saving && !savedLocally ? <span className="spinner spinner--inverse" aria-hidden="true" /> : <Icon name="check" size={20} strokeWidth={2.25} />}
+              {savedLocally ? 'Saved on this device' : saving ? 'Saving on this device…' : mode === 'edit' ? 'Save changes' : 'Save flight'}
             </button>
           </div>
         </div>
