@@ -11,18 +11,27 @@ import { fileURLToPath, URL } from 'node:url';
  */
 function supabaseEnv(mode: string) {
   const env = { ...loadEnv(mode, process.cwd(), ''), ...process.env };
-  const pick = (...names: string[]) => names.map((n) => env[n]?.trim()).find(Boolean) ?? '';
-  return {
-    url: pick('VITE_SUPABASE_URL', 'SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL'),
-    key: pick(
-      'VITE_SUPABASE_ANON_KEY',
-      'VITE_SUPABASE_PUBLISHABLE_KEY',
-      'SUPABASE_ANON_KEY',
-      'SUPABASE_PUBLISHABLE_KEY',
-      'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-      'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
-    ),
-  };
+  const urlNames = ['VITE_SUPABASE_URL', 'SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL'];
+  const keyNames = [
+    'VITE_SUPABASE_ANON_KEY',
+    'VITE_SUPABASE_PUBLISHABLE_KEY',
+    'SUPABASE_ANON_KEY',
+    'SUPABASE_PUBLISHABLE_KEY',
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+    'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+  ];
+  const urlName = urlNames.find((n) => env[n]?.trim());
+  const keyName = keyNames.find((n) => env[n]?.trim());
+  if (mode === 'production') {
+    // Build-log diagnostics: variable NAMES only, never values.
+    const seen = Object.keys(env).filter((n) => /SUPABASE/i.test(n)).sort();
+    console.log(
+      urlName && keyName
+        ? `[cloud sync] enabled (URL from ${urlName}, key from ${keyName})`
+        : `[cloud sync] disabled — missing ${urlName ? '' : 'SUPABASE_URL '}${keyName ? '' : 'SUPABASE_ANON_KEY'}. Supabase-like variables visible to this build: ${seen.join(', ') || 'none'}`,
+    );
+  }
+  return { url: urlName ? env[urlName]!.trim() : '', key: keyName ? env[keyName]!.trim() : '' };
 }
 
 // Relative base so the build works on GitHub Pages sub-paths and any static host.
