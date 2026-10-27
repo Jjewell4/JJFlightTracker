@@ -23,9 +23,7 @@
   align-items: center;
   height: calc(var(--tabbar-h) + var(--safe-bottom));
   padding-bottom: var(--safe-bottom);
-  background: var(--glass);
-  backdrop-filter: saturate(160%) blur(20px);
-  -webkit-backdrop-filter: saturate(160%) blur(20px);
+  background: var(--bg-elevated);
   border-top: 1px solid var(--border);
 }
 
