@@ -15,7 +15,21 @@ function mockFetch() { return vi.fn<typeof fetch>().mockResolvedValueOnce(json({
 describe('screenshot server', () => {
   it('reports incomplete setup without making network requests', async () => {
     const f = vi.fn<typeof fetch>();
-    await expect(extractScreenshot(body, auth, { ...config, geminiKey: '' }, f)).rejects.toMatchObject({ status: 503 });
+    await expect(extractScreenshot(body, auth, { ...config, geminiKey: '' }, f)).rejects.toMatchObject({ status: 503, message: expect.stringContaining('GEMINI_API_KEY') });
+    expect(f).not.toHaveBeenCalled();
+  });
+  it('identifies missing Supabase settings without revealing any configured values', async () => {
+    const f = vi.fn<typeof fetch>();
+    try {
+      await extractScreenshot(body, auth, { ...config, supabaseUrl: '', supabaseKey: '' }, f);
+      expect.fail('Expected missing configuration');
+    } catch (error) {
+      const message = (error as Error).message;
+      expect(message).toContain('SUPABASE_URL');
+      expect(message).toContain('SUPABASE_ANON_KEY');
+      expect(message).not.toContain(config.geminiKey);
+      expect(message).not.toContain('GEMINI_API_KEY');
+    }
     expect(f).not.toHaveBeenCalled();
   });
   it('rejects a readable image with no flights rather than creating an empty record', async () => {

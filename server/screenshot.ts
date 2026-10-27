@@ -17,7 +17,12 @@ const schema = {
 };
 
 export async function extractScreenshot(body: unknown, authorization: string | undefined, config: ScreenshotConfig, fetcher: typeof fetch = fetch) {
-  if (!config.geminiKey || !config.supabaseUrl || !config.supabaseKey) fail(503, 'Screenshot import is not configured yet. You can still enter your flight manually.');
+  const missing = [
+    !config.geminiKey.trim() && 'GEMINI_API_KEY',
+    !config.supabaseUrl.trim() && 'SUPABASE_URL (or its VITE_/NEXT_PUBLIC_ equivalent)',
+    !config.supabaseKey.trim() && 'SUPABASE_ANON_KEY or SUPABASE_PUBLISHABLE_KEY (or their VITE_/NEXT_PUBLIC_ equivalents)',
+  ].filter(Boolean);
+  if (missing.length) fail(503, `Screenshot import is missing server configuration: ${missing.join('; ')}. Set it in Vercel for this deployment’s environment, then redeploy.`);
   if (!authorization || !/^Bearer [A-Za-z0-9._~-]+$/.test(authorization)) fail(401, 'Sign in to import a screenshot.');
   const b = body as { image?: unknown; mimeType?: unknown } | null;
   if (!b || typeof b.image !== 'string' || b.image.length > 2_800_000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(b.image)) fail(400, 'Choose a smaller PNG, JPEG or WebP image.');
