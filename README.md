@@ -216,3 +216,60 @@ The browser script covers preview, handle conflicts, publishing, anonymous viewi
 live refresh, city search, failure recovery and unpublishing. It uses
 `/usr/bin/chromium` and blocks other remote hosts. It does not verify your deployed
 Supabase project or Vercel routing configuration.
+
+## Screenshot flight import (Gemini)
+
+On **Log a flight → Import a screenshot**, signed-in users can select a PNG, JPEG,
+or WebP image, preview it, and explicitly send it to Gemini. Extracted segments
+are reviewed individually and then copied into the normal editable flight form.
+Nothing is saved until the user taps **Save flight**. Missing years and unknown
+airport codes remain blank. Lookup suggestions cannot overwrite extracted fields
+without user interaction. Flights retain a `screenshot` source in backups.
+
+Deployment on Vercel:
+
+1. Run [`supabase/screenshot-import.sql`](supabase/screenshot-import.sql) in the
+   same Supabase project as cloud sync. It is safe to rerun.
+2. Set **`GEMINI_API_KEY`** as a server-only Vercel environment variable. Never use
+   a `VITE_` prefix, commit the key, or paste it into a client-side setting.
+3. Optionally set **`GEMINI_MODEL`** to a Gemini model that supports image input
+   and structured JSON output. The default is `gemini-2.5-flash`; ensure the model
+   is available to your project. Configure Google API billing/quota limits as appropriate.
+4. Ensure Vercel has the same `SUPABASE_URL` and `SUPABASE_ANON_KEY` / publishable
+   key used for cloud sync (the supported `VITE_` / `NEXT_PUBLIC_` equivalents also
+   work). A service-role key is neither required nor used.
+5. Redeploy. Test with a non-sensitive screenshot and verify the extracted date,
+   airports, times, and local save. If setup is incomplete, the app explains that
+   screenshot import is unavailable and manual entry remains usable.
+
+`api/extract-flight.ts` is a Vercel Node function with a 60-second duration limit.
+It authenticates the bearer token with Supabase, consumes a durable atomic quota,
+then calls Gemini. Limits are **10 attempts per UTC day and 100 per UTC month per
+user**, including failed/cancelled provider requests. The quota fails closed if
+its migration is missing; counters are not reset by redeployments. Use provider
+project quotas/budgets as an additional total-spend limit. Signups and per-account
+quotas alone are not a global spend cap.
+
+The browser re-encodes images as JPEG, removes metadata, and limits dimensions
+before upload. Original files are limited to 10 MB; transmitted images are under
+approximately 2.1 MB. The server validates size and signature. Images and extracted
+payloads are not stored or logged by this feature; Google processes the image
+under the Gemini API terms applicable to your project. The UI explains this
+before sending and recommends cropping out personal details. No image is added
+to a backup or public journal. Extraction needs internet; reviewed flights save
+locally and sync through the existing background flow.
+
+`npm run dev` runs the frontend only. For end-to-end local server development,
+use Vercel's local development workflow (`vercel dev`) with server environment
+variables, or test a Vercel preview deployment. Tests mock the AI and auth HTTP
+responses; SQL quota enforcement is exercised with PostgreSQL via PGlite.
+For the browser regression test, start a separate frontend with:
+
+```sh
+VITE_SUPABASE_URL=https://profile-test.invalid VITE_SUPABASE_ANON_KEY=public-test-fixture npm run dev -- --host 127.0.0.1 --port 5174 --strictPort
+node scripts/screenshot-smoke.mjs
+```
+
+The browser test uses synthetic image data and mocked services; it does not
+establish live Gemini extraction accuracy. A configured deployment must be tested
+with representative airline screenshots before relying on its suggestions.

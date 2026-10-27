@@ -87,7 +87,7 @@ export function sanitizeFlight(raw: unknown): ImportFlight | undefined {
     ['seatType', ['window', 'middle', 'aisle']],
     ['cabinClass', ['economy', 'premium', 'business', 'first', 'private']],
     ['reason', ['leisure', 'business', 'crew', 'other']],
-    ['source', ['manual', 'lookup', 'fr24', 'csv', 'backup']],
+    ['source', ['manual', 'lookup', 'screenshot', 'fr24', 'csv', 'backup']],
   ];
   for (const [k, allowed] of enums) if (f[k] !== undefined && !allowed.includes(f[k] as string)) delete f[k];
   if (typeof f.id !== 'string' || !f.id) delete f.id;

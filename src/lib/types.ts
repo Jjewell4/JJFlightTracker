@@ -7,7 +7,7 @@ export type DatePrecision = 'day' | 'month' | 'year';
 export type SeatType = 'window' | 'middle' | 'aisle';
 export type CabinClass = 'economy' | 'premium' | 'business' | 'first' | 'private';
 export type FlightReason = 'leisure' | 'business' | 'crew' | 'other';
-export type FlightSource = 'manual' | 'lookup' | 'fr24' | 'csv' | 'backup';
+export type FlightSource = 'manual' | 'lookup' | 'screenshot' | 'fr24' | 'csv' | 'backup';
 
 export interface Flight {
   /** Stable unique id (crypto.randomUUID). */

@@ -32,6 +32,12 @@ const cand = (key: string, flight: Partial<Flight>): ImportCandidate => ({
 });
 
 describe('backup format', () => {
+  it('preserves screenshot provenance through a backup round trip', () => {
+    const flight = mk({ id: 'image-import', source: 'screenshot' });
+    const parsed = parseBackup(backupToJson(buildBackup([flight], DEFAULT_SETTINGS)));
+    expect(parsed.rejected).toBe(0);
+    expect(JSON.stringify(parsed)).toContain('screenshot');
+  });
   const flights = [
     mk({ id: 'a', flightNumber: 'UA1', airlineIcao: 'UAL', depTime: '08:00', arrTime: '09:00', durationMin: 60, note: 'x', cabinClass: 'first', seatType: 'aisle', reason: 'crew' }),
     mk({ id: 'b', date: '2019-03-01', datePrecision: 'month', from: 'KSFO', to: 'EGLL', source: 'fr24' }),

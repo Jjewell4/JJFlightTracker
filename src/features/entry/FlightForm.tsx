@@ -19,6 +19,7 @@ import { TimesCard } from './TimesCard';
 import { AircraftSheet, AirlineSheet, AirportSheet } from './pickers';
 import {
   applyLookup,
+  emptyValues,
   clearFields,
   formEquals,
   inferSeatType,
@@ -34,6 +35,7 @@ import {
 import { usageStats } from './history-stats';
 import { getDetailsOpen, saveDetailsOpen, saveEntryDefaults } from './prefs';
 import { QuickEntry } from './QuickEntry';
+import { ScreenshotImport } from './ScreenshotImport';
 import { useFlightLookup } from './useFlightLookup';
 import { announceLocalSave } from '@/services/sync/controller';
 
@@ -79,6 +81,7 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
   const [savedLocally, setSavedLocally] = useState(false);
   const savingRef = useRef(false);
   const [saveError, setSaveError] = useState('');
+  const [screenshotReview, setScreenshotReview] = useState(false);
   const [sheet, setSheet] = useState<SheetName>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -315,7 +318,7 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
     savingRef.current = true;
     setSaving(true);
     const usedLookup = [...auto.values()].some((src) => src !== PREFIX);
-    const source = usedLookup ? 'lookup' : (base?.source ?? 'manual');
+    const source = screenshotReview ? 'screenshot' : usedLookup ? 'lookup' : (base?.source ?? 'manual');
     try {
       const input = enrichFlight(valuesToInput(v, { source, base }));
       if (base) {
@@ -393,6 +396,13 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
       </header>
 
       {mode === 'new' && !dirty && <QuickEntry onApply={(values) => { patch(values); touch('from', 'to'); }} />}
+      {mode === 'new' && !saving && <ScreenshotImport dirty={dirty} onApply={(values) => {
+        setV({ ...emptyValues({ cabinClass: v.cabinClass, reason: v.reason }), ...values });
+        setEdited(new Set(['airline', 'from', 'to', 'times', 'aircraft', 'registration', 'seatType']));
+        setAuto(new Map()); setArmed(false); setScreenshotReview(true); setSubmitted(false);
+        if (values.aircraftType || values.seatNumber) setDetailsOpen(true);
+      }} />}
+      {screenshotReview && <p className="entry-header__note" role="status">From your screenshot — review all fields below. Missing dates and airports must be filled before saving.</p>}
       <form className="entry-form" onSubmit={onSubmit} noValidate>
         <section className="entry-card flight-card" aria-label="Date and flight number">
           <DateField id="entry-date" date={v.date} precision={v.datePrecision} onChange={setDate} error={errors.date} />

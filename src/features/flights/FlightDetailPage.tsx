@@ -18,6 +18,7 @@ import './FlightDetailPage.css';
 const SOURCE_LABEL: Record<FlightSource, string> = {
   manual: 'Logged manually',
   lookup: 'Logged with flight lookup',
+  screenshot: 'Reviewed from a screenshot',
   fr24: 'Imported from Flightradar24',
   csv: 'Imported from CSV',
   backup: 'Restored from backup',
