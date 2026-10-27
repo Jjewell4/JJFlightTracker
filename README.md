@@ -115,8 +115,11 @@ copied to your own Supabase database and to any other device you sign in on.
 4. **Show the 6-digit code in the email** (Authentication → Emails → Magic Link template): add
    `<p>Your code: {{ .Token }}</p>`. The code is the most reliable way to sign in inside the installed app.
 5. **Vercel env vars** (Project → Settings → Environment Variables), for Production (and Preview if you test there):
-   - `VITE_SUPABASE_URL` — Supabase → Project Settings → API → Project URL
-   - `VITE_SUPABASE_ANON_KEY` — the `anon` / publishable key (public by design; RLS protects the data)
+   - `SUPABASE_URL` — Supabase → Project Settings → API → Project URL
+   - `SUPABASE_ANON_KEY` — the `anon` / publishable key (public by design; RLS protects the data)
+
+   `VITE_`-prefixed and `NEXT_PUBLIC_`-prefixed names (and `*_PUBLISHABLE_KEY`) work too. Only these two
+   values are passed to the browser; the service-role key is never used — don't put it in either variable.
 
    Then **redeploy** — Vite bakes env vars in at build time.
 6. In the app: **More → Cloud sync** → enter your email → type the code. Your existing log uploads automatically.

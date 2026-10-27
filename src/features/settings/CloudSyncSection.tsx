@@ -43,7 +43,7 @@ export function CloudSyncSection({ Group, say }: { Group: (p: { title?: string; 
 
   if (sync.phase === 'disabled') {
     return (
-      <Group title="Cloud sync" footer="Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to the deployment’s environment variables and redeploy to turn on sync. See README → Cloud sync.">
+      <Group title="Cloud sync" footer="Add SUPABASE_URL and SUPABASE_ANON_KEY to the deployment’s environment variables and redeploy to turn on sync. See README → Cloud sync.">
         <div className="list__row srow">
           <span className="stile stile--plain" aria-hidden>
             <Icon name="cloud" size={18} />
