@@ -6,6 +6,21 @@ const b = await chromium.launch({
   args: ['--no-sandbox'],
 });
 let profile = null;
+const cloudFlights = new Map();
+let publicRequests = 0;
+function sharedFlights() {
+  const today = new Date().toISOString().slice(0, 10);
+  return [...cloudFlights.values()]
+    .filter((r) => !r.deleted && r.data.date < today)
+    .map(({ data: f }) => ({
+      from: f.from,
+      to: f.to,
+      date: profile.exact_dates ? f.date : f.date.slice(0, 7) + '-01',
+      datePrecision: profile.exact_dates ? f.datePrecision || 'day' : 'month',
+      ...(f.airlineIcao ? { airlineIcao: f.airlineIcao } : {}),
+      ...(f.aircraftType ? { aircraftType: f.aircraftType } : {}),
+    }));
+}
 let failLoad = true;
 let failPublish = true;
 let failRemove = true;
@@ -38,7 +53,15 @@ async function mock(context) {
     const url = new URL(req.url());
     let data = [];
     if (url.pathname === '/auth/v1/user') data = user;
-    else if (url.pathname === '/rest/v1/public_profiles') {
+    else if (url.pathname === '/rest/v1/flights') {
+      if (req.method() === 'POST')
+        for (const row of req.postDataJSON())
+          cloudFlights.set(row.id, {
+            ...row,
+            server_updated_at: new Date().toISOString(),
+          });
+      data = [];
+    } else if (url.pathname === '/rest/v1/public_profiles') {
       if (req.method() === 'POST') {
         if (failPublish) {
           failPublish = false;
@@ -53,7 +76,8 @@ async function mock(context) {
         profile = {
           slug: body.slug,
           display_name: body.display_name,
-          flights: body.flights,
+          flights: [],
+          exact_dates: body.exact_dates,
           published_at: new Date().toISOString(),
         };
         data = profile;
@@ -81,8 +105,11 @@ async function mock(context) {
         data = profile;
       }
     } else if (url.pathname === '/rest/v1/rpc/get_public_profile') {
+      publicRequests++;
       data =
-        profile && profile.slug === req.postDataJSON().handle ? [profile] : [];
+        profile && profile.slug === req.postDataJSON().handle
+          ? [{ ...profile, flights: sharedFlights() }]
+          : [];
     }
     await route.fulfill({
       status: 200,
@@ -125,9 +152,10 @@ try {
   await p
     .getByText('Your public journal is published.', { exact: true })
     .waitFor();
-  assert(profile.flights.length > 0);
-  assert(!JSON.stringify(profile).includes('seatNumber'));
-  assert(profile.flights.every((f) => f.datePrecision !== 'day'));
+  assert(cloudFlights.size > 0);
+  assert(sharedFlights().length > 0);
+  assert(!JSON.stringify(sharedFlights()).includes('seatNumber'));
+  assert(sharedFlights().every((f) => f.datePrecision !== 'day'));
   const visitor = await b.newContext({ viewport: { width: 390, height: 844 } });
   await mock(visitor);
   const v = await visitor.newPage();
@@ -143,6 +171,23 @@ try {
   await v.screenshot({ path: '/tmp/public-mobile.png', fullPage: false });
   await v.setViewportSize({ width: 1440, height: 1000 });
   await v.screenshot({ path: '/tmp/public-desktop.png' });
+  // Simulate an edit arriving through ordinary cloud sync, not profile publishing.
+  const initialPublicRequests = publicRequests;
+  cloudFlights.set('live-new', {
+    id: 'live-new',
+    deleted: false,
+    data: { date: '1901-03-04', from: 'KSAN', to: 'KLAX', airlineIcao: 'UAL' },
+  });
+  await v.getByRole('searchbox').fill('Mar 1901');
+  await v.evaluate(() => window.dispatchEvent(new Event('online')));
+  await v.waitForFunction(() =>
+    document.querySelector('.public-flight-list')?.textContent?.includes('SAN'),
+  );
+  assert(publicRequests > initialPublicRequests);
+  cloudFlights.delete('live-new');
+  await v.evaluate(() => window.dispatchEvent(new Event('online')));
+  await v.getByText('No flights match your search.', { exact: true }).waitFor();
+  await v.getByRole('searchbox').fill('');
   await p.getByRole('button', { name: 'Unpublish', exact: true }).click();
   await p
     .getByRole('alertdialog')
@@ -164,7 +209,7 @@ try {
   await v.getByRole('heading', { name: 'This journal isn’t public' }).waitFor();
   assert.deepEqual(errors, []);
   console.log(
-    'PASS mocked-service browser: preview, publish, fresh anonymous visitor at /jordan, private-field exclusion, retry, handle conflict, city search, failed-unpublish feedback, unpublish and unavailable state.',
+    'PASS mocked-service browser: preview, publish, fresh anonymous visitor at /jordan, private-field exclusion, live refresh without republishing, retry, handle conflict, city search, failed-unpublish feedback, unpublish and unavailable state.',
   );
 } finally {
   await b.close();

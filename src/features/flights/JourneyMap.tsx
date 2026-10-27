@@ -19,10 +19,10 @@ export function JourneyMap({ flights }: { flights: Flight[] }) {
             [170, 75],
           ],
       640,
-      280,
-      { padding: 0.16, minSpanDeg: 45 },
+      360,
+      { padding: 0.045, minSpanDeg: 30 },
     );
-    const dots = landDots(view, 8)
+    const dots = landDots(view, 9)
       .map(([x, y]) => `M${x.toFixed(1)} ${y.toFixed(1)}h0`)
       .join("");
     const arcs = routes.features.map((f) => ({
@@ -50,7 +50,7 @@ export function JourneyMap({ flights }: { flights: Flight[] }) {
   return (
     <svg
       className="journey-map"
-      viewBox="0 0 640 280"
+      viewBox="0 0 640 360"
       role="img"
       aria-label="Your flown routes and airports"
     >

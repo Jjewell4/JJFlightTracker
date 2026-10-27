@@ -119,7 +119,7 @@ export default function SettingsPage() {
 
   async function doInstall() {
     const r = await install.install();
-    if (r === 'accepted') say('Installing FlightDiary…');
+    if (r === 'accepted') say('Installing FlightJournal…');
   }
 
   async function protect() {
@@ -322,12 +322,12 @@ export default function SettingsPage() {
         {install.isStandalone ? (
           <div className="list__row srow">
             <Tile icon="check" tone="green" />
-            <RowText title="Installed" sub="You’re using FlightDiary as an app." />
+            <RowText title="Installed" sub="You’re using FlightJournal as an app." />
           </div>
         ) : install.canInstall ? (
           <button type="button" className="list__row srow" onClick={() => void doInstall()}>
             <Tile icon="plus" />
-            <RowText title="Install app" sub="Add FlightDiary to your home screen — works offline." />
+            <RowText title="Install app" sub="Add FlightJournal to your home screen — works offline." />
             <span className="badge badge--accent">Install</span>
           </button>
         ) : install.isIosSafari ? (
@@ -399,7 +399,7 @@ export default function SettingsPage() {
           <div className="sabout__head">
             <img src={`${import.meta.env.BASE_URL}favicon.svg`} width="44" height="44" alt="" />
             <div>
-              <div className="sabout__name">FlightDiary</div>
+              <div className="sabout__name">FlightJournal</div>
               <div className="srow__sub">Your flights, kept on your device. Optional account sync.</div>
             </div>
           </div>

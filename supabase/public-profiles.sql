@@ -1,4 +1,4 @@
--- Run after schema.sql. Public snapshots are separate from private flight records.
+-- Run after schema.sql. Public journal settings are separate from private flight records.
 -- Anonymous visitors can fetch a known handle, never enumerate owners/private flights.
 begin;
 create or replace function public.valid_public_flights(items jsonb)
@@ -36,10 +36,42 @@ revoke all on public.public_profiles from anon;
 grant select,insert,update,delete on public.public_profiles to authenticated;
 drop policy if exists "profiles: own" on public.public_profiles;
 create policy "profiles: own" on public.public_profiles for all to authenticated using ((select auth.uid())=user_id) with check ((select auth.uid())=user_id);
-create or replace function public.get_public_profile(handle text)
-returns table(slug text,display_name text,flights jsonb,published_at timestamptz)
-language sql stable security definer set search_path = public as $$
- select p.slug,p.display_name,p.flights,p.published_at from public.public_profiles p where p.slug=handle limit 1;
+-- Live journals: safe projection of the owner's cloud flights on every read.
+-- Re-run this whole file for existing snapshot deployments. URLs remain unchanged.
+do $$ begin
+ if not exists(select 1 from information_schema.columns where table_schema='public' and table_name='public_profiles' and column_name='exact_dates') then
+  alter table public.public_profiles add column exact_dates boolean not null default false;
+  update public.public_profiles p set exact_dates=exists(select 1 from jsonb_array_elements(p.flights) f where f->>'datePrecision'='day');
+ end if;
+end $$;
+create or replace function public.project_public_flight(data jsonb, exact_dates boolean)
+returns jsonb language plpgsql immutable set search_path=public as $$
+declare result jsonb; precision text := coalesce(data->>'datePrecision','day');
+begin
+ result=jsonb_strip_nulls(jsonb_build_object(
+  'date',case when precision='year' then left(data->>'date',4)||'-01-01' when exact_dates then data->>'date' else left(data->>'date',7)||'-01' end,
+  'datePrecision',case when precision='year' then 'year' when exact_dates then precision else 'month' end,
+  'from',data->>'from','to',data->>'to','airlineIcao',data->>'airlineIcao','airlineIata',data->>'airlineIata','aircraftType',data->>'aircraftType'
+ ));
+ if not public.valid_public_flights(jsonb_build_array(result)) then return null; end if;
+ return result;
+end $$;
+drop function if exists public.get_public_profile(text);
+create function public.get_public_profile(handle text)
+returns table(slug text,display_name text,flights jsonb,published_at timestamptz,exact_dates boolean)
+language sql stable security definer set search_path=public as $$
+ select p.slug,p.display_name,coalesce(live.flights,'[]'::jsonb),greatest(p.published_at,live.changed_at),p.exact_dates
+ from public.public_profiles p
+ left join lateral (
+  select jsonb_agg(public.project_public_flight(f.data,p.exact_dates) order by f.data->>'date' desc,f.id) filter (where not f.deleted and public.project_public_flight(f.data,p.exact_dates) is not null and
+   case coalesce(f.data->>'datePrecision','day')
+    when 'year' then left(f.data->>'date',4)<to_char(current_date,'YYYY')
+    when 'month' then left(f.data->>'date',7)<to_char(current_date,'YYYY-MM')
+    else f.data->>'date'<to_char(current_date,'YYYY-MM-DD') end
+  ) as flights,max(f.server_updated_at) as changed_at
+  from public.flights f where f.user_id=p.user_id
+ ) live on true
+ where p.slug=handle limit 1;
 $$;
 revoke all on function public.get_public_profile(text) from public;
 grant execute on function public.get_public_profile(text) to anon,authenticated;

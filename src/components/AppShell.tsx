@@ -15,6 +15,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { to: '/', label: 'Home', icon: 'home', end: true },
+  { to: '/flights', label: 'Log', icon: 'plane', end: true },
   { to: '/map', label: 'Map', icon: 'globe' },
   { to: '/stats', label: 'Stats', icon: 'chart' },
   { to: '/settings', label: 'More', icon: 'settings' },
@@ -30,7 +31,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const isMap = pathname === '/map';
   const isBare = pathname === '/welcome';
   // Top-level tabs get the slim app bar (logo → home, account avatar) on phones.
-  const hasTopbar = pathname === '/' || pathname === '/stats' || pathname === '/settings';
+  const hasTopbar = pathname === '/' || pathname === '/flights' || pathname === '/stats' || pathname === '/settings';
   const sync = useCloudSync();
 
   const navigate = useNavigate();
@@ -72,9 +73,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className={`shell${isMap ? ' shell--fullbleed' : ''}${isBare ? ' shell--bare' : ''}`}>
       <aside className="shell__sidebar" aria-label="Primary">
-        <Link to="/" className="shell__brand" aria-label="FlightDiary — home">
+        <Link to="/" className="shell__brand" aria-label="FlightJournal — home">
           <img className="brand-icon" src={`${import.meta.env.BASE_URL}favicon.svg`} width="32" height="32" alt="" />
-          FlightDiary
+          FlightJournal
         </Link>
         <NavLink to="/flights/new" className="shell__add-wide">
           <Icon name="plus" size={18} /> Log a flight
@@ -86,7 +87,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               {n.label === 'More' ? 'Settings' : n.label}
             </NavLink>
           ))}
-          <NavLink to="/flights" className="shell__side-link"><Icon name="plane" size={20} />Flight log</NavLink>
           <NavLink to="/import" className="shell__side-link">
             <Icon name="upload" size={20} />
             Import
@@ -98,9 +98,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main className="shell__main">
         {hasTopbar && (
           <div className="topbar">
-            <Link to="/" className="topbar__brand" aria-label="FlightDiary — home">
+            <Link to="/" className="topbar__brand" aria-label="FlightJournal — home">
               <img className="brand-icon" src={`${import.meta.env.BASE_URL}favicon.svg`} width="32" height="32" alt="" />
-              FlightDiary
+              FlightJournal
             </Link>
             <AccountButton />
           </div>
@@ -116,16 +116,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {!isForm && !isBare && (
         <nav className="tabbar" aria-label="Primary">
-          {NAV.slice(0, 2).map((n) => (
-            <NavLink key={n.to} to={n.to} end={n.end} className="tabbar__link">
-              <Icon name={n.icon} size={22} />
-              <span>{n.label}</span>
-            </NavLink>
-          ))}
-          <NavLink to="/flights/new" className="tabbar__add" aria-label="Log a flight">
-            <Icon name="plus" size={26} />
-          </NavLink>
-          {NAV.slice(2).map((n) => (
+          {NAV.map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end} className="tabbar__link">
               <Icon name={n.icon} size={22} />
               <span>{n.label}</span>

@@ -164,45 +164,50 @@ fills the editable form. It deliberately does not guess dates from arbitrary
 emails. CSV export now offers readable spreadsheet columns plus a separate
 Flightradar24 compatibility option. JSON remains the lossless backup format.
 
-## Public FlightDiary journals
+## Live public FlightJournal pages
 
-Public journals are opt-in snapshots. In **Settings → Public journal**, sign in,
-choose a unique handle such as `jordan`, enter a display name, preview, and publish.
-On a root-hosted Vercel deployment the URL is `https://your-domain/jordan`.
-Publish again to refresh or rename; **Unpublish** removes the server snapshot.
-Changing a handle retires the old URL. Unpublishing cannot recall copies someone
-already saved. Profiles currently support up to 10,000 shared flights.
+In **Settings → Public journal**, sign in, choose a handle such as `jordan`, enter
+a display name, preview, and enable sharing. The public URL is
+`https://your-domain/jordan` on a root-hosted Vercel deployment.
 
-**Deployment prerequisite:** run [`supabase/public-profiles.sql`](supabase/public-profiles.sql)
-in the same Supabase project's SQL Editor after `schema.sql`. No new secret is
-needed. This creates a separate public-snapshot table, owner-only row policies,
-and a narrow anonymous lookup function; it does not make the private flights
-table public. The migration is rerunnable. Until installed, Settings explains
-that sharing is unavailable and offers a retry.
+The page reads a privacy-filtered view of the owner's cloud flights. Additions,
+edits and deletions appear after normal cloud sync, without republishing. An open
+visitor page refreshes every 30 seconds while visible, and on foreground or
+reconnection. Offline edits appear after reconnecting and syncing. Settings are
+saved only when you change the handle, display name or date-privacy preference.
+**Unpublish** disables the URL. Previously downloaded copies cannot be recalled.
 
-The committed Vercel rewrite serves clean single-segment profile URLs, and
-trailing slashes are canonicalized. Other hosts need an equivalent rewrite to
-`index.html`. These clean URLs require a root-hosted app; GitHub Pages subpath
-hosting does not provide this rewrite automatically.
+**Deployment prerequisite:** run (or re-run)
+[`supabase/public-profiles.sql`](supabase/public-profiles.sql) after `schema.sql`.
+The migration upgrades existing snapshot journals to live pages while retaining
+URLs and date-privacy preferences. No new secret is needed. It keeps the private
+flights table protected and exposes only an allowlisted projection through a
+narrow lookup function. The legacy snapshot column is retained for migration
+compatibility but is no longer served to visitors. Before first publishing, the
+app waits for cloud sync to finish so the public source is current.
 
-Published fields are routes, airline codes, aircraft types and dates. Dates
-default to month precision; exact dates are opt-in. Notes, times, flight numbers,
-seat details, aircraft registrations, local record IDs and account details never
-enter the snapshot. Today/future flights are excluded. Imprecise dates in the
-current month/year are conservatively excluded until that period is past.
-Public visitors get a separate read-only view with totals, route map and a
-searchable history. It does not load their private flights or start cloud sync.
+Shared fields are routes, airline codes, aircraft types and dates. Dates default
+to month precision; exact dates are opt-in. Notes, times, flight numbers, seat
+details, registrations, private record IDs and account information are excluded.
+Today and future flights stay private. The server uses its UTC date boundary;
+imprecise dates in the current month/year are conservatively withheld. Public
+visitors get totals, a route map and searchable history without starting their
+own cloud sync or reading their private flight log.
 
-`npm test` includes PostgreSQL RLS/allowlist tests via PGlite, in addition to
-snapshot projection and handle tests. For the isolated browser flow, start a
-separate dev server with test fixtures (not real credentials):
+The Vercel rewrite serves clean profile URLs and canonicalizes trailing slashes.
+Other hosts need an equivalent rewrite to `index.html`. GitHub Pages subpath
+hosting does not provide this clean-URL rewrite automatically.
+
+`npm test` includes actual PostgreSQL policy/projection tests through PGlite,
+including live additions, edits, deletions, privacy preferences and revocation.
+For the isolated mocked-service browser flow:
 
 ```bash
 VITE_SUPABASE_URL=https://profile-test.invalid VITE_SUPABASE_ANON_KEY=public-test-fixture npm run dev -- --host 127.0.0.1 --port 5174 --strictPort
 node scripts/public-smoke.mjs
 ```
 
-That script intercepts the fake service and checks preview, handle conflict,
-publishing, anonymous viewing, city search, retry, failed-unpublish feedback and
-revocation. It uses the cloud image's `/usr/bin/chromium` and blocks other remote
-hosts. It does not validate a deployed Supabase project or hosting configuration.
+The browser script covers preview, handle conflicts, publishing, anonymous viewing,
+live refresh, city search, failure recovery and unpublishing. It uses
+`/usr/bin/chromium` and blocks other remote hosts. It does not verify your deployed
+Supabase project or Vercel routing configuration.

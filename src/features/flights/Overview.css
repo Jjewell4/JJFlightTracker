@@ -12,7 +12,10 @@
 .overview__section-head { display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); margin-block:var(--space-6) var(--space-3); }
 .overview__section-head a { display:flex; align-items:center; color:var(--accent); font-size:var(--text-sm); min-height:44px; }
 .journey-map { display:block; width:100%; height:220px; }
-.journey-map__land { fill:none; stroke:var(--text-3); stroke-opacity:.32; stroke-width:2.3; stroke-linecap:round; }
-.journey-map__arc { fill:none; stroke:var(--accent); stroke-opacity:.55; stroke-width:1.5; }
+.journey-map__land { fill:none; stroke:var(--text-3); stroke-opacity:.72; stroke-width:2.8; stroke-linecap:round; }
+.journey-map__arc { fill:none; stroke:var(--accent); stroke-opacity:.8; stroke-width:1.8; }
 .journey-map__airport { fill:var(--accent-2); stroke:var(--surface); stroke-width:1.5; }
 @media(min-width:960px) { .overview__map .journey-map { height:260px; } }
+
+.overview__map .journey-map { height:auto; aspect-ratio:640 / 360; }
+[data-theme="light"] .journey-map__land { stroke:var(--text-2); stroke-opacity:.65; }

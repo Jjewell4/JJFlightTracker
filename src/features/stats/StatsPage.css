@@ -278,30 +278,29 @@
   padding: var(--space-4) var(--space-4) var(--space-3);
   overflow: hidden;
 }
-/* Distance story: compact editorial hierarchy, without decorative planet tiles. */
-.distance-story { background:linear-gradient(125deg,var(--surface),var(--bg-elevated)); }
-.distance-story__heading { display:flex; align-items:center; justify-content:space-between; color:var(--accent-2); }
-.distance-story__eyebrow { font-size:10px; font-weight:650; letter-spacing:.13em; }
-.distance-story h3 { font-size:var(--text-md); font-weight:500; color:var(--text-2); margin-top:var(--space-5); }
-.distance-story__distance { font-size:clamp(2rem,5vw,3rem); font-weight:750; letter-spacing:-.045em; font-variant-numeric:tabular-nums; margin-block:var(--space-2) var(--space-6); line-height:1.2; }
-.distance-story__distance>span { display:inline-block; font-size:var(--text-sm); letter-spacing:0; color:var(--text-3); font-weight:400; margin-left:var(--space-3); }
-.distance-story__comparisons { display:grid; gap:var(--space-4); }
-.distance-story__comparisons>div { display:flex; align-items:center; gap:var(--space-3); padding-bottom:var(--space-4); border-bottom:1px solid var(--border); }
-.distance-story__symbol { width:44px; height:44px; display:grid; place-items:center; border-radius:var(--radius-md); color:var(--accent); background:var(--accent-soft); flex-shrink:0; }
-.distance-story__symbol--moon { color:var(--accent-2); background:var(--accent-2-soft); }
-.distance-story__comparisons>div>div { display:flex; flex-direction:column; gap:var(--space-1); }
-.distance-story__comparisons strong { font-size:var(--text-xl); font-variant-numeric:tabular-nums; line-height:1.1; }
-.distance-story__comparisons small { color:var(--text-3); margin-left:2px; font-weight:400; }
-.distance-story__comparisons div>span:not(.distance-story__symbol) { font-size:var(--text-xs); color:var(--text-2); }
-.distance-story__reference { margin-left:auto; text-align:right; max-width:110px; line-height:1.5; }
-.distance-story__milestone { margin-top:var(--space-5); }
-.distance-story__milestone-label { display:flex; justify-content:space-between; gap:var(--space-3); font-size:var(--text-xs); }
-.distance-story__milestone-label strong { color:var(--accent-2); }
-.distance-story__track { height:6px; background:var(--surface-3); border-radius:var(--radius-pill); overflow:hidden; margin-block:var(--space-3); }
-.distance-story__track>span { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,var(--accent-2),var(--accent)); }
-.distance-story__milestone p { font-size:var(--text-xs); color:var(--text-2); }
-.distance-story__note { font-size:10px; color:var(--text-3); line-height:1.5; margin-top:var(--space-4); }
-@media(max-width:400px){.distance-story__reference{max-width:85px;font-size:10px!important}.distance-story__comparisons>div{gap:var(--space-2)}}
+/* Earth-to-Moon arc: one compact illustration, readable at phone width. */
+.celestial-journey { background:radial-gradient(ellipse at 12% 58%,var(--accent-soft),transparent 46%),var(--surface); padding:var(--space-5); }
+.celestial-journey__numbers { display:flex; justify-content:space-between; gap:var(--space-4); }
+.celestial-journey__numbers>div { display:flex; flex-direction:column; gap:var(--space-1); }
+.celestial-journey__numbers>div:last-child { text-align:right; }
+.celestial-journey__numbers strong { font-size:clamp(1.7rem,4vw,2.25rem); letter-spacing:-.04em; font-variant-numeric:tabular-nums; line-height:1.15; }
+.celestial-journey__numbers small { font-size:.7em; margin-left:2px; color:var(--text-2); }
+.celestial-journey__numbers span { color:var(--text-2); font-size:var(--text-xs); }
+.celestial-journey__art { display:block; width:100%; height:auto; max-height:200px; margin-block:var(--space-2) var(--space-3); }
+.celestial-journey__stars { fill:var(--text-3); stroke:var(--text-3); stroke-opacity:.35; fill-opacity:.35; }
+.celestial-journey__atmosphere { fill:var(--accent-soft); stroke:var(--accent); stroke-opacity:.3; }
+.celestial-journey__land { fill:none; stroke:var(--text); stroke-opacity:.65; stroke-width:1.45; stroke-linecap:round; }
+.celestial-journey__route-glow { fill:none; stroke:var(--accent-2); stroke-opacity:.06; stroke-width:10; }
+.celestial-journey__origin { fill:var(--accent-2); stroke:var(--surface); stroke-width:1.5; }
+.celestial-journey__plane { color:var(--accent-2); }
+.celestial-journey__moon-halo { fill:var(--text-3); fill-opacity:.08; }
+.celestial-journey__craters { fill:var(--bg-elevated); fill-opacity:.24; }
+.celestial-journey__planet-label { fill:var(--text-3); font-size:8px; font-weight:600; letter-spacing:1.7px; }
+.celestial-journey__milestone { display:flex; justify-content:space-between; gap:var(--space-2); color:var(--text-2); font-size:11px; }
+.celestial-journey__milestone strong { color:var(--accent-2); }
+.celestial-journey__progress { height:3px; overflow:hidden; background:var(--surface-3); border-radius:var(--radius-pill); margin-block:var(--space-2) var(--space-3); }
+.celestial-journey__progress span { display:block; height:100%; background:var(--accent-2); border-radius:inherit; }
+.celestial-journey__note { color:var(--text-3); font-size:10px; line-height:1.6; }
 
 /* ---------- insights ---------- */
 .stats-insights {

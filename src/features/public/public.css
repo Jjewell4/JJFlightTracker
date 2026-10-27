@@ -152,4 +152,7 @@
 .public-totals dd {
   margin-left: 0;
 }
-.public-flight-list li > div { min-width:0; overflow-wrap:anywhere; }
+.public-flight-list li > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

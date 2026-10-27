@@ -46,6 +46,7 @@ export interface PublicProfile {
   display_name: string;
   flights: PublicFlight[];
   published_at: string;
+  exact_dates?: boolean;
 }
 export function publicFlights(
   flights: Flight[],

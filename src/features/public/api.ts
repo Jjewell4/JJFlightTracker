@@ -6,7 +6,7 @@ export async function loadOwnProfile(
   const sb = await getSupabase();
   const { data, error } = await sb
     .from('public_profiles')
-    .select('slug,display_name,flights,published_at')
+    .select('slug,display_name,flights,published_at,exact_dates')
     .eq('user_id', userId)
     .maybeSingle();
   if (error) throw error;
@@ -14,13 +14,13 @@ export async function loadOwnProfile(
 }
 export async function publishProfile(
   userId: string,
-  profile: Omit<PublicProfile, 'published_at'>,
+  profile: Pick<PublicProfile, 'slug' | 'display_name' | 'exact_dates'>,
 ): Promise<PublicProfile> {
   const sb = await getSupabase();
   const { data, error } = await sb
     .from('public_profiles')
     .upsert({ ...profile, user_id: userId }, { onConflict: 'user_id' })
-    .select('slug,display_name,flights,published_at')
+    .select('slug,display_name,flights,published_at,exact_dates')
     .single();
   if (error) throw error;
   return data;
@@ -46,6 +46,8 @@ export function profileError(e: unknown): string {
   if (error.code === '23505')
     return 'That URL is already taken. Choose another handle.';
   if (
+    error.code === '42703' ||
+    error.code === 'PGRST204' ||
     error.code === '42P01' ||
     error.code === 'PGRST205' ||
     error.code === 'PGRST202'

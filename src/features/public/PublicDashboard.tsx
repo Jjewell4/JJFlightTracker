@@ -140,8 +140,8 @@ export function PublicDashboard({
         )}
       </section>
       <footer className="public-footer">
-        Published {new Date(profile.published_at).toLocaleDateString()} · A
-        shared snapshot; recent changes may not appear.
+        Updated {new Date(profile.published_at).toLocaleDateString()} · Live
+        journal; updates automatically from synced flights.
       </footer>
     </article>
   );

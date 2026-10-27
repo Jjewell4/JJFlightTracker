@@ -18,7 +18,7 @@ const base = {
   airlineIcao: 'UAL',
   aircraftType: 'B738',
 } as Flight;
-describe('public snapshots', () => {
+describe('public flight projection', () => {
   it('uses an explicit field allowlist and hides exact dates by default', () => {
     expect(publicFlights([base], false, '2026-10-28')).toEqual([
       {

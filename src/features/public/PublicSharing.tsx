@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { todayLocal } from '@/lib/time';
 import { useFlights } from '@/lib/db';
-import { useCloudSync } from '@/services/sync/controller';
+import { useCloudSync, syncBeforeSharing } from '@/services/sync/controller';
 import { ConfirmSheet } from '@/components/Sheet';
 import {
   loadOwnProfile,
@@ -46,9 +46,7 @@ export function PublicSharing() {
             setSaved(p);
             setSlug(p?.slug || '');
             setName(p?.display_name || '');
-            setExact(
-              p?.flights.some((f) => f.datePrecision === 'day') || false,
-            );
+            setExact(p?.exact_dates || false);
             setLoaded(true);
           }
         })
@@ -60,7 +58,7 @@ export function PublicSharing() {
     };
   }, [sync.userId, attempt]);
   const today = todayLocal();
-  const snapshot = useMemo(
+  const previewFlights = useMemo(
     () => publicFlights(flights ?? [], exact, today),
     [flights, exact, today],
   );
@@ -68,7 +66,7 @@ export function PublicSharing() {
   const candidate: PublicProfile = {
     slug: handle,
     display_name: name.trim() || 'Your flight journal',
-    flights: snapshot,
+    flights: previewFlights,
     published_at: new Date().toISOString(),
   };
   async function publish() {
@@ -77,10 +75,11 @@ export function PublicSharing() {
     setError('');
     setNotice('');
     try {
+      await syncBeforeSharing(sync.userId);
       const p = await publishProfile(sync.userId, {
         slug: handle,
         display_name: name.trim(),
-        flights: snapshot,
+        exact_dates: exact,
       });
       setSaved(p);
       setNotice('Your public journal is published.');
@@ -100,7 +99,9 @@ export function PublicSharing() {
       setConfirm(false);
       setNotice('Your journal is no longer public.');
     } catch (e) {
-      setRemoveError(`${profileError(e)} Unpublishing was not confirmed. Treat your journal as public and try again.`);
+      setRemoveError(
+        `${profileError(e)} Unpublishing was not confirmed. Treat your journal as public and try again.`,
+      );
     } finally {
       setBusy(false);
     }
@@ -109,7 +110,9 @@ export function PublicSharing() {
     <section className="sgroup">
       <h2 className="section-title sgroup__title">Public journal</h2>
       <div className="card public-sharing">
-        <p>Share a read-only dashboard and flight history at your own URL.</p>
+        <p>
+          Share a live, read-only dashboard and flight history at your own URL.
+        </p>
         {sync.phase !== 'signed-in' ? (
           <p className="field__hint">
             {sync.phase === 'disabled' ? (
@@ -135,8 +138,9 @@ export function PublicSharing() {
                   </a>
                 </p>
                 <p className="field__hint">
-                  Last published {new Date(saved.published_at).toLocaleString()}
-                  . Changes to your log stay private until you publish again.
+                  Sharing enabled{' '}
+                  {new Date(saved.published_at).toLocaleString()}. Your journal
+                  updates automatically as your flights sync.
                 </p>
                 <button
                   className="btn btn--ghost"
@@ -207,12 +211,13 @@ export function PublicSharing() {
                   Include exact flight dates
                 </label>
                 <p className="field__hint">
-                  {snapshot.length} past flights will be shared: routes,{' '}
-                  {exact ? 'flight dates' : 'months and years'}, airlines and
-                  aircraft types. Notes, seats, flight numbers, tail numbers,
-                  times and account information are excluded. Today’s and future
-                  flights stay private. Anyone with the URL can view or copy the
-                  published information.
+                  Your live journal includes {previewFlights.length} past
+                  flights now and automatically includes new past flights after
+                  syncing: routes, {exact ? 'flight dates' : 'months and years'}
+                  , airlines and aircraft types. Notes, seats, flight numbers,
+                  tail numbers, times and account information are excluded.
+                  Today’s and future flights stay private. Anyone with the URL
+                  can view or copy the published information.
                 </p>
                 {saved && saved.slug !== handle && (
                   <p className="field__hint">
@@ -234,15 +239,14 @@ export function PublicSharing() {
                       !preview ||
                       !validHandle(handle) ||
                       !name.trim() ||
-                      flights === undefined ||
-                      snapshot.length > 10000
+                      flights === undefined
                     }
                     onClick={() => void publish()}
                   >
                     {busy
                       ? 'Saving…'
                       : saved
-                        ? 'Publish latest snapshot'
+                        ? 'Save sharing settings'
                         : 'Publish journal'}
                   </button>
                   {saved && (
@@ -263,11 +267,6 @@ export function PublicSharing() {
                     Choose a valid handle: 3–30 characters, starting with a
                     letter and ending with a letter or number. App route names
                     are reserved.
-                  </p>
-                )}
-                {snapshot.length > 10000 && (
-                  <p className="field__error">
-                    Public journals currently support up to 10,000 flights.
                   </p>
                 )}
                 {preview && (

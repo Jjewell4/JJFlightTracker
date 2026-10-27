@@ -233,3 +233,4 @@
   }
 }
 .brand-icon { display:block; flex-shrink:0; border-radius:var(--radius-sm); }
+.tabbar__link { min-height:48px; justify-content:center; }

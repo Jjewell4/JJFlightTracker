@@ -166,3 +166,10 @@ export function startCloudSync(): void {
     if (document.visibilityState === 'visible') void syncNow();
   }, 5 * 60 * 1000);
 }
+
+/** Sharing must not announce a live journal before its source flights reach the server. */
+export async function syncBeforeSharing(userId: string): Promise<void> {
+  if (state.userId !== userId || state.phase !== 'signed-in') throw new Error('Sign in before enabling sharing.');
+  await syncNow();
+  if (state.userId !== userId || state.status !== 'idle' || state.pending > 0) throw new Error(state.error || 'Connect and finish syncing your flights before enabling sharing.');
+}

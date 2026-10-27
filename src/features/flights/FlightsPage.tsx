@@ -147,9 +147,7 @@ export function FlightsPage() {
           <h1 className="page-title">{archive ? 'Flight log' : 'Your flight journal'}</h1>
           <p className="page-subtitle">{archive ? 'Every journey, easy to find.' : 'The places you’ve been. The journeys still ahead.'}</p>
         </div>
-        <Link to="/import" className="btn btn--ghost btn--icon flights__import" aria-label="Import flights">
-          <Icon name="upload" size={20} />
-        </Link>
+        {archive && <Link to="/flights/new" className="btn btn--primary"><Icon name="plus" size={18} />Add flight</Link>}
       </header>
 
       {!archive && <SummaryHero summary={summary} unit={unit} upcoming={upcoming.length} />}
@@ -166,7 +164,7 @@ export function FlightsPage() {
             <Link className="btn btn--primary" to="/flights/new"><Icon name="plus" size={18} />Log a flight</Link>
             <Link className="btn" to={`/flights/new?return=${encodeURIComponent(featured.id)}`}><Icon name="swap" size={18} />Add the return</Link>
             <Link className="btn btn--ghost" to={`/flights/new?duplicate=${encodeURIComponent(featured.id)}`}>Fly this route again</Link>
-            <Link className="btn btn--ghost" to="/import"><Icon name="upload" size={18} />Import a spreadsheet</Link>
+
           </div>
         </section>
       )}
