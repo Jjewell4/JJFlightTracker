@@ -346,6 +346,8 @@ describe('computeStats', () => {
   it('derives insights', () => {
     expect(s.insights.find((i) => i.id === 'seat')?.title).toBe('Window seat person');
     expect(s.insights.find((i) => i.id === 'hour')?.title).toBe('Early bird');
+    expect(s.insights.find((i) => i.id === 'seat')?.kind).toBe('window');
+    expect(s.insights.find((i) => i.id === 'hour')?.kind).toBe('morning');
     expect(s.insights.find((i) => i.id === 'haul')?.detail).toMatch(/over 4,000 km$/);
   });
 

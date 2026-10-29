@@ -77,3 +77,17 @@ describe('StatsPage', () => {
     expect(el.textContent).toContain('Month by month');
   });
 });
+
+describe('highlight icons', () => {
+  it('match what each highlight is about', async () => {
+    const { insightIcon } = await import('./insight-icons');
+    expect(insightIcon({ id: 'seat', kind: 'window' })).toBe('window');
+    expect(insightIcon({ id: 'seat', kind: 'aisle' })).toBe('aisle');
+    expect(insightIcon({ id: 'hour', kind: 'morning' })).toBe('sunrise');
+    expect(insightIcon({ id: 'hour', kind: 'evening' })).toBe('moon');
+    expect(insightIcon({ id: 'reason', kind: 'business' })).toBe('briefcase');
+    expect(insightIcon({ id: 'reason', kind: 'leisure' })).toBe('palm');
+    expect(insightIcon({ id: 'haul' })).toBe('route');
+    expect(insightIcon({ id: 'cabin' })).toBe('glass');
+  });
+});

@@ -807,6 +807,8 @@ export interface Insight {
   id: string;
   title: string;
   detail: string;
+  /** What the sentence is about, for picking an icon: seat type, weekday (mon…sun), part of day or reason. */
+  kind?: string;
 }
 
 export function computeInsights(
@@ -820,14 +822,14 @@ export function computeInsights(
 
   if (s.seat.known >= 3) {
     const top = topOf(s.seat);
-    if (top && top.share >= 0.45) out.push({ id: 'seat', title: `${top.label} seat person`, detail: `${pct(top.share)} of flights with a known seat` });
+    if (top && top.share >= 0.45) out.push({ id: 'seat', kind: top.key, title: `${top.label} seat person`, detail: `${pct(top.share)} of flights with a known seat` });
   }
   const weekdayTotal = s.weekday.reduce((a, b) => a + b, 0);
   if (weekdayTotal >= 5) {
     const max = Math.max(...s.weekday);
     const i = s.weekday.indexOf(max);
     const full = ['Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays', 'Sundays'][i];
-    out.push({ id: 'weekday', title: `${full} are for flying`, detail: `${pct(max / weekdayTotal)} of ${audience === 'visitor' ? '' : 'your '}flights depart on a ${full.slice(0, -1)}` });
+    out.push({ id: 'weekday', kind: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'][i], title: `${full} are for flying`, detail: `${pct(max / weekdayTotal)} of ${audience === 'visitor' ? '' : 'your '}flights depart on a ${full.slice(0, -1)}` });
   }
   const hourTotal = s.hour.reduce((a, b) => a + b, 0);
   if (hourTotal >= 5) {
@@ -840,11 +842,11 @@ export function computeInsights(
       ['Night owl', evening],
     ] as const).reduce((a, b) => (b[1] > a[1] ? b : a));
     const when = label === 'Early bird' ? 'before noon' : label === 'Afternoon flyer' ? 'between noon and 6 PM' : 'after 6 PM';
-    out.push({ id: 'hour', title: label, detail: `${pct(n / hourTotal)} of departures ${when}` });
+    out.push({ id: 'hour', kind: label === 'Early bird' ? 'morning' : label === 'Afternoon flyer' ? 'afternoon' : 'evening', title: label, detail: `${pct(n / hourTotal)} of departures ${when}` });
   }
   if (s.reason.known >= 3) {
     const top = topOf(s.reason);
-    if (top && top.share >= 0.5) out.push({ id: 'reason', title: top.key === 'business' ? 'Road warrior' : top.key === 'leisure' ? 'Here for the adventures' : `Mostly ${top.label.toLowerCase()}`, detail: `${pct(top.share)} of trips were ${top.label.toLowerCase()}` });
+    if (top && top.share >= 0.5) out.push({ id: 'reason', kind: top.key, title: top.key === 'business' ? 'Road warrior' : top.key === 'leisure' ? 'Here for the adventures' : `Mostly ${top.label.toLowerCase()}`, detail: `${pct(top.share)} of trips were ${top.label.toLowerCase()}` });
   }
   if (s.haul.known >= 3) {
     const long = s.haul.items.find((i) => i.key === 'long')!;

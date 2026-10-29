@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Icon, type IconName } from '@/components/Icon';
+import { Icon } from '@/components/Icon';
 import { useFlightSource, withFlightSource, type FlightFields, type ViewParams } from '@/lib/flight-source';
 import { useReferenceReady } from '@/data/reference';
 import { flownFlights } from '@/lib/flight-utils';
 import { availableYears, computeStats, filterByYear, flightYear, summarizeTotals, type Insight, type YearScope } from '@/lib/stats';
 import type { Flight } from '@/lib/types';
 import { insightAvailable, statsSections } from './sections';
+import { insightIcon } from './insight-icons';
 import { Hero } from './Hero';
 import { TimeCharts } from './TimeCharts';
 import { TravelCalendar } from './TravelCalendar';
@@ -184,15 +185,14 @@ function ScopeChips({ years, scope, onChange, counts, total }: { years: number[]
   );
 }
 
-const INSIGHT_ICONS: Record<string, IconName> = { seat: 'seat', weekday: 'calendar', hour: 'clock', reason: 'sparkle', haul: 'globe', cabin: 'sparkle' };
-
 function Insights({ items }: { items: Insight[] }) {
   return (
     <section className="stats-insights" aria-label="Highlights">
       {items.map((i, n) => (
         <div key={i.id} className="stats-insight animate-in" style={{ animationDelay: `${120 + n * 60}ms` }}>
           <span className={`stats-insight__icon stats-insight__icon--${n % 2 ? 'amber' : 'sky'}`} aria-hidden>
-            <Icon name={INSIGHT_ICONS[i.id] ?? 'sparkle'} size={18} />
+            {/* The busiest weekday reads best as the day itself, like a calendar page. */}
+            {i.id === 'weekday' && i.kind ? <span className="stats-insight__day">{i.kind}</span> : <Icon name={insightIcon(i)} size={18} />}
           </span>
           <p className="stats-insight__title">{i.title}</p>
           <p className="stats-insight__detail">{i.detail}</p>
