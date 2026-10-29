@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { extractScreenshot } from '../../../server/screenshot';
+import { extractScreenshot, screenshotStatus } from '../../../server/screenshot';
 import { parseScreenshotResult } from './schema';
 import { screenshotValues } from '@/features/entry/ScreenshotImport';
 import { installReference } from '@/test/reference-fixture';
@@ -85,5 +85,91 @@ describe('screenshot review', () => {
   it('preserves separate flight segments and rejects oversized result lists', () => {
     expect(parseScreenshotResult({ flights: [flight, { ...flight, from: 'LAX', to: 'SAN' }] }).flights).toHaveLength(2);
     expect(() => parseScreenshotResult({ flights: Array(7).fill(flight) })).toThrow();
+  });
+});
+
+describe('screenshot server diagnostics and resilience', () => {
+  const googleErr = (status: number, s: string, reason = '', message = '') => json({ error: { code: status, status: s, message, details: reason ? [{ reason }] : [] } }, status);
+  const authOk = () => json({ id: 'user-1' });
+
+  it('falls back to another model when the configured one is unavailable', async () => {
+    const f = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(authOk()).mockResolvedValueOnce(json(true))
+      .mockResolvedValueOnce(googleErr(404, 'NOT_FOUND'))
+      .mockResolvedValueOnce(json(provider()));
+    const out = await extractScreenshot(body, auth, { ...config, model: 'gemini-retired' }, f);
+    expect(out.flights[0].from).toBe('SAN');
+    expect(String(f.mock.calls[2][0])).toContain('gemini-retired');
+    expect(String(f.mock.calls[3][0])).toContain('gemini-flash-latest');
+  });
+
+  it('explains a rejected key, refunds the attempt and never echoes the provider payload', async () => {
+    const f = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(authOk()).mockResolvedValueOnce(json(true))
+      .mockResolvedValueOnce(googleErr(400, 'INVALID_ARGUMENT', 'API_KEY_INVALID', 'secret provider text'))
+      .mockResolvedValueOnce(json(true));
+    await expect(extractScreenshot(body, auth, { ...config, model: 'gemini-x' }, f)).rejects.toMatchObject({ status: 503, code: 'setup', message: expect.stringContaining('GEMINI_API_KEY') });
+    expect(String(f.mock.calls[3][0])).toContain('refund_screenshot_import');
+    await expect(extractScreenshot(body, auth, config, vi.fn<typeof fetch>().mockResolvedValueOnce(authOk()).mockResolvedValueOnce(json(true)).mockResolvedValueOnce(googleErr(400, 'INVALID_ARGUMENT', 'API_KEY_INVALID', 'secret provider text')))).rejects.not.toThrow('secret provider text');
+  });
+
+  it('explains restricted keys (403) without trying other models', async () => {
+    const f = vi.fn<typeof fetch>().mockResolvedValueOnce(authOk()).mockResolvedValueOnce(json(true)).mockResolvedValueOnce(googleErr(403, 'PERMISSION_DENIED'));
+    await expect(extractScreenshot(body, auth, config, f)).rejects.toMatchObject({ code: 'setup', message: expect.stringContaining('restrictions') });
+    expect(f.mock.calls.filter((c) => String(c[0]).includes('generateContent'))).toHaveLength(1);
+  });
+
+  it('does not refund when the image itself was unreadable', async () => {
+    const f = vi.fn<typeof fetch>().mockResolvedValueOnce(authOk()).mockResolvedValueOnce(json(true)).mockResolvedValueOnce(json({ candidates: [{ finishReason: 'MAX_TOKENS' }] }));
+    await expect(extractScreenshot(body, auth, config, f)).rejects.toMatchObject({ status: 422, code: 'unreadable' });
+    expect(f.mock.calls.some((c) => String(c[0]).includes('refund'))).toBe(false);
+  });
+
+  it('caps thinking so answers are not truncated', async () => {
+    const f = mockFetch();
+    await extractScreenshot(body, auth, config, f);
+    const request = JSON.parse(f.mock.calls[2][1]!.body as string);
+    expect(request.generationConfig.thinkingConfig).toEqual({ thinkingBudget: 0 });
+    expect(request.generationConfig.maxOutputTokens).toBeGreaterThanOrEqual(8192);
+  });
+});
+
+describe('screenshot setup status', () => {
+  it('reports missing configuration without network calls and names misplaced keys', async () => {
+    const f = vi.fn<typeof fetch>();
+    const status = await screenshotStatus(undefined, { ...config, geminiKey: '', misnamed: ['VITE_GEMINI_API_KEY'] }, f);
+    expect(status.ready).toBe(false);
+    expect(status.checks.find((c) => c.id === 'gemini_key')).toMatchObject({ ok: false, detail: expect.stringContaining('VITE_GEMINI_API_KEY') });
+    expect(JSON.stringify(status)).not.toContain(config.supabaseKey);
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it('verifies key, model and quota for a signed-in user', async () => {
+    const f = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(json({ id: 'user-1' }))
+      .mockResolvedValueOnce(json({ name: 'models/gemini-2.5-flash' }))
+      .mockResolvedValueOnce(json([{ day_remaining: 7, month_remaining: 93 }]));
+    const status = await screenshotStatus(auth, config, f);
+    expect(status).toMatchObject({ ready: true, model: 'gemini-2.5-flash' });
+    expect(status.checks.find((c) => c.id === 'quota')?.detail).toContain('7 of 10');
+    expect(JSON.stringify(status)).not.toContain(config.geminiKey);
+  });
+
+  it('flags an install that lacks the quota functions', async () => {
+    const f = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(json({ id: 'user-1' }))
+      .mockResolvedValueOnce(json({ name: 'models/gemini-2.5-flash' }))
+      .mockResolvedValueOnce(json({ code: 'PGRST202' }, 404));
+    const status = await screenshotStatus(auth, config, f);
+    expect(status.ready).toBe(false);
+    expect(status.checks.find((c) => c.id === 'quota')).toMatchObject({ ok: false, detail: expect.stringContaining('screenshot-import.sql') });
+  });
+});
+
+describe('server environment', () => {
+  it('accepts common key names and strips pasted whitespace/quotes', async () => {
+    const { configFromEnv } = await import('../../../api/extract-flight');
+    const c = configFromEnv({ GOOGLE_API_KEY: ' "abc123"\n', SUPABASE_URL: 'https://x.supabase.co/', SUPABASE_ANON_KEY: 'anon', VITE_GEMINI_API_KEY: 'leaked' });
+    expect(c).toMatchObject({ geminiKey: 'abc123', supabaseUrl: 'https://x.supabase.co', supabaseKey: 'anon', misnamed: ['VITE_GEMINI_API_KEY'] });
   });
 });

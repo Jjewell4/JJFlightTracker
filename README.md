@@ -229,23 +229,39 @@ without user interaction. Flights retain a `screenshot` source in backups.
 Deployment on Vercel:
 
 1. Run [`supabase/screenshot-import.sql`](supabase/screenshot-import.sql) in the
-   same Supabase project as cloud sync. It is safe to rerun.
-2. Set **`GEMINI_API_KEY`** as a server-only Vercel environment variable. Never use
-   a `VITE_` prefix, commit the key, or paste it into a client-side setting.
-3. Optionally set **`GEMINI_MODEL`** to a Gemini model that supports image input
-   and structured JSON output. The default is `gemini-2.5-flash`; ensure the model
-   is available to your project. Configure Google API billing/quota limits as appropriate.
-4. Ensure Vercel has the same `SUPABASE_URL` and `SUPABASE_ANON_KEY` / publishable
-   key used for cloud sync (the supported `VITE_` / `NEXT_PUBLIC_` equivalents also
-   work). A service-role key is neither required nor used.
-5. Redeploy. Test with a non-sensitive screenshot and verify the extracted date,
-   airports, times, and local save. If setup is incomplete, the app explains that
-   screenshot import is unavailable and manual entry remains usable.
+   same Supabase project as cloud sync. It is safe to rerun — rerun it after updates
+   (newer versions add refunds for failed attempts and the status check).
+2. Create a key in [Google AI Studio](https://aistudio.google.com/apikey) and set it as
+   **`GEMINI_API_KEY`** (server-only) in Vercel → Settings → Environment Variables, ticking
+   **Production**. Never use a `VITE_` prefix. `GOOGLE_API_KEY` is also accepted.
+   If you created the key in Google Cloud Console, give it **no application restrictions**
+   (server calls have no referrer) and make sure the **Generative Language API** is enabled.
+3. Optionally set **`GEMINI_MODEL`**. If unset (recommended) the server uses
+   `gemini-flash-latest`, falling back to `gemini-2.5-flash` and `gemini-2.5-flash-lite`
+   when a model isn't available to your key.
+4. Ensure Vercel has the same `SUPABASE_URL` and `SUPABASE_ANON_KEY` / publishable key
+   used for cloud sync. A service-role key is neither required nor used.
+5. **Redeploy** (environment variables only apply to new deployments), then in the app open
+   **Log a flight → Scan screenshot**. If anything fails, tap **Check setup**: it calls
+   `GET /api/extract-flight` and lists each requirement (key present, key accepted and which
+   model is used, Supabase settings, usage limits installed and remaining) with the exact fix.
+
+Troubleshooting messages map to causes:
+
+| Message | Fix |
+|---|---|
+| missing server configuration: GEMINI_API_KEY | Add the variable for Production and redeploy |
+| Gemini rejected GEMINI_API_KEY | Paste a fresh key (watch for spaces); redeploy |
+| Gemini refused the API key (permission denied) | Remove key restrictions; enable Generative Language API |
+| No Gemini model worked with this API key | Set `GEMINI_MODEL` to a model listed in AI Studio |
+| usage limits aren't installed | Run `supabase/screenshot-import.sql` |
+| Gemini's usage limit for this API key is used up | Free-tier quota; wait or raise it in AI Studio |
 
 `api/extract-flight.ts` is a Vercel Node function with a 60-second duration limit.
 It authenticates the bearer token with Supabase, consumes a durable atomic quota,
 then calls Gemini. Limits are **10 attempts per UTC day and 100 per UTC month per
-user**, including failed/cancelled provider requests. The quota fails closed if
+user**. Attempts that fail because of server setup or a Gemini outage are refunded;
+unreadable images still count. The quota fails closed if
 its migration is missing; counters are not reset by redeployments. Use provider
 project quotas/budgets as an additional total-spend limit. Signups and per-account
 quotas alone are not a global spend cap.

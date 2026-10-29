@@ -23,3 +23,22 @@ it('enforces durable per-user quotas, isolates users, and rolls over UTC days/mo
     await expect(consume()).rejects.toThrow();
   } finally { await db.close(); }
 }, 20_000);
+
+it('refunds attempts without going negative and reports remaining allowance', async () => {
+  const db = new PGlite();
+  try {
+    await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; insert into auth.users values ('00000000-0000-0000-0000-000000000001');`);
+    const sql = await readFile(new URL('../../../supabase/screenshot-import.sql', import.meta.url), 'utf8');
+    await db.exec(sql);
+    await db.exec(`select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false); set role authenticated;`);
+    const status = async () => (await db.query<{ day_remaining: number; month_remaining: number }>('select * from public.screenshot_import_status()')).rows[0];
+    expect(await status()).toEqual({ day_remaining: 10, month_remaining: 100 });
+    await db.query('select public.consume_screenshot_import()');
+    await db.query('select public.consume_screenshot_import()');
+    expect(await status()).toEqual({ day_remaining: 8, month_remaining: 98 });
+    await db.query('select public.refund_screenshot_import()');
+    expect(await status()).toEqual({ day_remaining: 9, month_remaining: 99 });
+    for (let i = 0; i < 5; i++) await db.query('select public.refund_screenshot_import()');
+    expect(await status()).toEqual({ day_remaining: 10, month_remaining: 100 });
+  } finally { await db.close(); }
+}, 20_000);
