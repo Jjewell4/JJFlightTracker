@@ -64,7 +64,7 @@ describe('Log → Trips', () => {
     // Newest first, grouped by year, linking to the trip pages.
     expect([...el.querySelectorAll('.tyear__year')].map((y) => y.textContent)).toEqual(['2026', '2025']);
     const cards = [...el.querySelectorAll<HTMLAnchorElement>('a.tcard')];
-    expect(cards.map((c) => c.querySelector('.tcard__title')!.textContent)).toEqual(['San Francisco', 'Boston']);
+    expect(cards.map((c) => c.querySelector('.tcard__title')!.textContent)).toEqual(['Weekend in San Francisco', 'Boston']);
     expect(cards[1].textContent).toContain('SAN→BOS→SAN');
     expect(cards[1].textContent).toContain('2 flights · 5 nights');
     expect(cards[1].getAttribute('href')).toMatch(/^\/trips\/auto-/);

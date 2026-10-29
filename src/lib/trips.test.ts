@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
+import { setReference } from '@/data/reference';
 import { installReference } from '@/test/reference-fixture';
 import type { Flight } from './types';
 import {
@@ -9,8 +10,10 @@ import {
   homeAirport,
   resolveTrip,
   stopNights,
+  suggestTripName,
   tripCounts,
   tripDates,
+  tripFromLegs,
   tripMinutes,
   tripOf,
   tripRoute,
@@ -43,7 +46,7 @@ describe('detectTrips', () => {
     expect(boston.roundTrip).toBe(true);
     expect(boston.nights).toBe(5);
     expect(tripTitle(boston)).toBe('Boston');
-    expect(tripTitle(sf)).toBe('San Francisco');
+    expect(tripTitle(sf)).toBe('Weekend in San Francisco'); // Fri → Sun
     expect(homeAirport(flights)).toBe('KSAN');
   });
 
@@ -56,7 +59,9 @@ describe('detectTrips', () => {
       leg('2026-09-30', 'KLAS', 'KSAN'), // two months in Las Vegas is still one trip
     ]);
     expect(trips.map((t) => t.flights.length).sort()).toEqual([2, 3]);
-    expect(trips.find((t) => t.main === 'KLAS')?.nights).toBe(60);
+    const vegas = trips.find((t) => t.main === 'KLAS')!;
+    expect(vegas.nights).toBe(60);
+    expect(tripTitle(vegas)).toBe('Two months in Las Vegas');
   });
 
   it('keeps saved trips intact and excludes their legs from suggestions', () => {
@@ -220,6 +225,8 @@ describe('time away (location over time)', () => {
     expect(t.start).toBe('2025-07-05');
     expect(t.roundTrip).toBe(true);
     expect(t.nights).toBeGreaterThan(80);
+    // "Three months in London, Paris & Rome" would be too long: the places win.
+    expect(tripTitle(t)).toBe('London, Paris & Rome');
   });
 
   it('ends a trip when your next flight leaves from home (return not logged)', () => {
@@ -272,5 +279,204 @@ describe('time away (location over time)', () => {
     expect(late).toHaveLength(10);
     expect(late.every((t) => t.roundTrip && t.flights.length === 2)).toBe(true);
     expect(trips.filter((t) => t.start < '2017-01-01').every((t) => t.roundTrip)).toBe(true);
+  });
+});
+
+describe('automatic trip names', () => {
+  // A few San Diego round trips first, so San Diego is clearly home.
+  const base = () => [
+    leg('2025-01-05', 'KSAN', 'KSEA'), leg('2025-01-07', 'KSEA', 'KSAN'),
+    leg('2025-02-05', 'KSAN', 'KPHX'), leg('2025-02-07', 'KPHX', 'KSAN'),
+    leg('2025-03-05', 'KSAN', 'KDEN'), leg('2025-03-07', 'KDEN', 'KSAN'),
+  ];
+  /** Title of the trip holding `probe` (default: the first leg given). */
+  const title = (flights: Flight[], probe = flights[0]) => {
+    const t = tripOf(detectTrips(flights), probe.id);
+    if (!t) throw new Error(`no trip holds ${probe.from} → ${probe.to}`);
+    return tripTitle(t);
+  };
+  /** A trip from San Diego: out on `out` to the first stop, on to each next stop on its date, home on `back`. */
+  const away = (out: string, stops: [string, string][], back: string) => {
+    const legs: Flight[] = [];
+    let from = 'KSAN';
+    for (const [date, to] of stops) {
+      legs.push(leg(legs.length ? date : out, from, to, '08:00', '14:00'));
+      from = to;
+    }
+    legs.push(leg(back, from, 'KSAN', '15:00', '21:00'));
+    return legs;
+  };
+
+  it('names a single destination by how long and when you were there', () => {
+    // Fri → Sun.
+    expect(title([leg('2026-04-10', 'KSAN', 'KORD', '08:00', '14:00'), leg('2026-04-12', 'KORD', 'KSAN', '17:00', '19:30')])).toBe('Weekend in Chicago');
+    // Out and back the same day: the stop is a "connection", but it's where you went.
+    expect(title([leg('2026-05-01', 'KSAN', 'KSFO', '07:00', '08:30'), leg('2026-05-01', 'KSFO', 'KSAN', '19:00', '20:30')])).toBe('Day trip to San Francisco');
+    // Sun → Fri: nothing to add.
+    expect(title([leg('2026-03-01', 'KSAN', 'KBOS', '07:00', '15:30'), leg('2026-03-06', 'KBOS', 'KSAN', '08:00', '11:40')])).toBe('Boston');
+    // Sat → Sun a week later.
+    expect(title([leg('2026-06-06', 'KSAN', 'LPPT', '17:00', '13:00', { arrDayOffset: 1 }), leg('2026-06-14', 'LPPT', 'KSAN', '11:00', '15:00')])).toBe('Week in Lisbon');
+    // Thu → Mon is more than a weekend.
+    expect(title([leg('2026-04-09', 'KSAN', 'KORD', '08:00', '14:00'), leg('2026-04-13', 'KORD', 'KSAN', '17:00', '19:30')])).toBe('Chicago');
+  });
+
+  it('keeps names short: a prefix that makes it too long is dropped', () => {
+    expect(title(away('2026-06-06', [['', 'LEST']], '2026-06-13'))).toBe('Santiago de Compostela');
+    expect(title(away('2026-06-06', [['', 'LPPT']], '2026-06-13'))).toBe('Week in Lisbon');
+  });
+
+  it('never counts connections as destinations', () => {
+    // The Denver connection on the way to Boston.
+    expect(title([
+      leg('2026-03-01', 'KSAN', 'KDEN', '07:00', '10:30'),
+      leg('2026-03-01', 'KDEN', 'KBOS', '11:45', '17:50'),
+      leg('2026-03-06', 'KBOS', 'KSAN', '08:00', '11:40'),
+    ])).toBe('Boston');
+    // Only "connections" (an overnight under 24h): the farthest point is the destination.
+    expect(title([leg('2026-07-10', 'KSAN', 'KSEA', '18:00', '20:30'), leg('2026-07-11', 'KSEA', 'KSAN', '16:00', '18:30')])).toBe('Weekend in Seattle');
+  });
+
+  it('lists two destinations, and names a country for three or more in one country abroad', () => {
+    expect(title(away('2026-06-06', [['', 'LPPT'], ['2026-06-10', 'LPPR']], '2026-06-15'))).toBe('Lisbon & Porto');
+    expect(title(away('2026-06-06', [['', 'LPPT'], ['2026-06-10', 'LPPR']], '2026-06-13'))).toBe('Week in Lisbon & Porto');
+    // Narita in, Haneda out: both are Tokyo.
+    const japan = (back: string) => [
+      leg('2026-10-01', 'KSAN', 'RJAA', '11:00', '15:00', { arrDayOffset: 1 }),
+      leg('2026-10-05', 'RJTT', 'RJCC', '09:00', '10:30'),
+      leg('2026-10-08', 'RJCC', 'RJBB', '09:00', '11:00'),
+      leg(back, 'RJBB', 'KSAN', '17:00', '10:00'),
+    ];
+    expect(title(japan('2026-10-11'))).toBe('Japan');
+    expect(title(japan('2026-10-15'))).toBe('Two weeks in Japan');
+    expect(title(away('2026-06-01', [['', 'EGLL'], ['2026-06-03', 'EGPH'], ['2026-06-05', 'EGCC']], '2026-06-08'))).toBe('Week in the UK');
+    expect(title(away('2026-06-01', [['', 'EGLL'], ['2026-06-03', 'EGPH'], ['2026-06-05', 'EGCC']], '2026-06-11'))).toBe('UK');
+  });
+
+  it('lists cities while they fit, then countries, a continent or "& 2 more"', () => {
+    expect(title(away('2026-05-01', [['', 'KDEN'], ['2026-05-04', 'KAUS'], ['2026-05-07', 'KBNA']], '2026-05-11'))).toBe('Denver, Austin & Nashville');
+    expect(title(away('2026-05-01', [['', 'KDEN'], ['2026-05-04', 'KAUS'], ['2026-05-07', 'KBNA'], ['2026-05-09', 'KATL']], '2026-05-12'))).toBe('Denver, Austin & 2 more');
+    expect(title(away('2026-07-01', [['', 'LFPG'], ['2026-07-05', 'LIRF'], ['2026-07-08', 'LEBL']], '2026-07-11'))).toBe('Paris, Rome & Barcelona');
+    // A long trip across Europe: too many cities to list, so the countries are counted.
+    const europe = (back: string) => away('2026-07-01', [['', 'EGLL'], ['2026-07-06', 'LFPG'], ['2026-07-10', 'LIRF'], ['2026-07-15', 'LEBL']], back);
+    expect(title(europe('2026-07-20'))).toBe('4 countries in Europe');
+    expect(title(europe('2026-07-22'))).toBe('Three weeks in Europe');
+    // Across continents.
+    expect(title(away('2026-02-01', [['', 'RJTT'], ['2026-02-06', 'VTBS'], ['2026-02-12', 'YSSY'], ['2026-02-19', 'NZAA']], '2026-02-25'))).toBe('Japan, Thailand & 2 more');
+  });
+
+  it('names one-way trips and trips the log picks up already away', () => {
+    // Out via Denver, home some other way: the next flight leaves from San Diego.
+    const later = [leg('2025-05-01', 'KSAN', 'KSFO'), leg('2025-05-03', 'KSFO', 'KSAN')];
+    const oneWay = [leg('2025-04-01', 'KSAN', 'KDEN', '07:00', '10:00'), leg('2025-04-01', 'KDEN', 'KBOS', '11:30', '17:00')];
+    expect(title([...base(), ...oneWay, ...later], oneWay[0])).toBe('To Boston');
+    const twoStops = [leg('2025-04-01', 'KSAN', 'KDEN', '07:00', '10:00'), leg('2025-04-03', 'KDEN', 'KBOS', '11:30', '17:00')];
+    expect(title([...base(), ...twoStops, ...later], twoStops[0])).toBe('Denver & Boston');
+
+    // The first flights in the log start in London; nothing claims they started at home.
+    const homeward = [leg('2024-12-01', 'EGLL', 'KJFK', '09:00', '12:00'), leg('2024-12-01', 'KJFK', 'KSAN', '14:00', '17:30')];
+    const t = tripOf(detectTrips([...homeward, ...base()]), homeward[0].id)!;
+    expect(t).toMatchObject({ startLogged: false, roundTrip: true });
+    expect(tripTitle(t)).toBe('Home from London');
+    const between = [leg('2024-12-01', 'EGLL', 'LFPG', '09:00', '11:15'), leg('2024-12-01', 'LFPG', 'LIRF', '13:00', '15:00')];
+    expect(title([...between, ...base()])).toBe('London to Rome');
+  });
+
+  it('ignores home-area airports', () => {
+    // San Diego is home, and Los Angeles (regularly used, 180 km away) is part of it.
+    const region = [
+      leg('2026-01-05', 'KSAN', 'KSEA', '07:00', '09:30'), leg('2026-01-08', 'KSEA', 'KSAN', '18:00', '20:30'),
+      leg('2026-02-02', 'KLAX', 'KDEN', '07:00', '10:30'), leg('2026-02-05', 'KDEN', 'KLAX', '18:00', '19:30'),
+      leg('2026-02-12', 'KLAX', 'KBOS', '07:00', '15:30'), leg('2026-02-16', 'KBOS', 'KLAX', '08:00', '11:30'),
+      leg('2026-04-01', 'KSAN', 'KPDX'), leg('2026-04-03', 'KPDX', 'KSAN'),
+    ];
+    // Out of San Diego, back into Los Angeles.
+    const nyc = [leg('2026-03-01', 'KSAN', 'KJFK', '07:00', '15:30'), leg('2026-03-04', 'KJFK', 'KLAX', '08:00', '11:30')];
+    expect(title([...region, ...nyc], nyc[0])).toBe('New York');
+    // A saved trip without a name that stays a few days in Los Angeles first.
+    const saved = [
+      leg('2026-05-01', 'KSAN', 'KLAX', '08:00', '09:00', { tripId: 's1' }),
+      leg('2026-05-04', 'KLAX', 'KSEA', '08:00', '10:45', { tripId: 's1' }),
+      leg('2026-05-07', 'KSEA', 'KSAN', '08:00', '10:45', { tripId: 's1' }),
+    ];
+    const t = detectTrips([...region, ...nyc, ...saved]).find((x) => x.id === 's1')!;
+    expect(t.stops.map((s) => [s.airport, s.home ?? false])).toEqual([['KLAX', true], ['KSEA', false]]);
+    expect(tripTitle(t)).toBe('Week in Seattle');
+  });
+
+  it('names upcoming trips the same way, including the holidays', () => {
+    // Nothing about a trip being in the future changes its name.
+    expect(title([leg('2027-01-15', 'KSAN', 'KORD', '08:00', '14:00'), leg('2027-01-17', 'KORD', 'KSAN', '17:00', '19:30')])).toBe('Weekend in Chicago');
+    const nyc = (out: string, back: string) => [leg(out, 'KSAN', 'KJFK', '07:00', '15:30'), leg(back, 'KJFK', 'KSAN', '18:00', '21:30')];
+    expect(title(nyc('2026-12-22', '2026-12-27'))).toBe('Christmas in New York');
+    expect(title(nyc('2026-12-29', '2027-01-02'))).toBe('New Year in New York');
+    expect(title(nyc('2026-12-20', '2027-01-03'))).toBe('Holidays in New York');
+    // A season abroad over Christmas isn't a Christmas trip.
+    expect(title(nyc('2026-11-01', '2027-01-20'))).toBe('New York');
+  });
+
+  it('prefers a saved name, and falls back to the automatic one when it is blank', () => {
+    const legs = [leg('2026-04-10', 'KSAN', 'KORD', '08:00', '14:00', { tripId: 't9', tripName: 'Cubs game' }), leg('2026-04-12', 'KORD', 'KSAN', '17:00', '19:30', { tripId: 't9' })];
+    expect(title(legs)).toBe('Cubs game');
+    const blank = detectTrips(legs.map((f) => ({ ...f, tripName: ' ' })))[0];
+    expect(tripTitle(blank)).toBe('Weekend in Chicago');
+    expect(suggestTripName(blank)).toBe('Weekend in Chicago');
+  });
+
+  it('degrades gracefully without reference data', () => {
+    // Airports the dataset doesn't know: their codes stand in.
+    expect(title([leg('2026-04-10', 'KSAN', 'XQQQ', '08:00', '14:00'), leg('2026-04-12', 'XQQQ', 'KSAN', '17:00', '19:30')])).toBe('Weekend in XQQQ');
+    const unknown = away('2026-06-01', [['', 'XQQA'], ['2026-06-03', 'XQQB'], ['2026-06-05', 'XQQC'], ['2026-06-07', 'XQQD'], ['2026-06-09', 'XQQE']], '2026-06-12');
+    expect(title(unknown)).toBe('XQQA, XQQB, XQQC & 2 more');
+    // Reference data not loaded yet (the log can render before it arrives).
+    const japan = [
+      leg('2026-10-01', 'KSAN', 'RJAA'), leg('2026-10-05', 'RJTT', 'RJCC'), leg('2026-10-08', 'RJCC', 'RJBB'), leg('2026-10-11', 'RJBB', 'KSAN'),
+    ];
+    setReference(null as never);
+    try {
+      expect(title(japan)).toBe('RJAA, RJCC & RJBB');
+      expect(title([leg('2026-04-10', 'KSAN', 'KORD'), leg('2026-04-12', 'KORD', 'KSAN')])).toBe('Weekend in KORD');
+    } finally {
+      installReference();
+    }
+  });
+});
+
+describe('tripFromLegs', () => {
+  it('names a single one-way leg', () => {
+    const f = leg('2026-11-20', 'KMCO', 'KSFO', '08:00', '11:15');
+    const t = tripFromLegs([f]);
+    expect(t).toMatchObject({ id: `auto-${f.id}`, saved: false, origin: 'KMCO', finish: 'KSFO', stops: [], roundTrip: false, startLogged: true, returnLogged: false, nights: 0 });
+    expect(tripTitle(t)).toBe('To San Francisco');
+  });
+
+  it('orders the legs, needs no times, and names an out-and-back', () => {
+    const untimed = (date: string, from: string, to: string) => {
+      const f = leg(date, from, to);
+      delete f.depTime;
+      return f;
+    };
+    const out = untimed('2026-04-10', 'KORD', 'KSFO');
+    const back = untimed('2026-04-12', 'KSFO', 'KORD');
+    const t = tripFromLegs([back, out]);
+    expect(t.id).toBe(`auto-${out.id}`);
+    expect(t.flights.map((f) => f.id)).toEqual([out.id, back.id]);
+    expect(t).toMatchObject({ origin: 'KORD', roundTrip: true, nights: 2, main: 'KSFO' });
+    expect(tripTitle(t)).toBe('Weekend in San Francisco');
+    // Same day, no times: still a day trip, in the order given.
+    expect(tripTitle(tripFromLegs([untimed('2026-04-15', 'KORD', 'KMSP'), untimed('2026-04-15', 'KMSP', 'KORD')]))).toBe('Day trip to Minneapolis');
+  });
+
+  it('refuses an empty list', () => {
+    expect(() => tripFromLegs([])).toThrow(RangeError);
+  });
+});
+
+describe('display cities', () => {
+  it('uses the city travellers mean, not the airport suburb', () => {
+    expect(cityName('RJAA')).toBe('Tokyo');
+    expect(cityName('KIAD')).toBe('Washington');
+    expect(cityName('EBBR')).toBe('Brussels');
+    expect(cityName('LFBO')).toBe('Toulouse'); // "Toulouse/Blagnac"
+    expect(cityName('KJFK')).toBe('New York');
   });
 });

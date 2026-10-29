@@ -49,7 +49,7 @@ describe('saved trips in the database', () => {
     expect(saved.flights).toHaveLength(3);
   });
 
-  it('renames (empty name falls back to the destination) and ungroups without touching the flights', async () => {
+  it('renames (empty name falls back to the automatic name) and ungroups without touching the flights', async () => {
     const { legs } = await seedBoston();
     const id = await saveTrip(legs.map((f) => f.id), 'Work');
     await renameTrip(id, 'Sprint offsite');

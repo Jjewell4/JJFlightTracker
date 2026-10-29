@@ -10,7 +10,7 @@
  * every leg with the same `tripId` (and `tripName`), so saved trips sync with the flights and
  * always win over detection. Only day-precision flights take part.
  */
-import { getAirport } from '@/data/reference';
+import { getAirport, getCountry } from '@/data/reference';
 import { airlineKey, departureInstant, flightDistanceKm } from './flight-utils';
 import { distanceKm, estimateDurationMin } from './geo';
 import { addDays, zonedToUtc } from './time';
@@ -23,6 +23,8 @@ export interface TripStop {
   stayMin: number;
   /** Short stops (< 24h) are connections, longer ones are destinations. */
   kind: 'connection' | 'stay';
+  /** The stop is in your home area (never a destination). Only set when true. */
+  home?: true;
 }
 
 export interface Trip {
@@ -160,7 +162,9 @@ function buildTrip(
   const stops: TripStop[] = [];
   for (let i = 0; i < flights.length - 1; i++) {
     const stayMin = Math.max(0, Math.round((depInstant(flights[i + 1]) - arrivalInstant(flights[i])) / 60_000));
-    stops.push({ airport: flights[i].to, stayMin, kind: stayMin < DAY_MIN ? 'connection' : 'stay' });
+    const stop: TripStop = { airport: flights[i].to, stayMin, kind: stayMin < DAY_MIN ? 'connection' : 'stay' };
+    if (isHome(stop.airport)) stop.home = true;
+    stops.push(stop);
   }
   const origin = first.from;
   const finish = last.to;
@@ -410,21 +414,243 @@ export function detectTrips(all: Flight[], opts: TripOptions = {}): Trip[] {
   return trips.sort((a, b) => b.start.localeCompare(a.start) || b.flights.length - a.flights.length);
 }
 
+/**
+ * One unsaved trip made of exactly these legs (in any order; sorted chronologically, origin =
+ * the first departure), e.g. to name flights about to be saved together. The legs needn't be in
+ * the database, and missing times are fine. Ends where it started → round trip. Throws on [].
+ */
+export function tripFromLegs(legs: Flight[]): Trip {
+  const flights = chronological(legs);
+  if (!flights.length) throw new RangeError('tripFromLegs needs at least one flight');
+  return buildTrip(`auto-${flights[0].id}`, false, flights);
+}
+
 /** The trip a flight belongs to, if any. */
 export function tripOf(trips: Trip[], flightId: string): Trip | undefined {
   return trips.find((t) => t.flights.some((f) => f.id === flightId));
 }
 
-/** City for display ("Paris", not "Paris (Roissy-en-France, Val-d'Oise)"), else the airport name or code. */
+/**
+ * Big airports whose dataset city is the suburb they sit in ("Narita", "Zaventem") rather than the
+ * place travellers mean. Keyed by IATA code.
+ */
+const METRO_CITY: Record<string, string> = {
+  ATH: 'Athens', BGY: 'Bergamo', BOG: 'Bogotá', BRU: 'Brussels', BSL: 'Basel', CEB: 'Cebu', CGN: 'Cologne', DFW: 'Dallas', EWR: 'New York',
+  DPS: 'Bali', EDI: 'Edinburgh', FRA: 'Frankfurt', GIG: 'Rio de Janeiro', IAD: 'Washington', KOA: 'Kona',
+  KRK: 'Kraków', KUL: 'Kuala Lumpur', LEJ: 'Leipzig', LIH: 'Kauai', LIL: 'Lille', LIN: 'Milan', LTN: 'London', LYS: 'Lyon',
+  MFM: 'Macau', MRS: 'Marseille', MXP: 'Milan', NAP: 'Naples', NGO: 'Nagoya', NRT: 'Tokyo', OGG: 'Maui',
+  OTP: 'Bucharest', PTY: 'Panama City', SAW: 'Istanbul', SJD: 'Los Cabos', SNA: 'Orange County', TIA: 'Tirana', TPE: 'Taipei',
+  VCE: 'Venice', ZAG: 'Zagreb',
+};
+
+/**
+ * City for display ("Paris", not "Paris (Roissy-en-France, Val-d'Oise)"; "Tokyo" for Narita), else
+ * the airport name or code.
+ */
 export function cityName(ident: string): string {
   const a = getAirport(ident);
-  return (a && baseCity(a.city)) || a?.name || a?.iata || ident;
+  if (!a) return ident;
+  return METRO_CITY[a.iata] || baseCity(a.city).split('/')[0].trim() || a.name || a.iata || ident;
 }
 
-/** Display title: saved name, else the primary destination's city (or code). */
+/** Display title: the saved name, else the automatic one (see suggestTripName). */
 export function tripTitle(t: Trip): string {
-  if (t.name?.trim()) return t.name.trim();
-  return cityName(t.main);
+  return t.name?.trim() || suggestTripName(t);
+}
+
+// ---------- automatic names ----------
+
+/** Longest place list shown in full ("Denver, Austin & Nashville"); longer ones get "& 2 more". */
+const LIST_MAX = 26;
+/** "Weekend in …", "Week in …" are dropped when the name would get longer than this. */
+const PREFIXED_MAX = 28;
+
+const CONTINENT_NAME: Record<string, string> = {
+  AF: 'Africa', AN: 'Antarctica', AS: 'Asia', EU: 'Europe', NA: 'North America', OC: 'Oceania', SA: 'South America',
+};
+const COUNTRY_SHORT: Record<string, string> = { US: 'USA', GB: 'UK', AE: 'UAE' };
+/** Country names that take "the" after "in" ("Week in the UK"). */
+const NEEDS_THE = /^(USA|UK|UAE|Netherlands|Philippines|Bahamas|Maldives|Gambia|Seychelles|Comoros)$|Islands$|^(United|Republic|Democratic|Central African|Dominican|Czech) /;
+const NUMBER_WORDS = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve'];
+
+let regionNames: Intl.DisplayNames | null | undefined;
+
+/** Short English country name: dataset first, then Intl; undefined when neither knows it. */
+function countryName(code: string): string | undefined {
+  const known = COUNTRY_SHORT[code] ?? getCountry(code)?.name;
+  if (known) return known;
+  try {
+    if (regionNames === undefined) regionNames = typeof Intl.DisplayNames === 'function' ? new Intl.DisplayNames(['en'], { type: 'region' }) : null;
+    const name = regionNames?.of(code);
+    return name && name !== code ? name : undefined;
+  } catch {
+    regionNames = null;
+    return undefined;
+  }
+}
+
+interface Place {
+  /** Same city (and country) → same key. */
+  key: string;
+  city: string;
+  country?: string;
+}
+
+function placeOf(ident: string): Place {
+  const a = getAirport(ident);
+  const city = cityName(ident);
+  return a ? { key: `${a.country}|${city.toLowerCase()}`, city, country: a.country || undefined } : { key: ident, city };
+}
+
+/** What a name says: bare ("4 countries in Europe") and after "in" ("Europe"). */
+interface Scope {
+  text: string;
+  inText: string;
+}
+
+const scopeOf = (text: string, inText = text): Scope => ({ text, inText });
+
+/** "A", "A & B", "A, B & C". */
+function joinAnd(names: string[]): string {
+  return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} & ${names[names.length - 1]}`;
+}
+
+/** joinAnd while it stays short, else "A, B & 2 more" (never "& 1 more"). */
+function listMore(names: string[]): string {
+  const all = joinAnd(names);
+  if (names.length <= 2 || all.length <= LIST_MAX) return all;
+  for (let shown = names.length - 2; shown >= 1; shown--) {
+    const text = `${names.slice(0, shown).join(', ')} & ${names.length - shown} more`;
+    if (text.length <= LIST_MAX || shown === 1) return text;
+  }
+  return all;
+}
+
+/**
+ * Where the trip went: its destinations in visiting order, one per city. Stays count; connections,
+ * the home area and where the trip starts and ends at home don't. A trip picked up already away
+ * counts its origin; one that doesn't end at home counts its finish. With no stay at all (a day
+ * trip, a quick overnight), the farthest point stands in.
+ */
+function tripPlaces(t: Trip): { places: Place[]; homeCountry?: string } {
+  const anchors: Place[] = [];
+  if (t.startLogged) anchors.push(placeOf(t.origin));
+  if (t.roundTrip) anchors.push(placeOf(t.finish));
+  const home = new Set(anchors.map((p) => p.key));
+  for (const s of t.stops) if (s.home) home.add(placeOf(s.airport).key);
+  const places: Place[] = [];
+  const add = (ident: string) => {
+    const p = placeOf(ident);
+    if (!home.has(p.key) && !places.some((q) => q.key === p.key)) places.push(p);
+  };
+  if (!t.startLogged) add(t.origin);
+  for (const s of t.stops) if (s.kind === 'stay' && !s.home) add(s.airport);
+  if (!t.roundTrip) add(t.finish);
+  if (!places.length) add(t.main);
+  return { places, homeCountry: anchors[0]?.country };
+}
+
+/** Cities; one foreign country ("Japan"); a few countries; a continent; else a short list. */
+function tripScope(places: Place[], homeCountry: string | undefined): Scope {
+  const cities = places.map((p) => p.city);
+  if (places.length <= 2) return scopeOf(joinAnd(cities));
+  const codes = places.every((p) => p.country) ? [...new Set(places.map((p) => p.country!))] : [];
+  const named = (list: string[]) => {
+    const names = list.map(countryName);
+    return names.every(Boolean) ? (names as string[]) : undefined;
+  };
+  const withThe = (n: string) => (NEEDS_THE.test(n) ? `the ${n}` : n);
+
+  // Three or more places in one foreign country: the country.
+  if (codes.length === 1 && codes[0] !== homeCountry) {
+    const [name] = named(codes) ?? [];
+    if (name) return scopeOf(name, withThe(name));
+  }
+  const all = joinAnd(cities);
+  if (all.length <= LIST_MAX) return scopeOf(all);
+
+  // Too many cities to list: name the countries abroad instead.
+  const abroad = codes.filter((c) => c !== homeCountry);
+  const names = abroad.length ? named(abroad) : undefined;
+  if (names) {
+    if (names.length === 1) return scopeOf(names[0], withThe(names[0]));
+    const list = joinAnd(names);
+    if (names.length <= 3 && list.length <= LIST_MAX) return scopeOf(list, joinAnd(names.map(withThe)));
+    const continents = new Set(abroad.map((c) => getCountry(c)?.continent));
+    const [continent] = continents;
+    if (continents.size === 1 && continent && CONTINENT_NAME[continent]) {
+      return scopeOf(`${names.length} countries in ${CONTINENT_NAME[continent]}`, CONTINENT_NAME[continent]);
+    }
+    return scopeOf(listMore(names));
+  }
+  return scopeOf(listMore(cities));
+}
+
+const weekday = (date: string) => new Date(`${date}T12:00:00Z`).getUTCDay();
+
+/** 1–3 nights leaving Thu–Sat and back Sat–Mon. */
+function isWeekend(t: Trip): boolean {
+  if (t.nights < 1 || t.nights > 3) return false;
+  return [4, 5, 6].includes(weekday(t.start)) && [6, 0, 1].includes(weekday(t.end));
+}
+
+/** Away over Christmas and/or New Year's Eve (a short trip, not a season abroad). */
+function holiday(t: Trip): string | undefined {
+  if (!(t.nights >= 1 && t.nights <= 21)) return undefined;
+  const year = t.start.slice(0, 4);
+  const christmas = t.start <= `${year}-12-25` && t.end >= `${year}-12-25`;
+  const newYear = t.end.slice(0, 4) > year;
+  if (christmas && newYear) return 'Holidays';
+  if (christmas) return 'Christmas';
+  return newYear ? 'New Year' : undefined;
+}
+
+/** "Week", "Two weeks", "Month", "Three months" when the length is about that; else undefined. */
+function span(nights: number): string | undefined {
+  if (nights >= 6 && nights <= 8) return 'Week';
+  for (const w of [2, 3]) if (Math.abs(nights - 7 * w) <= 1) return `${NUMBER_WORDS[w]} weeks`;
+  if (nights >= 27 && nights <= 34) return 'Month';
+  const months = Math.round(nights / 30.44);
+  if (months >= 2 && months <= 12 && Math.abs(nights - months * 30.44) <= 7) return `${NUMBER_WORDS[months]} months`;
+  return undefined;
+}
+
+/**
+ * Automatic trip name, short because the dates are shown with it:
+ * - one place: "Weekend in Chicago" (1–3 nights over a weekend), "Day trip to Chicago",
+ *   "Week in Lisbon" / "Two weeks in …" / "Month in …" / "Three months in …" when about that long,
+ *   "Christmas in …" / "New Year in …" / "Holidays in …" (both), else just "Chicago";
+ * - not back home in the log: "To San Francisco"; picked up already away: "Home from London",
+ *   "London to Rome";
+ * - two places: "Lisbon & Porto"; three or more in one foreign country: "Japan"; otherwise the
+ *   cities while they fit ("Paris, Rome & Barcelona"), then the countries ("France & Italy"),
+ *   "4 countries in Europe", or "Japan, Thailand & 2 more". Prefixes apply to these too while short.
+ * Connections and the home area never count as places. Works without reference data (codes).
+ */
+export function suggestTripName(t: Trip): string {
+  const { places, homeCountry } = tripPlaces(t);
+  if (!places.length) return cityName(t.main);
+  const hasStay = t.stops.some((s) => s.kind === 'stay' && !s.home);
+  const [first] = places;
+  if (!t.startLogged && first.key === placeOf(t.origin).key) {
+    // The log picks the trip up already away.
+    if (t.roundTrip && places.length === 1) return `Home from ${first.city}`;
+    if (!t.roundTrip && places.length === 2 && !hasStay) return `${first.city} to ${places[1].city}`;
+  }
+  if (!t.roundTrip && t.startLogged && places.length === 1) return `To ${first.city}`;
+
+  const scope = tripScope(places, homeCountry);
+  const prefixed = (prefix: string) => {
+    const text = `${prefix} ${scope.inText}`;
+    return text.length <= PREFIXED_MAX ? text : scope.text;
+  };
+  if (t.roundTrip && t.nights === 0 && t.flights.length >= 2) return prefixed('Day trip to');
+  const occasion = holiday(t);
+  if (occasion) return prefixed(`${occasion} in`);
+  if (!t.roundTrip) return scope.text;
+  if (isWeekend(t)) return prefixed('Weekend in');
+  const length = span(t.nights);
+  return length ? prefixed(`${length} in`) : scope.text;
 }
 
 /** Date range label, e.g. "Oct 3 – 7, 2026", "Dec 28, 2025 – Jan 4, 2026". */

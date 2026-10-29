@@ -113,4 +113,19 @@ describe('TripPage', () => {
     await settle(() => el.querySelector('h1')?.textContent === 'Spring conference');
     expect(el.textContent).toContain('Saved trip');
   });
+
+  it('offers the automatic name when renaming a saved trip', async () => {
+    await addFlights([
+      { ...leg('2026-04-10', 'KSAN', 'KORD', '08:00', '14:00', 'UA1'), tripId: 'trip-x', tripName: 'Cubs game' },
+      { ...leg('2026-04-12', 'KORD', 'KSAN', '17:00', '19:30', 'UA2'), tripId: 'trip-x' },
+    ]);
+    const el = await render('/trips/trip-x');
+    expect(el.querySelector('h1')?.textContent).toBe('Cubs game');
+    const rename = [...el.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Rename')!;
+    await act(async () => rename.click());
+    const input = document.querySelector<HTMLInputElement>('.tname input')!;
+    expect(input.value).toBe('Cubs game');
+    expect(input.placeholder).toBe('Weekend in Chicago');
+    expect(document.querySelector('.tname__lead')?.textContent).toContain('“Weekend in Chicago”');
+  });
 });

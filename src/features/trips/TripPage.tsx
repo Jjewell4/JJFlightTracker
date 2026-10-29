@@ -5,7 +5,7 @@ import { ConfirmSheet, Sheet } from '@/components/Sheet';
 import { useReferenceReady } from '@/data/reference';
 import { renameTrip, saveTrip, unsaveTrip, useFlights, useSettings } from '@/lib/db';
 import { todayLocal } from '@/lib/time';
-import { resolveTrip, tripCounts, tripDates, tripMinutes, tripTitle, type Trip } from '@/lib/trips';
+import { resolveTrip, suggestTripName, tripCounts, tripDates, tripMinutes, tripTitle, type Trip } from '@/lib/trips';
 import type { Settings } from '@/lib/types';
 import { formatDistance } from '@/features/flights/flight-logic';
 import { FlightRow } from '@/features/flights/FlightRow';
@@ -319,7 +319,7 @@ function TripView({ trip, settings, onBack, onUngrouped }: { trip: Trip; setting
         open={naming !== null}
         mode={naming ?? 'save'}
         initial={trip.saved ? (trip.name ?? '') : title}
-        placeholder={tripTitle({ ...trip, name: undefined })}
+        placeholder={suggestTripName(trip)}
         legs={trip.flights.length}
         busy={busy}
         onSubmit={submitName}
@@ -400,7 +400,7 @@ function TripNameSheet({
         <p className="tname__lead">
           {mode === 'save'
             ? `Keeps these ${plural(legs, 'flight')} together as one trip. The flights themselves don’t change.`
-            : `Leave it empty to name the trip after its destination (${placeholder}).`}
+            : `Leave it empty to use the suggested name, “${placeholder}”.`}
         </p>
         <label className="field">
           <span className="field__label">Trip name</span>
