@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LAYOUTS, defaultLayoutForLetter, layoutForAircraft, layoutLabel, seatLetter, seatPosition, variantIndex } from './cabin-layout';
+import { LAYOUTS, PLANS, defaultLayoutForLetter, isOverWing, layoutForAircraft, layoutLabel, parseSeat, planForAircraft, planForLayout, seatLetter, seatPosition, variantIndex } from './cabin-layout';
 
 describe('layoutForAircraft', () => {
   it.each([
@@ -31,6 +31,16 @@ describe('seat letters and positions', () => {
     expect(seatLetter(undefined)).toBeUndefined();
   });
 
+  it('parses row and letter', () => {
+    expect(parseSeat('12A')).toEqual({ row: 12, letter: 'A' });
+    expect(parseSeat(' 3 k ')).toEqual({ row: 3, letter: 'K' });
+    expect(parseSeat('A')).toEqual({ row: undefined, letter: 'A' });
+    expect(parseSeat('0C')).toEqual({ row: undefined, letter: 'C' });
+    expect(parseSeat('12')).toBeUndefined();
+    expect(parseSeat('A12')).toBeUndefined();
+    expect(parseSeat(undefined)).toBeUndefined();
+  });
+
   it('classifies window / middle / aisle and side', () => {
     const nb = LAYOUTS['3-3'];
     expect([0, 1, 2, 3, 4, 5].map((i) => seatPosition(nb, i).type)).toEqual(['window', 'middle', 'aisle', 'aisle', 'middle', 'window']);
@@ -55,5 +65,28 @@ describe('seat letters and positions', () => {
   it('falls back by letter range', () => {
     expect(defaultLayoutForLetter('F').id).toBe('3-3');
     expect(defaultLayoutForLetter('K').id).toBe('3-4-3');
+  });
+});
+
+describe('aircraft plans', () => {
+  it.each([
+    ['A320', 'narrow'], ['B738', 'narrow'], ['B38M', 'narrow'], ['A20N', 'narrow'], ['B737', 'narrow'],
+    ['A321', 'narrow-long'], ['A21N', 'narrow-long'], ['B739', 'narrow-long'], ['B752', 'narrow-long'],
+    ['BCS3', 'a220'], ['MD88', 'tailjet'], ['B712', 'tailjet'], ['E75L', 'ejet'], ['CRJ9', 'crj'], ['E145', 'erj'], ['DH8D', 'prop'], ['AT76', 'prop'],
+    ['B763', 'b767'], ['A332', 'a330'], ['A343', 'a340'], ['B789', 'twin'], ['A35K', 'twin'], ['B77W', 'b777'], ['B744', 'quad'], ['A388', 'quad'],
+  ])('%s → %s', (icao, id) => {
+    expect(planForAircraft(icao)?.id).toBe(id);
+  });
+
+  it('covers every layout and keeps the wing inside the usual length', () => {
+    for (const layout of Object.values(LAYOUTS)) expect(planForLayout(layout)).toBeDefined();
+    for (const p of Object.values(PLANS)) {
+      expect(p.wing[0]).toBeLessThan(p.wing[1]);
+      expect(p.wing[1]).toBeLessThanOrEqual(p.rows);
+      expect(p.rows).toBeLessThanOrEqual(p.maxRows);
+    }
+    expect(planForAircraft('C172')).toBeUndefined();
+    expect(isOverWing(PLANS.narrow, 10)).toBe(true);
+    expect(isOverWing(PLANS.narrow, 18)).toBe(false);
   });
 });

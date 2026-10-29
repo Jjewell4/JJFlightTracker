@@ -82,28 +82,45 @@ describe('seat heatmap', () => {
   const legs = (seats: string[], aircraftType = 'B738') =>
     seats.map((seat, i) => f({ from: 'LAX', to: 'SFO', date: `2024-04-${String(i + 1).padStart(2, '0')}`, aircraftType, seatNumber: seat }));
 
-  it('draws a cabin row shaded by how often each seat was picked', async () => {
-    await addFlights([...legs(['12A', '14A', '3A', '20F', '9C', '16E']), ...legs(['40K', '41A', '42C', '43B', '44H'], 'B77W'), f({ from: 'LAX', to: 'SFO', date: '2024-05-01', seatType: 'aisle' })]);
+  it('draws the whole cabin with the user’s seats, and switches aircraft', async () => {
+    await addFlights([
+      ...legs(['12A', '14A', '3A', '20F', '9C', '16E', '17C', '18B', '19C']),
+      ...legs(['40K', '41A', '42C', '43B', '44H', '45A', '46K', '47D'], 'B77W'),
+      f({ from: 'LAX', to: 'SFO', date: '2024-05-01', seatType: 'aisle' }),
+      f({ from: 'LAX', to: 'SFO', date: '2024-05-02', aircraftType: 'B738', seatNumber: 'A' }),
+    ]);
     const el = await render();
     const card = el.querySelector('.seatmap')!;
     expect(card).not.toBeNull();
-    expect(card.textContent).toContain('You pick A most — window on the left');
-    expect(card.textContent).toContain('Narrowbody');
-    expect(card.textContent).toContain('Widebody');
-    const rows = card.querySelectorAll('.seatmap-cabin');
-    expect(rows).toHaveLength(2);
-    expect(rows[0].querySelectorAll('button')).toHaveLength(6);
-    expect(rows[1].querySelectorAll('button')).toHaveLength(10);
-    const seatA = rows[0].querySelector<HTMLButtonElement>('button[aria-label^="Seat A,"]')!;
-    expect(seatA.getAttribute('aria-label')).toBe('Seat A, window on the left: 3 flights');
-    expect(seatA.dataset.level).toBe('4');
-    expect(rows[0].querySelector('button[aria-label^="Seat B,"]')?.getAttribute('data-level')).toBe('0');
+    expect(card.querySelector('.stats-card__subtitle')?.textContent).toBe('You sit mid-cabin: median row 16');
+
+    const plane = () => card.querySelector('svg[role="img"]')!;
+    expect(plane().getAttribute('aria-label')).toContain('typical A320 · 737 cabin, 32 rows');
+    expect(plane().querySelectorAll('.sm-seat')).toHaveLength(32 * 6);
+    expect(plane().querySelectorAll('.sm-seat:not([data-level="0"])')).toHaveLength(9);
+    expect(card.textContent).toContain('Median row16');
+    expect(card.textContent).toContain('1 seat has a letter but no row.');
     expect(card.textContent).toContain('1 more flight has only a seat type: 1 aisle.');
 
-    const seatF = rows[0].querySelector<HTMLButtonElement>('button[aria-label^="Seat F,"]')!;
-    await act(async () => seatF.click());
-    expect(seatF.getAttribute('aria-pressed')).toBe('true');
-    expect(card.querySelector('[role="status"]')?.textContent).toContain('Seat F · window on the right');
+    // The most-used seats are buttons that drive the readout.
+    const chips = [...card.querySelectorAll<HTMLButtonElement>('.seatmap-chip')];
+    expect(chips.map((c) => c.textContent)).toEqual(['3A', '9C', '12A', '14A', '16E', '17C']);
+    const status = () => card.querySelector('[role="status"]')!.textContent;
+    expect(status()).toContain('Seat 3A');
+    await act(async () => chips[2].click());
+    expect(chips[2].getAttribute('aria-pressed')).toBe('true');
+    expect(status()).toBe('Seat 12A1 flight · window on the left · over the wing');
+    await act(async () => chips[5].click());
+    expect(status()).toBe('Seat 17C1 flight · aisle on the left · over the wing');
+    await act(async () => chips[1].click());
+    expect(status()).toBe('Seat 9C1 flight · aisle on the left · front third');
+
+    const toggle = card.querySelector('[role="radiogroup"][aria-label="Aircraft"]')!;
+    const b777 = [...toggle.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === '777')!;
+    await act(async () => b777.click());
+    expect(plane().getAttribute('aria-label')).toContain('typical 777 cabin, 50 rows');
+    expect(plane().querySelectorAll('.sm-seat')).toHaveLength(50 * 10);
+    expect(status()).toContain('Seat 40K');
   });
 
   it('stays hidden with too few seat numbers', async () => {

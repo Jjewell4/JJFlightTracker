@@ -68,6 +68,17 @@ export function seatLetter(seat: string | undefined): string | undefined {
   return m ? m[1].toUpperCase() : undefined;
 }
 
+/**
+ * Row and letter from a seat number: "12A" → { row: 12, letter: 'A' }. A bare letter ("A")
+ * keeps its letter with no row; anything else (and row 0) is undefined / row-less.
+ */
+export function parseSeat(seat: string | undefined): { row?: number; letter: string } | undefined {
+  const m = /^\s*(\d{1,3})?\s*([A-Za-z])\s*$/.exec(seat ?? '');
+  if (!m) return undefined;
+  const row = m[1] ? Number(m[1]) : undefined;
+  return { row: row && row > 0 ? row : undefined, letter: m[2].toUpperCase() };
+}
+
 /** Index (0-based, left to right) of a letter in a variant, or -1. */
 export function variantIndex(variant: string[], letter: string): number {
   return variant.join('').indexOf(letter);
@@ -112,3 +123,95 @@ export function defaultLayoutForLetter(letter: string): CabinLayout {
 
 /** Whether a letter appears in any of the layout's variants. */
 export const layoutHasLetter = (layout: CabinLayout, letter: string) => layout.variants.some((v) => variantIndex(v, letter) >= 0);
+
+/* ---------------------------------------------------------------------------------------------
+ * Whole-aircraft plans: how many rows a type usually has and roughly which rows sit beside the
+ * wing. Row numbering varies a lot by airline (premium cabins, skipped rows), so these are
+ * deliberately coarse: enough to say "front third" or "over the wing", never more.
+ * ------------------------------------------------------------------------------------------- */
+
+export type EngineMount = 'wing' | 'tail' | 'prop';
+
+export interface CabinPlan {
+  id: string;
+  /** Short name for the toggle, e.g. "A320 · 737". */
+  label: string;
+  /** Usual last row; the drawing is at least this long. */
+  rows: number;
+  /** Longest drawing; seats further back are counted in a footnote instead. */
+  maxRows: number;
+  /** First and last row (inclusive) roughly beside the wing. Approximate. */
+  wing: [number, number];
+  engines: EngineMount;
+  /** Four engines on the wing (747, A380, A340). */
+  quad?: boolean;
+}
+
+const P = (id: string, label: string, rows: number, maxRows: number, wing: [number, number], engines: EngineMount = 'wing', quad = false): CabinPlan => ({
+  id,
+  label,
+  rows,
+  maxRows,
+  wing,
+  engines,
+  ...(quad ? { quad } : {}),
+});
+
+export const PLANS = {
+  quad: P('quad', '747 · A380', 50, 60, [20, 34], 'wing', true),
+  a340: P('a340', 'A340', 45, 55, [18, 28], 'wing', true),
+  b777: P('b777', '777', 50, 60, [20, 33]),
+  twin: P('twin', '787 · A350', 45, 55, [18, 30]),
+  a330: P('a330', 'A330', 45, 55, [18, 28]),
+  b767: P('b767', '767', 40, 48, [16, 25]),
+  narrowLong: P('narrow-long', 'A321 · 757', 40, 48, [14, 22]),
+  narrow: P('narrow', 'A320 · 737', 32, 38, [10, 17]),
+  a220: P('a220', 'A220', 30, 36, [10, 16]),
+  tailjet: P('tailjet', 'MD-80 · 717', 30, 36, [10, 16], 'tail'),
+  ejet: P('ejet', 'E-Jet', 22, 30, [8, 13]),
+  crj: P('crj', 'CRJ', 22, 30, [8, 13], 'tail'),
+  erj: P('erj', 'ERJ', 18, 24, [7, 11], 'tail'),
+  prop: P('prop', 'Turboprop', 20, 26, [3, 8], 'prop'),
+} satisfies Record<string, CabinPlan>;
+
+/** ICAO type designator patterns → plan. First match wins. */
+const PLAN_RULES: [RegExp, CabinPlan][] = [
+  [/^(B74|A38)/, PLANS.quad],
+  [/^A34/, PLANS.a340],
+  [/^B77/, PLANS.b777],
+  [/^(B78|A35)/, PLANS.twin],
+  [/^(A33|A30|A310)/, PLANS.a330],
+  [/^B76/, PLANS.b767],
+  [/^(A321|A21N|B739|B39M|B3XM|B75)/, PLANS.narrowLong],
+  [/^(A31[89]|A32|A19N|A20N|B73|B3[78]M|B72|B70|C919|DC8)/, PLANS.narrow],
+  [/^(BCS|SU9)/, PLANS.a220],
+  [/^(B712|DC9|MD8|MD9|F100|F70|F28)/, PLANS.tailjet],
+  [/^(E17|E19|E29|E75)/, PLANS.ejet],
+  [/^CRJ/, PLANS.crj],
+  [/^(E135|E145|E14)/, PLANS.erj],
+  [/^(AT[47]|DH8|SF34|SB20|F50|E120)/, PLANS.prop],
+];
+
+const LAYOUT_PLANS: Record<LayoutId, CabinPlan> = {
+  '1-2': PLANS.erj,
+  '2-2': PLANS.ejet,
+  '2-3': PLANS.a220,
+  '3-3': PLANS.narrow,
+  '2-3-2': PLANS.b767,
+  '2-4-2': PLANS.a330,
+  '3-3-3': PLANS.twin,
+  '3-4-3': PLANS.b777,
+};
+
+/** Whole-aircraft plan for an ICAO type, or undefined if unknown. */
+export function planForAircraft(icao: string | undefined): CabinPlan | undefined {
+  const code = icao?.trim().toUpperCase();
+  if (!code) return undefined;
+  return PLAN_RULES.find(([re]) => re.test(code))?.[1];
+}
+
+/** Typical plan for a layout when the aircraft type is unknown. */
+export const planForLayout = (layout: CabinLayout): CabinPlan => LAYOUT_PLANS[layout.id];
+
+/** Whether a row is (roughly) beside the wing. */
+export const isOverWing = (plan: CabinPlan, row: number) => row >= plan.wing[0] && row <= plan.wing[1];
