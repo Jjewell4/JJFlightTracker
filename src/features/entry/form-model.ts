@@ -5,6 +5,9 @@ import { computeDuration, isValidTime, todayLocal } from '@/lib/time';
 import type { CabinClass, DatePrecision, Flight, FlightInput, FlightReason, SeatType } from '@/lib/types';
 import type { AirlineInfo, FlightLookupResult } from '@/services/lookup';
 
+/** Longest note kept (keeps every flight record small enough to sync). */
+export const NOTE_MAX = 2000;
+
 export interface FormValues {
   date: string;
   datePrecision: DatePrecision;
@@ -322,7 +325,7 @@ export function valuesToInput(v: FormValues, opts: { source: FlightInput['source
     seatType: v.seatType,
     cabinClass: v.cabinClass,
     reason: v.reason,
-    note: v.note.trim() || undefined,
+    note: v.note.trim().slice(0, NOTE_MAX) || undefined,
     source: opts.source,
   };
   return input;

@@ -142,11 +142,22 @@ export async function pullEmailDrafts(): Promise<number> {
   const rows = data as InboxRow[];
   const open = new Set(rows.map((r) => r.id));
   const acks = await pendingAcks();
+  // Drafts not among the newest open rows: drop only those finished elsewhere (keeps progress
+  // on older open ones when more than 50 are waiting).
+  const local0 = (await db.drafts.toArray()).filter((d) => d.source === 'email' && d.remoteId && !open.has(d.remoteId));
+  let finished = new Set<string>();
+  if (local0.length) {
+    const { data: states, error: stateError } = await sb.from('email_inbox').select('id,status').in('id', local0.map((d) => d.remoteId!));
+    if (!stateError && states) {
+      const known = new Map((states as { id: string; status: string }[]).map((r) => [r.id, r.status]));
+      finished = new Set(local0.filter((d) => !known.has(d.remoteId!) || ['done', 'dismissed'].includes(known.get(d.remoteId!)!)).map((d) => d.id));
+    }
+  }
   let added = 0;
   await db.transaction('rw', db.drafts, async () => {
     const local = (await db.drafts.toArray()).filter((d) => d.source === 'email');
     const have = new Set(local.map((d) => d.remoteId));
-    for (const d of local) if (d.remoteId && !open.has(d.remoteId)) await db.drafts.delete(d.id);
+    for (const d of local) if (finished.has(d.id)) await db.drafts.delete(d.id);
     for (const row of rows) {
       if (have.has(row.id) || acks[row.id]) continue;
       await db.drafts.put(rowToDraft(row));

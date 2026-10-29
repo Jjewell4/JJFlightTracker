@@ -15,6 +15,26 @@
         {
           "key": "Cache-Control",
           "value": "public, max-age=0, must-revalidate"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=(), payment=()"
         }
       ]
     },
@@ -39,14 +59,21 @@
     {
       "source": "/api/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "private, no-store" }
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store"
+        }
       ]
     }
   ],
   "trailingSlash": false,
   "functions": {
-    "api/extract-flight.ts": { "maxDuration": 60 },
-    "api/inbound-email.ts": { "maxDuration": 60 }
+    "api/extract-flight.ts": {
+      "maxDuration": 60
+    },
+    "api/inbound-email.ts": {
+      "maxDuration": 60
+    }
   },
   "rewrites": [
     {

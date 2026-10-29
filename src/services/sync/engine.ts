@@ -41,9 +41,30 @@ interface SyncState {
   userId: string;
   cursor: string | null;
   lastSyncAt?: number;
+  /** Last time every row was re-read (a periodic safety net for anything a pull missed). */
+  lastFullAt?: number;
 }
 
 const STATE_KEY = 'sync.state';
+/** The account the flights on this device belong to; survives sign-out. */
+const OWNER_KEY = 'sync.owner';
+const FULL_PULL_EVERY_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * A different account signed in while this device still holds another account's flights.
+ * Nothing is pushed until the user chooses (adoptLocalFlights or remove them).
+ */
+export class AccountSwitchError extends Error {
+  constructor(public count: number) {
+    super(`This device has ${count} ${count === 1 ? 'flight' : 'flights'} from another account. Choose in Settings whether to add them to this account.`);
+    this.name = 'AccountSwitchError';
+  }
+}
+
+/** The signed-in account takes over the flights on this device (they'll be pushed to it). */
+export async function adoptLocalFlights(userId: string): Promise<void> {
+  await db.kv.put({ key: OWNER_KEY, value: userId });
+}
 /** Re-read a little before the cursor so rows committed out of order are never missed. */
 const CURSOR_OVERLAP_MS = 2 * 60 * 1000;
 const PUSH_CHUNK = 200;
@@ -71,13 +92,22 @@ export async function countPendingChanges(): Promise<number> {
 export async function syncOnce(remote: SyncRemote, userId: string, now: () => number = Date.now): Promise<SyncResult> {
   let state = await getSyncState();
   if (!state || state.userId !== userId) {
+    // Another account's flights must never be uploaded into this one without asking.
+    const owner = ((await db.kv.get(OWNER_KEY))?.value as string | undefined) ?? state?.userId;
+    if (owner && owner !== userId) {
+      const count = await db.flights.count();
+      if (count > 0) throw new AccountSwitchError(count);
+    }
     // New account on this device: start from scratch so nothing is mistaken for "already synced".
     await resetSyncState();
     state = { userId, cursor: null };
   }
+  await db.kv.put({ key: OWNER_KEY, value: userId });
 
   // ---- pull ----
-  const since = state.cursor ? new Date(Date.parse(state.cursor) - CURSOR_OVERLAP_MS).toISOString() : null;
+  // Every so often re-read everything, so a row a pull ever missed can't stay missing.
+  const full = !state.lastFullAt || now() - state.lastFullAt > FULL_PULL_EVERY_MS;
+  const since = state.cursor && !full ? new Date(Date.parse(state.cursor) - CURSOR_OVERLAP_MS).toISOString() : null;
   const rows = await remote.pull(since);
   let cursor = state.cursor;
   for (const r of rows) if (!cursor || Date.parse(r.server_updated_at) > Date.parse(cursor)) cursor = r.server_updated_at;
@@ -106,7 +136,7 @@ export async function syncOnce(remote: SyncRemote, userId: string, now: () => nu
   }
 
   const at = now();
-  await db.kv.put({ key: STATE_KEY, value: { userId, cursor, lastSyncAt: at } satisfies SyncState });
+  await db.kv.put({ key: STATE_KEY, value: { userId, cursor, lastSyncAt: at, lastFullAt: full ? at : state.lastFullAt } satisfies SyncState });
   return { pulled, pushed: changed.length, deleted: removed.length, at };
 }
 

@@ -197,7 +197,7 @@ export function DetailsSection({
             <label className="field__label" htmlFor="entry-note">
               Notes
             </label>
-            <textarea id="entry-note" className="input" rows={3} value={v.note} onChange={(e) => onPatch({ note: e.target.value })} placeholder="Upgrade, great views, delayed 2h…" />
+            <textarea id="entry-note" className="input" rows={3} maxLength={2000} value={v.note} onChange={(e) => onPatch({ note: e.target.value })} placeholder="Upgrade, great views, delayed 2h…" />
           </div>
 
           <div>

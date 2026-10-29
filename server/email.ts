@@ -126,7 +126,8 @@ export async function handleInbound(
     if (u.email) allowed.add(u.email.toLowerCase());
   }
   if (sendersRes.ok) for (const s of (await sendersRes.json()) as { email: string }[]) allowed.add(s.email.toLowerCase());
-  if (!allowed.has(fromHeader) && !allowed.has(envelope)) {
+  // Only the visible From counts: the envelope sender isn't covered by DMARC and is easy to fake.
+  if (!allowed.has(fromHeader)) {
     return { outcome: 'sender-not-allowed', message: 'Forward from an email address you added in Window Seat → Settings → Email import.' };
   }
 

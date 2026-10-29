@@ -6,7 +6,7 @@
 import { useSyncExternalStore } from 'react';
 import { liveQuery } from 'dexie';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
-import { countPendingChanges, getSyncState, resetSyncState, syncOnce, type SyncResult } from './engine';
+import { adoptLocalFlights, type AccountSwitchError, countPendingChanges, getSyncState, resetSyncState, syncOnce, type SyncResult } from './engine';
 import { cleanAuthParamsFromUrl, getSupabase, isCloudConfigured, signOutCloud, supabaseRemote } from './supabase';
 
 export interface CloudSyncState {
@@ -21,6 +21,8 @@ export interface CloudSyncState {
   pending: number;
   /** One-off message for the app shell to show (e.g. after an email-link sign-in). */
   notice?: string;
+  /** Flights on this device that belong to another account, waiting for the user's choice. */
+  foreignFlights?: number;
 }
 
 let state: CloudSyncState = { phase: isCloudConfigured ? 'loading' : 'disabled', status: 'idle', pending: 0 };
@@ -76,9 +78,14 @@ export function syncNow(): Promise<void> {
         const result = await syncOnce(supabaseRemote(sb, userId), userId);
         setState({ lastResult: result, lastSyncAt: result.at });
       } while (again);
-      setState({ status: 'idle', pending: await countPendingChanges() });
+      setState({ status: 'idle', pending: await countPendingChanges(), foreignFlights: undefined });
       failures = 0;
     } catch (e) {
+      if (e instanceof Error && e.name === 'AccountSwitchError') {
+        // Waits for the user's choice; retrying wouldn't change anything.
+        setState({ status: 'error', error: e.message, foreignFlights: (e as AccountSwitchError).count });
+        return;
+      }
       console.error('Cloud sync failed', e);
       setState({ status: 'error', error: errorMessage(e) });
       // A flaky connection may never dispatch an `online` event. Retry without
@@ -127,12 +134,34 @@ async function applySession(session: Session | null, announce = initialized) {
   } else {
     clearTimeout(retry);
     failures = 0;
-    setState({ phase: 'signed-out', email: undefined, userId: undefined, status: 'idle', error: undefined });
+    setState({ phase: 'signed-out', email: undefined, userId: undefined, status: 'idle', error: undefined, foreignFlights: undefined });
   }
+}
+
+/**
+ * The signed-in account takes the other account's flights on this device (they're uploaded),
+ * or `discard` removes them from this device first. Either way, syncing resumes.
+ */
+export async function resolveForeignFlights(choice: 'adopt' | 'discard'): Promise<void> {
+  if (!state.userId) return;
+  if (choice === 'discard') {
+    const { deleteAllFlights } = await import('@/lib/db');
+    await deleteAllFlights();
+    await resetSyncState();
+  }
+  await adoptLocalFlights(state.userId);
+  setState({ foreignFlights: undefined, error: undefined });
+  await syncNow();
 }
 
 /** Signs out of the cloud on this device. Flights stay on the device. */
 export async function signOut(): Promise<void> {
+  // Push pending changes first (deletes especially would otherwise come back on next sign-in).
+  if (state.phase === 'signed-in' && state.pending > 0 && !state.foreignFlights) {
+    await Promise.race([syncNow(), new Promise((r) => setTimeout(r, 8_000))]);
+  } else if (running) {
+    await Promise.race([running, new Promise((r) => setTimeout(r, 8_000))]);
+  }
   await signOutCloud();
   await resetSyncState();
   await applySession(null);

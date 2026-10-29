@@ -233,3 +233,35 @@ button.srow:disabled {
   flex: none;
   min-width: 44px;
 }
+
+/* ---------- flights from another account ---------- */
+.foreign {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
+  padding: var(--space-4);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.foreign__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 700;
+}
+.foreign__title svg {
+  flex: none;
+  color: var(--warning);
+}
+.foreign__text {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.foreign__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}

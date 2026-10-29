@@ -56,8 +56,8 @@ drop policy if exists "own inbox read" on public.email_inbox;
 create policy "own inbox read" on public.email_inbox for select using (user_id = auth.uid());
 drop policy if exists "own inbox update" on public.email_inbox;
 create policy "own inbox update" on public.email_inbox for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+-- No delete for users: the daily email limit counts these rows (status changes are enough).
 drop policy if exists "own inbox delete" on public.email_inbox;
-create policy "own inbox delete" on public.email_inbox for delete using (user_id = auth.uid());
 
 -- Users may only change an item's status (done / dismissed), not what was read.
 revoke update on public.email_inbox from authenticated;

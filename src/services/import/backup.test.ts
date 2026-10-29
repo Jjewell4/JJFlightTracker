@@ -226,14 +226,16 @@ describe('planImport + commitImport', () => {
     expect(await db.flights.count()).toBe(1);
   });
 
-  it('replace mode swaps the whole log in one go and restores ids, timestamps and settings', async () => {
+  it('replace mode swaps the whole log in one go and restores ids, creation times and settings', async () => {
     await db.flights.bulkPut([mk({ id: 'old1' }), mk({ id: 'old2' })]);
     const backup = parseBackup(backupToJson(buildBackup([mk({ id: 'new1', createdAt: 42, updatedAt: 43 })], { ...DEFAULT_SETTINGS, theme: 'light' })));
     const plan = planImport({ candidates: backup.candidates, duplicates: new Map(), skipped: new Set(), policy: 'skip' });
     const res = await commitImport(plan, { replace: true, settings: backup.settings });
     expect(res).toMatchObject({ added: 1, removed: 2, settingsRestored: true });
     const all = await db.flights.toArray();
-    expect(all).toEqual([expect.objectContaining({ id: 'new1', createdAt: 42, updatedAt: 43 })]);
+    expect(all).toEqual([expect.objectContaining({ id: 'new1', createdAt: 42 })]);
+    // Restored flights count as edited now, so the cloud's newer copies (or its deletes) don't override them.
+    expect(all[0].updatedAt).toBeGreaterThan(43);
     expect((await getSettings()).theme).toBe('light');
   });
 
@@ -255,7 +257,8 @@ describe('planImport + commitImport', () => {
     const dups = findDuplicates(parsed.candidates, []);
     const res = await commitImport(planImport({ candidates: parsed.candidates, duplicates: dups, skipped: new Set(), policy: 'skip' }));
     expect(res.added).toBe(2);
-    expect((await db.flights.toArray()).sort((x, y) => x.id.localeCompare(y.id))).toEqual(original);
+    const strip = ({ updatedAt: _u, ...f }: (typeof original)[number]) => f;
+    expect((await db.flights.toArray()).sort((x, y) => x.id.localeCompare(y.id)).map(strip)).toEqual(original.map(strip));
   });
 
   it('importing the same backup twice skips everything (merge)', async () => {

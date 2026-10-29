@@ -35,22 +35,24 @@ revoke all on function public.consume_screenshot_import() from public;
 grant execute on function public.consume_screenshot_import() to authenticated;
 -- Give an attempt back when extraction failed for reasons unrelated to the image
 -- (server setup or Gemini outages). Never goes below zero.
-create or replace function public.refund_screenshot_import()
+-- Refunds happen only server-side (service role), for attempts that failed for reasons outside
+-- the user's control. Users can't call this themselves, so they can't reset their own quota.
+drop function if exists public.refund_screenshot_import();
+create or replace function public.refund_screenshot_import(p_user uuid)
 returns boolean language plpgsql security definer set search_path = public as $$
 declare
- owner_id uuid := auth.uid();
  today date := (now() at time zone 'UTC')::date;
  month_start date := date_trunc('month', now() at time zone 'UTC')::date;
 begin
- if owner_id is null then return false; end if;
+ if p_user is null then return false; end if;
  update public.screenshot_import_usage set
   day_count = case when day = today then greatest(day_count - 1, 0) else day_count end,
   month_count = case when month = month_start then greatest(month_count - 1, 0) else month_count end
- where user_id = owner_id;
+ where user_id = p_user;
  return found;
 end $$;
-revoke all on function public.refund_screenshot_import() from public;
-grant execute on function public.refund_screenshot_import() to authenticated;
+revoke all on function public.refund_screenshot_import(uuid) from public, anon, authenticated;
+grant execute on function public.refund_screenshot_import(uuid) to service_role;
 
 -- Remaining allowance for the signed-in user (read-only; used by the in-app setup check).
 create or replace function public.screenshot_import_status()

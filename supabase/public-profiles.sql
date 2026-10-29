@@ -72,7 +72,14 @@ language sql stable security definer set search_path=public as $$
     when 'year' then left(f.data->>'date',4)<to_char(current_date,'YYYY')
     when 'month' then left(f.data->>'date',7)<to_char(current_date,'YYYY-MM')
     else f.data->>'date'<to_char(current_date,'YYYY-MM-DD') end
-  ) as flights,max(f.server_updated_at) as changed_at
+  ) as flights,
+  -- "Updated" only reflects published flights (not private, future or deleted edits).
+  max(f.server_updated_at) filter (where not f.deleted and public.project_public_flight(f.data,p.exact_dates) is not null and
+   case coalesce(f.data->>'datePrecision','day')
+    when 'year' then left(f.data->>'date',4)<to_char(current_date,'YYYY')
+    when 'month' then left(f.data->>'date',7)<to_char(current_date,'YYYY-MM')
+    else f.data->>'date'<to_char(current_date,'YYYY-MM-DD') end
+  ) as changed_at
   from public.flights f where f.user_id=p.user_id
  ) live on true
  where p.slug=handle limit 1;

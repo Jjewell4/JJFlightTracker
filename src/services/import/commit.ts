@@ -54,8 +54,9 @@ function compact<T extends object>(obj: T): T {
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined && v !== null && v !== '')) as T;
 }
 
+/** Imported flights count as edited now, so a restore wins over older copies in the cloud. */
 function toFlight(f: ImportFlight, index: number, now: number): Flight {
-  return compact({ ...f, id: f.id ?? newId(), createdAt: f.createdAt ?? now + index, updatedAt: f.updatedAt ?? now + index }) as Flight;
+  return compact({ ...f, id: f.id ?? newId(), createdAt: f.createdAt ?? now + index, updatedAt: now + index }) as Flight;
 }
 
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));

@@ -44,6 +44,7 @@ export function configFromEnv(env: NodeJS.ProcessEnv): ScreenshotConfig {
     // Never used — reported by name so a browser-exposed key can be renamed.
     misnamed,
     keyHints,
+    serviceKey: clean(env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SECRET_KEY) || undefined,
     // Vercel system variables: which deployment answered, so a stale or Preview build is obvious.
     deployment: {
       env: clean(env.VERCEL_ENV) || undefined,

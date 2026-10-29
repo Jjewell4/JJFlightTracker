@@ -25,6 +25,7 @@ import { FlightRow, FlightRowSkeleton } from './FlightRow';
 import { SearchBar } from './SearchBar';
 import { SummaryHero, SummaryHeroSkeleton } from './SummaryHero';
 import { ReviewBanner } from '@/features/review/ReviewBanner';
+import { ForeignFlights } from '@/features/settings/ForeignFlights';
 import { UpcomingCard } from './UpcomingCard';
 import { OnThisDay } from './OnThisDay';
 import { LogViewSwitch, TripsList, useLogView } from '@/features/trips/TripsList';
@@ -162,6 +163,7 @@ export function FlightsPage() {
 
       {!archive && <SummaryHero summary={summary} unit={unit} upcoming={upcoming.length} />}
 
+      {home && <ForeignFlights />}
       {home && <ReviewBanner className="rbanner--home" />}
 
       {!archive && !filtering && shownUpcoming.length > 0 && (

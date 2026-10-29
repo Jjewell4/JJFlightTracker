@@ -32,6 +32,8 @@ export interface ScreenshotConfig {
   supabaseKey: string;
   /** Names of misnamed variables found in the environment, for diagnostics only (never values). */
   misnamed?: string[];
+  /** Server-only service-role key; used for quota refunds (users can't refund themselves). */
+  serviceKey?: string;
   /** Names of variables that look like a Gemini key but couldn't be used (typos, empty values). */
   keyHints?: string[];
   /** Which deployment is answering (Vercel system variables), shown when the key is missing. */
@@ -148,7 +150,7 @@ async function verifyUser(authorization: string | undefined, config: ScreenshotC
   if (!auth.ok) fail(503, 'Could not verify your account with Supabase. Check SUPABASE_URL and SUPABASE_ANON_KEY in Vercel, then retry.', 'setup');
   const user = (await auth.json()) as { id?: string };
   if (!user?.id) fail(401, 'Sign in to import a screenshot.');
-  return headers;
+  return { headers, userId: user.id };
 }
 
 /** What to send Gemini: the system instructions plus the user parts (an image, or an email's text). */
@@ -260,7 +262,7 @@ export async function extractScreenshot(body: unknown, authorization: string | u
   const isWebp = bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
   if (!((mimeType === 'image/jpeg' && isJpeg) || (mimeType === 'image/png' && isPng) || (mimeType === 'image/webp' && isWebp))) fail(400, 'The file is not a supported image.');
 
-  const headers = await verifyUser(authorization, config, fetcher);
+  const { headers, userId } = await verifyUser(authorization, config, fetcher);
 
   // Atomic database quota works across serverless instances; no image or extracted text is stored.
   const quota = await fetcher(`${config.supabaseUrl}/rest/v1/rpc/consume_screenshot_import`, { method: 'POST', headers, body: '{}', signal: AbortSignal.timeout(10_000) });
@@ -275,10 +277,15 @@ export async function extractScreenshot(body: unknown, authorization: string | u
   } catch (error) {
     const code = error instanceof ImportError ? error.code : 'busy';
     // Give the attempt back when the failure wasn't about this image (setup or provider trouble).
-    // Older quota installs lack refund_screenshot_import; that call then fails harmlessly.
-    if (code === 'setup' || code === 'busy' || code === 'unknown') {
+    // Only the server can refund (service-role key), so users can't reset their own quota.
+    if (config.serviceKey && (code === 'setup' || code === 'busy' || code === 'unknown')) {
       try {
-        await fetcher(`${config.supabaseUrl}/rest/v1/rpc/refund_screenshot_import`, { method: 'POST', headers, body: '{}', signal: AbortSignal.timeout(5_000) });
+        await fetcher(`${config.supabaseUrl}/rest/v1/rpc/refund_screenshot_import`, {
+          method: 'POST',
+          headers: { apikey: config.serviceKey, Authorization: `Bearer ${config.serviceKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ p_user: userId }),
+          signal: AbortSignal.timeout(5_000),
+        });
       } catch {
         /* best effort */
       }
@@ -327,7 +334,7 @@ export async function screenshotStatus(authorization: string | undefined, config
     session = { id: 'session', label: 'Signed in', ok: null, detail: 'Sign in to run the full check.' };
   } else if (supabaseOk) {
     try {
-      headers = await verifyUser(authorization, config, fetcher);
+      headers = (await verifyUser(authorization, config, fetcher)).headers;
       session = { id: 'session', label: 'Signed in', ok: true, detail: 'Your session is valid.' };
     } catch (e) {
       session = { id: 'session', label: 'Signed in', ok: false, detail: e instanceof Error ? e.message : 'Could not verify your session.' };

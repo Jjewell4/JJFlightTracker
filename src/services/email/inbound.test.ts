@@ -64,6 +64,9 @@ describe('inbound email', () => {
     const stranger = server({ senders: ['me@work.com'] });
     expect((await handleInbound({ raw: raw('someone@else.com'), to }, config, stranger.f)).outcome).toBe('sender-not-allowed');
     expect(usedGemini(stranger.calls)).toBe(false);
+    // A faked envelope sender doesn't help: only the (DMARC-checked) From header counts.
+    const spoof = server();
+    expect((await handleInbound({ raw: raw('attacker@evil.com'), to, from: 'jordan@gmail.com' }, config, spoof.f)).outcome).toBe('sender-not-allowed');
   });
 
   it('refuses unknown addresses, forged senders, duplicates and over-limit days before using Gemini', async () => {

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Avatar, syncLabel } from '@/components/AccountButton';
 import { Icon } from '@/components/Icon';
 import { useCloudSync } from '@/services/sync/controller';
+import { ForeignFlights } from './ForeignFlights';
 
 /** Settings entry for the account: status at a glance, details on /account. */
 export function CloudSyncSection({ Group }: { Group: (p: { title?: string; footer?: ReactNode; children: ReactNode }) => ReactNode }) {
@@ -10,6 +11,8 @@ export function CloudSyncSection({ Group }: { Group: (p: { title?: string; foote
   if (sync.phase === 'disabled') return null;
   const signedIn = sync.phase === 'signed-in';
   return (
+    <>
+    <ForeignFlights />
     <Group title="Account">
       <Link to="/account" className="list__row srow">
         <Avatar size={36} />
@@ -20,5 +23,6 @@ export function CloudSyncSection({ Group }: { Group: (p: { title?: string; foote
         <Icon name="chevron" size={16} className="srow__chev" />
       </Link>
     </Group>
+    </>
   );
 }

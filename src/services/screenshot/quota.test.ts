@@ -5,7 +5,7 @@ import { expect, it } from 'vitest';
 it('enforces durable per-user quotas, isolates users, and rolls over UTC days/months', async () => {
   const db = new PGlite();
   try {
-    await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; insert into auth.users values ('00000000-0000-0000-0000-000000000001'),('00000000-0000-0000-0000-000000000002');`);
+    await db.exec(`create role anon; create role authenticated; create role service_role; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; insert into auth.users values ('00000000-0000-0000-0000-000000000001'),('00000000-0000-0000-0000-000000000002');`);
     const sql = await readFile(new URL('../../../supabase/screenshot-import.sql', import.meta.url), 'utf8');
     await db.exec(sql); await db.exec(sql);
     const asUser = async (n: number) => db.exec(`reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000${n}',false); set role authenticated;`);
@@ -27,7 +27,7 @@ it('enforces durable per-user quotas, isolates users, and rolls over UTC days/mo
 it('refunds attempts without going negative and reports remaining allowance', async () => {
   const db = new PGlite();
   try {
-    await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; insert into auth.users values ('00000000-0000-0000-0000-000000000001');`);
+    await db.exec(`create role anon; create role authenticated; create role service_role; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; insert into auth.users values ('00000000-0000-0000-0000-000000000001');`);
     const sql = await readFile(new URL('../../../supabase/screenshot-import.sql', import.meta.url), 'utf8');
     await db.exec(sql);
     await db.exec(`select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false); set role authenticated;`);
@@ -36,9 +36,12 @@ it('refunds attempts without going negative and reports remaining allowance', as
     await db.query('select public.consume_screenshot_import()');
     await db.query('select public.consume_screenshot_import()');
     expect(await status()).toEqual({ day_remaining: 8, month_remaining: 98 });
-    await db.query('select public.refund_screenshot_import()');
+    // Users can't refund themselves (that would reset their own quota).
+    await expect(db.query("select public.refund_screenshot_import('00000000-0000-0000-0000-000000000001')")).rejects.toThrow(/permission denied/);
+    const refund = async () => db.exec("reset role; set role service_role; select public.refund_screenshot_import('00000000-0000-0000-0000-000000000001'); reset role; set role authenticated;");
+    await refund();
     expect(await status()).toEqual({ day_remaining: 9, month_remaining: 99 });
-    for (let i = 0; i < 5; i++) await db.query('select public.refund_screenshot_import()');
+    for (let i = 0; i < 5; i++) await refund();
     expect(await status()).toEqual({ day_remaining: 10, month_remaining: 100 });
   } finally { await db.close(); }
 }, 20_000);

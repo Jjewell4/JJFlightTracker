@@ -21,12 +21,19 @@ create table if not exists public.flights (
 create index if not exists flights_user_server_updated_idx
   on public.flights (user_id, server_updated_at);
 
--- Stamp every insert/update with the server clock (clients can't spoof it).
+-- Stamp every insert/update with the server clock (clients can't spoof it), and enforce
+-- last-write-wins: a push carrying an older edit than the cloud's keeps the newer one (the
+-- stamp still moves, so the device that pushed the stale copy pulls the winner back).
 create or replace function public.flights_touch()
 returns trigger
 language plpgsql
 as $$
 begin
+  if tg_op = 'UPDATE' and new.updated_at < old.updated_at then
+    new.data := old.data;
+    new.deleted := old.deleted;
+    new.updated_at := old.updated_at;
+  end if;
   new.server_updated_at := now();
   return new;
 end;

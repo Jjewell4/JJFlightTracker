@@ -4,7 +4,7 @@ import { parseScreenshotResult } from './schema';
 import { screenshotValues } from '@/features/review/draft-legs';
 import { installReference } from '@/test/reference-fixture';
 beforeAll(installReference);
-const config = { geminiKey: 'test-only-secret', model: 'gemini-2.5-flash', supabaseUrl: 'https://test.invalid', supabaseKey: 'test-anon' };
+const config = { geminiKey: 'test-only-secret', model: 'gemini-2.5-flash', supabaseUrl: 'https://test.invalid', supabaseKey: 'test-anon', serviceKey: 'test-service' };
 const body = { image: Buffer.from([255,216,255,224,0,0]).toString('base64'), mimeType: 'image/jpeg' };
 const auth = 'Bearer test.jwt.token';
 const flight = { date: '2026-10-27', from: 'SAN', to: 'LAX', flightNumber: 'UA123', depTime: '08:20', arrTime: '09:30', arrDayOffset: 0, aircraftType: '', seatNumber: '12A' };

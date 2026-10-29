@@ -98,20 +98,29 @@ async function cloudRequest<T>(request: (signal: AbortSignal) => PromiseLike<T>)
 export function supabaseRemote(sb: SupabaseClient, userId: string): SyncRemote {
   return {
     async pull(since) {
+      // Keyset pagination on (server_updated_at, id): rows edited mid-pull move to the end
+      // instead of shifting later pages, so none is skipped at a page boundary.
       const out: RemoteRow[] = [];
-      for (let from = 0; ; from += PAGE) {
+      let after: RemoteRow | undefined;
+      const quote = (v: string) => `"${v.replace(/"/g, '\\"')}"`;
+      for (;;) {
         let q = sb
           .from('flights')
           .select('id, data, updated_at, deleted, server_updated_at')
           .eq('user_id', userId)
           .order('server_updated_at', { ascending: true })
           .order('id', { ascending: true })
-          .range(from, from + PAGE - 1);
-        if (since) q = q.gt('server_updated_at', since);
+          .limit(PAGE);
+        if (after) {
+          const at = quote(after.server_updated_at);
+          q = q.or(`server_updated_at.gt.${at},and(server_updated_at.eq.${at},id.gt.${quote(after.id)})`);
+        } else if (since) q = q.gt('server_updated_at', since);
         const { data, error } = await cloudRequest((signal) => q.abortSignal(signal));
         if (error) throw error;
-        out.push(...((data ?? []) as RemoteRow[]));
-        if (!data || data.length < PAGE) break;
+        const rows = (data ?? []) as RemoteRow[];
+        out.push(...rows);
+        if (rows.length < PAGE) break;
+        after = rows[rows.length - 1];
       }
       return out;
     },

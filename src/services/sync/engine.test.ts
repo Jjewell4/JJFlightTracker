@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, addFlight, deleteFlight, updateFlight, getAllFlights } from '@/lib/db';
 import type { Flight } from '@/lib/types';
-import { countPendingChanges, syncOnce, type RemoteRow, type SyncRemote } from './engine';
+import { adoptLocalFlights, countPendingChanges, resetSyncState, syncOnce, type RemoteRow, type SyncRemote } from './engine';
 
 /** In-memory stand-in for the Supabase table: server stamps every write with an increasing time. */
 class FakeCloud {
@@ -173,14 +173,44 @@ describe('cloud sync engine', () => {
     expect(cloud.rows.get('b')!.deleted).toBe(false);
   });
 
-  it('starts fresh when a different account signs in on the device', async () => {
+  it('never uploads another account’s flights without asking, then pushes them once adopted', async () => {
     await addFlight({ ...base, id: 'a', date: '2024-01-01', from: 'KSAN', to: 'KSFO' });
     await syncOnce(cloud.remote(), USER);
+    await resetSyncState(); // signed out
 
     const other = new FakeCloud();
+    await expect(syncOnce(other.remote(), 'user-2')).rejects.toMatchObject({ name: 'AccountSwitchError', count: 1 });
+    expect(other.rows.has('a')).toBe(false);
+
+    await adoptLocalFlights('user-2');
     const r = await syncOnce(other.remote(), 'user-2');
     expect(r.pushed).toBe(1);
     expect(other.rows.has('a')).toBe(true);
+  });
+
+  it('adopts flights logged before ever signing in, and lets an emptied device switch freely', async () => {
+    await addFlight({ ...base, id: 'a', date: '2024-01-01', from: 'KSAN', to: 'KSFO' });
+    expect((await syncOnce(cloud.remote(), USER)).pushed).toBe(1);
+    await resetSyncState();
+    await db.flights.clear();
+    const other = new FakeCloud();
+    await expect(syncOnce(other.remote(), 'user-2')).resolves.toMatchObject({ pushed: 0 });
+  });
+
+  it('re-reads every row about once a week to heal anything a pull missed', async () => {
+    let t = Date.parse('2026-01-01T00:00:00Z');
+    await addFlight({ ...base, id: 'a', date: '2024-01-01', from: 'KSAN', to: 'KSFO' });
+    const remote = cloud.remote();
+    const pull = vi.spyOn(remote, 'pull');
+    await syncOnce(remote, USER, () => t);
+    t += 60_000;
+    await syncOnce(remote, USER, () => t); // pulls its own pushed row → cursor set
+    t += 60_000;
+    await syncOnce(remote, USER, () => t);
+    expect(pull.mock.calls.at(-1)?.[0]).not.toBeNull();
+    t += 8 * 24 * 60 * 60 * 1000;
+    await syncOnce(remote, USER, () => t);
+    expect(pull.mock.calls.at(-1)?.[0]).toBeNull();
   });
 
   it('marks identical flights already present on both sides as synced without re-pushing', async () => {
