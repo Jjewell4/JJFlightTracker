@@ -19,3 +19,78 @@
 
 .overview__map .journey-map { height:auto; aspect-ratio:640 / 360; }
 [data-theme="light"] .journey-map__land { stroke:var(--text-2); stroke-opacity:.65; }
+
+/* ---------- On this day ---------- */
+.memories {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+}
+.memories__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.memories__icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  color: var(--accent-2);
+  background: var(--accent-2-soft);
+}
+.memories__title {
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+.memories__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.memories__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-2) 0;
+  color: var(--text);
+}
+.memories__list li + li .memories__row {
+  border-top: 1px solid var(--border);
+}
+.memories__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.memories__route {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  font-weight: 650;
+  min-width: 0;
+}
+.memories__cities {
+  margin-left: var(--space-2);
+  font-weight: 450;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.memories__when {
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+.memories__chev {
+  color: var(--text-3);
+  flex: none;
+}

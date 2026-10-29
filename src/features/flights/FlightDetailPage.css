@@ -647,3 +647,59 @@
     --pass-pad: var(--space-6);
   }
 }
+
+/* ---------- live tracking (day of travel) ---------- */
+.track {
+  margin-bottom: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  border-color: color-mix(in srgb, var(--success) 35%, var(--border));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--success) 10%, var(--surface)), var(--surface));
+}
+.track__head {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+.track__pulse {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 60%, transparent);
+  animation: track-pulse 1.8s ease-out infinite;
+}
+@keyframes track-pulse {
+  70% {
+    box-shadow: 0 0 0 10px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+.track__title {
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+.track__sub {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.track__links {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+@container detail (min-width: 820px) {
+  .track {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .track__links {
+    min-width: 340px;
+  }
+}

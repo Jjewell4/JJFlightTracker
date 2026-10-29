@@ -336,7 +336,9 @@ export interface FlightHistory {
 export function flightHistory(flight: Flight, all: Flight[]): FlightHistory {
   const rk = routeKey(flight);
   const ak = airlineKey(flight);
-  const route = all.filter((f) => routeKey(f) === rk);
+  const listed = all.filter((f) => routeKey(f) === rk);
+  // The flight itself may be missing from a stale list (e.g. just saved): count it anyway.
+  const route = listed.some((f) => f.id === flight.id) ? listed : [...listed, flight];
   const chrono = [...route].sort((a, b) => a.date.localeCompare(b.date) || (a.depTime ?? '').localeCompare(b.depTime ?? '') || a.createdAt - b.createdAt);
   const reg = flight.registration?.replace(/-/g, '').toUpperCase();
   return {
@@ -378,4 +380,33 @@ export function limitGroups(groups: YearGroup[], limit: number): YearGroup[] {
     out.push(months.length === y.months.length && months[months.length - 1] === y.months[y.months.length - 1] ? y : { ...y, months });
   }
   return out;
+}
+
+export interface Memory {
+  flight: Flight;
+  yearsAgo: number;
+  exact: boolean;
+}
+
+/**
+ * Flights from this date in earlier years ("On this day"). Falls back to the surrounding
+ * week when nothing matches the exact day. Day-precision flights only; newest first.
+ */
+export function onThisDay(flights: Flight[], today: string, windowDays = 3, max = 3): Memory[] {
+  const [ty, tm, td] = today.split('-').map(Number);
+  const dayOfYear = (m: number, d: number) => Date.UTC(2000, m - 1, d) / 86_400_000; // leap-year calendar
+  const target = dayOfYear(tm, td);
+  const candidates: Memory[] = [];
+  for (const f of flights) {
+    if (f.datePrecision !== 'day') continue;
+    const [y, m, d] = f.date.split('-').map(Number);
+    if (y >= ty) continue;
+    let diff = Math.abs(dayOfYear(m, d) - target);
+    diff = Math.min(diff, 366 - diff);
+    if (diff > windowDays) continue;
+    candidates.push({ flight: f, yearsAgo: ty - y, exact: diff === 0 });
+  }
+  const exact = candidates.filter((c) => c.exact);
+  const pick = exact.length ? exact : candidates;
+  return pick.sort((a, b) => a.yearsAgo - b.yearsAgo || b.flight.date.localeCompare(a.flight.date)).slice(0, max);
 }

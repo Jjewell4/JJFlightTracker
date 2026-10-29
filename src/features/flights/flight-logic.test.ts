@@ -20,6 +20,7 @@ import {
   routeKey,
   splitUpcoming,
   tzAbbrev,
+  onThisDay,
 } from './flight-logic';
 
 let seq = 0;
@@ -248,5 +249,21 @@ describe('history', () => {
     expect(h.airlineCount).toBe(2);
     expect(h.aircraftCount).toBe(1);
     expect(h.tailCount).toBe(2);
+  });
+});
+
+describe('onThisDay', () => {
+  const mk = (id: string, date: string, datePrecision: 'day' | 'month' = 'day') => ({ id, date, datePrecision, from: 'KSAN', to: 'KSFO', source: 'manual', createdAt: 0, updatedAt: 0 }) as Flight;
+  it('prefers exact anniversaries, newest first', () => {
+    const out = onThisDay([mk('a', '2020-10-29'), mk('b', '2023-10-29'), mk('c', '2024-10-27'), mk('d', '2026-10-29')], '2026-10-29');
+    expect(out.map((m) => [m.flight.id, m.yearsAgo, m.exact])).toEqual([['b', 3, true], ['a', 6, true]]);
+  });
+  it('falls back to the surrounding week and ignores imprecise dates', () => {
+    const out = onThisDay([mk('c', '2024-10-27'), mk('m', '2023-10-01', 'month'), mk('far', '2022-10-10')], '2026-10-29');
+    expect(out.map((m) => m.flight.id)).toEqual(['c']);
+    expect(out[0].exact).toBe(false);
+  });
+  it('wraps around the new year', () => {
+    expect(onThisDay([mk('nye', '2024-12-31')], '2026-01-02').map((m) => m.flight.id)).toEqual(['nye']);
   });
 });

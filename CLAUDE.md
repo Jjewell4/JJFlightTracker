@@ -1,7 +1,12 @@
-# Flight Log — personal flight tracker PWA
+# FlightJournal — personal flight tracker PWA
 
-Mobile-first, offline-capable personal flight log (a better "my.flightradar24"). Static site: no backend.
-All user data lives in IndexedDB on the device; backups are JSON export/import.
+Mobile-first, offline-capable personal flight log (a better "my.flightradar24"), deployed on Vercel
+from `main` (other branches don't deploy — see vercel.json).
+Local-first: flights live in IndexedDB on the device and sync to Supabase when signed in
+(`src/services/sync`, `supabase/schema.sql`). Public journals (`/<handle>`) are served from a
+privacy-filtered Supabase RPC (`supabase/public-profiles.sql`). One serverless function,
+`api/extract-flight.ts` (+ `server/screenshot.ts`), reads flight screenshots with Gemini;
+`GET` on it returns setup diagnostics. Server secrets (GEMINI_API_KEY) never get a VITE_ prefix.
 
 ## Stack
 - Vite 8 + React 19 + TypeScript (strict), `react-router-dom` v7 with **HashRouter** (static hosting / GitHub Pages).
@@ -16,6 +21,9 @@ All user data lives in IndexedDB on the device; backups are JSON export/import.
 - `npm run dev` / `npm run build` / `npm run preview`
 - `npm test` (vitest run), `npm run typecheck`
 - `npm run data -- --cache` regenerates `public/data/*.json` from OurAirports + OpenFlights
+- Browser checks: Playwright needs `chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })`
+  in this environment; dev builds expose `window.__seedSampleFlights()` for sample data and
+  `localStorage.flightlog.onboarded = '1'` skips the welcome screen.
 
 ## Layout
 - `src/lib/types.ts` — domain types (Flight, Airport, Airline, Settings). Shared contract: add fields, never rename.
@@ -34,3 +42,4 @@ All user data lives in IndexedDB on the device; backups are JSON export/import.
 - Mobile first: design at 390px width, then scale up (sidebar layout at ≥960px).
   Touch targets ≥44px, respect safe-area insets, no hover-only affordances.
 - Keep lookups graceful offline: network features must degrade silently.
+- SQL files in `supabase/` must stay safe to re-run; the user pastes them into the SQL editor.

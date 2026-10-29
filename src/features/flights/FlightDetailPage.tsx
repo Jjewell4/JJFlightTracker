@@ -13,6 +13,10 @@ import { prettyFlightNumber, rowDate, shortCity } from './FlightRow';
 import { RouteMap } from './RouteMap';
 import { ConfirmSheet, Sheet } from '@/components/Sheet';
 import { goBackScreens } from '@/components/useBackDismiss';
+import { isUpcoming } from '@/lib/flight-utils';
+import { downloadText } from '@/services/import/download';
+import { buildIcs, icsFileName, isTrackable, trackingLinks } from './flight-links';
+import { shareFlightImage } from './share-card';
 import './FlightDetailPage.css';
 
 const SOURCE_LABEL: Record<FlightSource, string> = {
@@ -85,6 +89,33 @@ function FlightDetail({ flight: f, all, settings, onBack }: { flight: Flight; al
     }
   };
 
+  const shareImage = async () => {
+    setMenu(false);
+    try {
+      const caption = history.routeCount > 1 ? `My ${ordinal(history.routeOrdinal)} flight on this route` : 'A new route for me';
+      const how = await shareFlightImage(f, { unit, caption });
+      if (how === 'downloaded') {
+        setToast('Image saved');
+        setTimeout(() => setToast(null), 2000);
+      }
+    } catch {
+      setToast('Couldn’t create the image');
+      setTimeout(() => setToast(null), 2500);
+    }
+  };
+
+  const links = trackingLinks(f);
+  const upcoming = isUpcoming(f);
+  const trackable = isTrackable(f) && links.length > 0;
+  const addToCalendar = () => {
+    setMenu(false);
+    const ics = buildIcs(f);
+    if (!ics) return;
+    downloadText(icsFileName(f), ics, 'text/calendar');
+    setToast('Calendar file downloaded');
+    setTimeout(() => setToast(null), 2500);
+  };
+
   const remove = async () => {
     setDeleting(true);
     await deleteFlight(f.id);
@@ -110,6 +141,24 @@ function FlightDetail({ flight: f, all, settings, onBack }: { flight: Flight; al
         </button>
       </header>
 
+        {trackable && (
+          <section className="track card animate-in" aria-label="Live tracking">
+            <div className="track__head">
+              <span className="track__pulse" aria-hidden />
+              <div>
+                <h2 className="track__title">Track this flight live</h2>
+                <p className="track__sub">Gate, delays and the plane’s position on the day of travel.</p>
+              </div>
+            </div>
+            <div className="track__links">
+              {links.map((l) => (
+                <a key={l.label} className="btn btn--block" href={l.url} target="_blank" rel="noopener noreferrer">
+                  <Icon name="globe" size={16} /> {l.label}
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
       <div className="detail__grid">
         <article className="pass animate-in" aria-label="Boarding pass">
           <div className="pass__top">
@@ -205,7 +254,10 @@ function FlightDetail({ flight: f, all, settings, onBack }: { flight: Flight; al
         <div className="sheet__title">{title}</div>
         <SheetItem icon="return" label="Log return flight" hint={`${toCode} → ${fromCode}`} to={`/flights/new?return=${f.id}`} />
         <SheetItem icon="copy" label="Duplicate" hint="Same route, new date" to={`/flights/new?duplicate=${f.id}`} />
-        <SheetItem icon="share" label="Share" onClick={share} />
+        <SheetItem icon="image" label="Share as image" hint="A card with the route map" onClick={() => void shareImage()} />
+        <SheetItem icon="share" label="Share as text" onClick={share} />
+        {upcoming && f.datePrecision === 'day' && <SheetItem icon="calendar" label="Add to calendar" hint="Downloads a calendar event" onClick={addToCalendar} />}
+        {links[0] && <SheetItem icon="globe" label={trackable ? 'Track live on Flightradar24' : 'Flight history on Flightradar24'} href={links[0].url} />}
         <SheetItem
           icon="trash"
           label="Delete flight"
@@ -375,7 +427,7 @@ function HistoryCard({
       <p className="hist__lead">
         {h.routeCount > 1 ? (
           <>
-            Your <strong>{ordinal(h.routeOrdinal)}</strong> flight between {fromCode} and {toCode}.
+            {isUpcoming(f) ? 'This will be your' : 'Your'} <strong>{ordinal(h.routeOrdinal)}</strong> flight between {fromCode} and {toCode}.
           </>
         ) : (
           <>
@@ -418,7 +470,7 @@ function HistoryCard({
   );
 }
 
-function SheetItem({ icon, label, hint, to, onClick, danger }: { icon: IconName; label: string; hint?: string; to?: string; onClick?: () => void; danger?: boolean }) {
+function SheetItem({ icon, label, hint, to, href, onClick, danger }: { icon: IconName; label: string; hint?: string; to?: string; href?: string; onClick?: () => void; danger?: boolean }) {
   const content = (
     <>
       <span className="sheet__icon">
@@ -431,6 +483,13 @@ function SheetItem({ icon, label, hint, to, onClick, danger }: { icon: IconName;
     </>
   );
   const cls = `sheet__item${danger ? ' sheet__item--danger' : ''}`;
+  if (href) {
+    return (
+      <a href={href} className={cls} target="_blank" rel="noopener noreferrer">
+        {content}
+      </a>
+    );
+  }
   return to ? (
     <Link to={to} className={cls}>
       {content}

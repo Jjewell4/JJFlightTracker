@@ -17,6 +17,7 @@ import {
   limitGroups,
   matchesFilters,
   matchesSearch,
+  onThisDay,
   splitUpcoming,
   type FlightFilters,
 } from './flight-logic';
@@ -24,6 +25,7 @@ import { FlightRow, FlightRowSkeleton } from './FlightRow';
 import { SearchBar } from './SearchBar';
 import { SummaryHero, SummaryHeroSkeleton } from './SummaryHero';
 import { UpcomingCard } from './UpcomingCard';
+import { OnThisDay } from './OnThisDay';
 import './FlightsPage.css';
 import { JourneyMap } from './JourneyMap';
 import './FlightDetailPage.css';
@@ -70,6 +72,7 @@ export function FlightsPage() {
   const all = flights ?? [];
   const { upcoming, past } = useMemo(() => splitUpcoming(all, now, today), [all, now, today, ready]);
   const summary = useMemo(() => computeSummary(past, today), [past, today, ready]);
+  const memories = useMemo(() => (archive ? [] : onThisDay(past, today)), [archive, past, today]);
   const options = useMemo(() => filterOptions(all), [all, ready]);
   const index = useMemo(() => new Map(all.map((f) => [f.id, flightSearchText(f)])), [all, ready]);
 
@@ -147,10 +150,24 @@ export function FlightsPage() {
           <h1 className="page-title">{archive ? 'Flight log' : 'Your flight journal'}</h1>
           <p className="page-subtitle">{archive ? 'Every journey, easy to find.' : 'The places you’ve been. The journeys still ahead.'}</p>
         </div>
-        {archive && <Link to="/flights/new" className="btn btn--primary"><Icon name="plus" size={18} />Add flight</Link>}
       </header>
 
       {!archive && <SummaryHero summary={summary} unit={unit} upcoming={upcoming.length} />}
+
+      {!archive && !filtering && shownUpcoming.length > 0 && (
+        <section className="flights__upcoming" aria-labelledby="upcoming-title">
+          <h2 id="upcoming-title" className="section-title">
+            Upcoming <span className="flights__count">{shownUpcoming.length}</span>
+          </h2>
+          <div className="flights__upcoming-list">
+            {shownUpcoming.map((f) => (
+              <UpcomingCard key={f.id} flight={f} today={today} clock={clock} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {!archive && !filtering && <OnThisDay memories={memories} />}
 
       {!archive && !filtering && featured && from && to && (
         <section className="overview" aria-label="Travel overview">
@@ -169,7 +186,7 @@ export function FlightsPage() {
         </section>
       )}
       <div className="overview__section-head"><h2 className="section-title">{archive || filtering ? 'Your flights' : 'Recent journeys'}</h2>{!archive && <Link to="/flights">View full log <Icon name="chevron" size={14} /></Link>}</div>
-      <SearchBar ref={searchRef} query={query} onQuery={setQuery} filters={filters} onFilters={setFilters} options={options} />
+      {(archive || filtering) && <SearchBar ref={searchRef} query={query} onQuery={setQuery} filters={filters} onFilters={setFilters} options={options} />}
 
       {filtering && (
         <p className="flights__results" aria-live="polite">
@@ -183,7 +200,8 @@ export function FlightsPage() {
         </p>
       )}
 
-      {shownUpcoming.length > 0 && (
+
+      {(archive || filtering) && shownUpcoming.length > 0 && (
         <section className="flights__upcoming" aria-labelledby="upcoming-title">
           <h2 id="upcoming-title" className="section-title">
             Upcoming <span className="flights__count">{shownUpcoming.length}</span>
