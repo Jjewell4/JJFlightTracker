@@ -7,7 +7,7 @@
   </linearGradient>
   <mask id="fj-ko" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
     <rect width="512" height="512" fill="#fff"/>
-    <path transform="translate(304 174) scale(2.06) translate(-50 -50)" d="M50 4C55 4 57 9 57 16V36L95 58V66L57 56V76L72 86V93L54 89L52 96H48L46 89L28 93V86L43 76V56L5 66V58L43 36V16C43 9 45 4 50 4Z" fill="#000" stroke="#000" stroke-width="9.70873786407767" stroke-linejoin="round"/>
+    <path transform="translate(327 176) rotate(18) scale(2.24) translate(-50 -50)" d="M50 4C55 4 57 9 57 16V36L95 58V66L57 56V76L72 86V93L54 89L52 96H48L46 89L28 93V86L43 76V56L5 66V58L43 36V16C43 9 45 4 50 4ZM28 86H72V93Q50 99 28 93Z" fill="#000" stroke="#000" stroke-width="8.928571428571427" stroke-linejoin="round"/>
   </mask></defs><rect width="512" height="512" rx="112" fill="url(#fj-bg)"/><g transform="translate(256 256) scale(1) translate(-256 -256)"><g mask="url(#fj-ko)">
-    <path d="M304 234V324A73 73 0 0 1 158 324" fill="none" stroke="#ffb547" stroke-width="50" stroke-linecap="round"/>
-    <circle cx="158" cy="324" r="42" fill="#ffb547"/><circle cx="158" cy="324" r="16" fill="#0c1631"/></g><path transform="translate(304 174) scale(2.06) translate(-50 -50)" d="M50 4C55 4 57 9 57 16V36L95 58V66L57 56V76L72 86V93L54 89L52 96H48L46 89L28 93V86L43 76V56L5 66V58L43 36V16C43 9 45 4 50 4Z" fill="url(#fj-plane)" stroke="url(#fj-plane)" stroke-width="3" stroke-linejoin="round"/></g></svg>
+    <path d="M127 382A211.72 211.72 0 0 0 307.26 236.76" fill="none" stroke="#ffb547" stroke-width="56" stroke-linecap="round"/>
+    <circle cx="127" cy="382" r="44" fill="#ffb547"/><circle cx="127" cy="382" r="15.84" fill="#0c1631"/></g><path transform="translate(327 176) rotate(18) scale(2.24) translate(-50 -50)" d="M50 4C55 4 57 9 57 16V36L95 58V66L57 56V76L72 86V93L54 89L52 96H48L46 89L28 93V86L43 76V56L5 66V58L43 36V16C43 9 45 4 50 4Z" fill="url(#fj-plane)" stroke="url(#fj-plane)" stroke-width="3" stroke-linejoin="round"/></g></svg>

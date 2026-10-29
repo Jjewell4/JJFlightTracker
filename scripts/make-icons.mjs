@@ -4,9 +4,10 @@
  * Playwright's chromium. Run:  node scripts/make-icons.mjs
  * (set CHROMIUM_PATH to use a specific chromium binary).
  *
- * The mark: a sky-blue airliner climbing out of an amber flight trail that hooks into a "J"
- * (FlightJournal) and ends at a ringed departure dot — on a night-sky tile. Bold shapes only, so it
- * still reads at 16×16; every important shape sits inside the maskable safe zone (80% circle).
+ * The mark: a sky-blue airliner climbing away from its departure point along a smooth amber flight
+ * path (a circular arc that leaves the ringed departure dot almost level and curves up to meet the
+ * plane's heading) — on a night-sky tile. Bold shapes only, so it still reads at 16×16; every
+ * important shape sits inside the maskable safe zone (80% circle).
  *
  * Outputs (committed):
  *   public/favicon.svg, public/icons/icon.svg
@@ -33,17 +34,41 @@ const PLANE =
 const AMBER = '#ffb547';
 const NIGHT = '#0c1631'; // tile edge colour; also the departure dot's centre
 
-// Geometry on a 512 canvas (optically centred: the bowl is heavier than the plane).
-const PLANE_LEN = 206;
-const PX = 304; // plane centre / trail stem x
-const PY = 174;
-const BX = 158; // departure dot centre
-const BY = 324;
-const TRAIL_W = 50;
+// Geometry on a 512 canvas. Optically centred: the bounding box sits a touch up-left of centre
+// because the arc's belly and the big plane pull the visual weight down-right.
+const PLANE_LEN = 224;
+const PX = 327; // plane centre
+const PY = 176;
+const PLANE_ANGLE = 18; // degrees clockwise from nose-up
+const BX = 127; // departure dot centre
+const BY = 382;
+const DOT_R = 44;
+const TRAIL_W = 56;
 const GAP = 10; // knock-out between plane and trail
 const S = PLANE_LEN / 100;
-const PLANE_T = `translate(${PX} ${PY}) scale(${S}) translate(-50 -50)`;
-const R = (PX - BX) / 2;
+const PLANE_T = `translate(${PX} ${PY}) rotate(${PLANE_ANGLE}) scale(${S}) translate(-50 -50)`;
+// Knock-out outline: the plane plus a smooth fairing from tailplane tip to tailplane tip, so the trail
+// ends in one clean curve behind the tail instead of notching around the tail cone.
+const KNOCKOUT = PLANE + 'M28 86H72V93Q50 99 28 93Z';
+
+/**
+ * The flight path: the circular arc through the departure dot that arrives tangent to the plane's
+ * heading. It ends under the tail (hidden by the knock-out), so the trail flows straight out of it.
+ */
+function flightPath() {
+  const a = (PLANE_ANGLE * Math.PI) / 180;
+  const h = [Math.sin(a), -Math.cos(a)]; // heading (unit)
+  const back = 0.62 * 46 * S; // from plane centre towards the tail
+  const E = [PX - h[0] * back, PY - h[1] * back];
+  const v = [BX - E[0], BY - E[1]];
+  let n = [-h[1], h[0]];
+  let dn = v[0] * n[0] + v[1] * n[1];
+  if (dn < 0) [n, dn] = [[-n[0], -n[1]], -dn];
+  const r = (v[0] ** 2 + v[1] ** 2) / (2 * dn); // circle tangent to h at E, through the dot
+  const sweep = h[0] * n[1] - h[1] * n[0] > 0 ? 1 : 0; // travel direction at the plane = heading
+  const f = (x) => +x.toFixed(2);
+  return `M${BX} ${BY}A${f(r)} ${f(r)} 0 0 ${sweep} ${f(E[0])} ${f(E[1])}`;
+}
 
 const defs = `
   <radialGradient id="fj-bg" cx=".66" cy=".26" r=".95">
@@ -54,16 +79,16 @@ const defs = `
   </linearGradient>
   <mask id="fj-ko" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
     <rect width="512" height="512" fill="#fff"/>
-    <path transform="${PLANE_T}" d="${PLANE}" fill="#000" stroke="#000" stroke-width="${(GAP * 2) / S}" stroke-linejoin="round"/>
+    <path transform="${PLANE_T}" d="${KNOCKOUT}" fill="#000" stroke="#000" stroke-width="${(GAP * 2) / S}" stroke-linejoin="round"/>
   </mask>`;
 
 /** Foreground art. mono = single-colour silhouette (holes transparent) for themed icons. */
 function art({ mono = false } = {}) {
   const trail = mono ? '#fff' : AMBER;
-  const dotHole = `<circle cx="${BX}" cy="${BY}" r="${TRAIL_W * 0.32}" fill="${mono ? '#000' : NIGHT}"/>`;
+  const dotHole = `<circle cx="${BX}" cy="${BY}" r="${DOT_R * 0.36}" fill="${mono ? '#000' : NIGHT}"/>`;
   const trailGroup = `
-    <path d="M${PX} ${PY + 60}V${BY}A${R} ${R} 0 0 1 ${BX} ${BY}" fill="none" stroke="${trail}" stroke-width="${TRAIL_W}" stroke-linecap="round"/>
-    <circle cx="${BX}" cy="${BY}" r="${TRAIL_W * 0.84}" fill="${trail}"/>`;
+    <path d="${flightPath()}" fill="none" stroke="${trail}" stroke-width="${TRAIL_W}" stroke-linecap="round"/>
+    <circle cx="${BX}" cy="${BY}" r="${DOT_R}" fill="${trail}"/>`;
   const plane = `<path transform="${PLANE_T}" d="${PLANE}" fill="${mono ? '#fff' : 'url(#fj-plane)'}" stroke="${mono ? '#fff' : 'url(#fj-plane)'}" stroke-width="3" stroke-linejoin="round"/>`;
   if (mono) {
     // Cut the knock-out gap and the dot's centre out of the silhouette.
@@ -96,9 +121,9 @@ function shortcutSvg(path, color) {
 
 const favicon = svg({ shape: 'tile', scale: 1 }); // biggest glyph: favicon + in-app brand mark
 const anyIcon = svg({ shape: 'tile', scale: 0.94 });
-const maskable = svg({ shape: 'bleed', scale: 0.86 });
-const apple = svg({ shape: 'bleed', scale: 0.9 });
-const mono = svg({ shape: 'none', scale: 0.86, mono: true });
+const maskable = svg({ shape: 'bleed', scale: 0.82 });
+const apple = svg({ shape: 'bleed', scale: 0.88 });
+const mono = svg({ shape: 'none', scale: 0.82, mono: true });
 const shortcutAdd = shortcutSvg('M12 5v14M5 12h14', AMBER);
 const shortcutStats = shortcutSvg('M5 19V11M12 19V5M19 19v-6', '#6fd0ff');
 
