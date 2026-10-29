@@ -1,13 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs>
-  <radialGradient id="fj-bg" cx=".66" cy=".26" r=".95">
-    <stop offset="0" stop-color="#2a4c96"/><stop offset=".5" stop-color="#16295a"/><stop offset="1" stop-color="#0c1631"/>
-  </radialGradient>
-  <linearGradient id="fj-plane" gradientUnits="userSpaceOnUse" x1="0" y1="4" x2="0" y2="96">
-    <stop offset="0" stop-color="#d2f3ff"/><stop offset=".45" stop-color="#6fd0ff"/><stop offset="1" stop-color="#3a8dff"/>
-  </linearGradient>
-  <mask id="fj-ko" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
-    <rect width="512" height="512" fill="#fff"/>
-    <path transform="translate(327 176) rotate(18) scale(2.24) translate(-50 -50)" d="M50 4C55 4 57 9 57 16V36L95 58V66L57 56V76L72 86V93L54 89L52 96H48L46 89L28 93V86L43 76V56L5 66V58L43 36V16C43 9 45 4 50 4ZM28 86H72V93Q50 99 28 93Z" fill="#000" stroke="#000" stroke-width="8.928571428571427" stroke-linejoin="round"/>
-  </mask></defs><rect width="512" height="512" rx="112" fill="url(#fj-bg)"/><g transform="translate(256 256) scale(1) translate(-256 -256)"><g mask="url(#fj-ko)">
-    <path d="M127 382A211.72 211.72 0 0 0 307.26 236.76" fill="none" stroke="#ffb547" stroke-width="56" stroke-linecap="round"/>
-    <circle cx="127" cy="382" r="44" fill="#ffb547"/><circle cx="127" cy="382" r="15.84" fill="#0c1631"/></g><path transform="translate(327 176) rotate(18) scale(2.24) translate(-50 -50)" d="M50 4C55 4 57 9 57 16V36L95 58V66L57 56V76L72 86V93L54 89L52 96H48L46 89L28 93V86L43 76V56L5 66V58L43 36V16C43 9 45 4 50 4Z" fill="url(#fj-plane)" stroke="url(#fj-plane)" stroke-width="3" stroke-linejoin="round"/></g></svg>
+  <clipPath id="ws-pane"><rect x="156" y="96" width="200" height="320" rx="88"/></clipPath>
+  <pattern id="ws-dots" width="16" height="16" patternUnits="userSpaceOnUse"><circle cx="8" cy="8" r="3.4" fill="#5b8fe6"/></pattern></defs><rect width="512" height="512" rx="112" fill="#13285a"/><g transform="translate(256 256) scale(1.08) translate(-256 -256)"><rect x="124" y="64" width="264" height="384" rx="120" fill="#e8f1ff"/>
+    <g clip-path="url(#ws-pane)"><rect x="140" y="80" width="232" height="352" fill="#0c1631"/>
+    <path d="M140 140L160 128L184 126L200 120L224 116L244 112L262 106L284 104L300 112L304 128L296 140L290 156L300 166L314 160L316 142L326 128L340 122L352 136L356 154L348 170L336 180L330 192L324 206L318 220L310 232L306 246L310 262L306 272L300 268L296 254L288 248L276 250L264 248L256 254L252 266L254 280L264 290L272 296L278 304L286 312L292 318L286 322L276 316L266 308L256 300L244 292L232 282L222 270L214 256L206 240L200 222L196 204L190 190L180 180L168 172L156 166L148 158L140 156Z" fill="#2f5aa8"/><path d="M290 322L304 320L320 326L334 334L350 344L362 356L354 372L342 386L330 400L318 414L308 432L296 432L292 414L288 396L284 378L282 360L280 344L284 332Z" fill="#2f5aa8"/><circle cx="216" cy="192" r="13" fill="#a6e3ff"/><circle cx="304" cy="208" r="13" fill="#a6e3ff"/><path d="M140 334L318 286L336 312L140 400Z" fill="#e8f1ff"/><path d="M318 286L330 242L348 247L336 312Z" fill="#ffb547"/></g></g></svg>

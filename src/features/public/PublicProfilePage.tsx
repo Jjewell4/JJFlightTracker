@@ -53,7 +53,7 @@ export default function PublicProfilePage({ slug }: { slug: string }) {
   useEffect(() => {
     const old = document.title;
     document.title = profile
-      ? `${profile.display_name} · FlightJournal`
+      ? `${profile.display_name} · Window Seat`
       : 'Shared flight journal';
     return () => {
       document.title = old;
@@ -61,7 +61,7 @@ export default function PublicProfilePage({ slug }: { slug: string }) {
   }, [profile]);
   const brand = (
     <a className="public-brand" href="/">
-      <img src="/favicon.svg" width="28" height="28" alt="" /> FlightJournal
+      <img src="/favicon.svg" width="28" height="28" alt="" /> Window Seat
     </a>
   );
   if (profile)

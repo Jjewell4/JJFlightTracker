@@ -63,8 +63,8 @@ export function buildIcs(f: Flight, now = Date.now()): string | undefined {
     f.note,
   ].filter(Boolean) as string[];
 
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//FlightJournal//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'BEGIN:VEVENT'];
-  lines.push(`UID:${f.id}@flightjournal`, `DTSTAMP:${icsDate(now)}`);
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Window Seat//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'BEGIN:VEVENT'];
+  lines.push(`UID:${f.id}@windowseat.me`, `DTSTAMP:${icsDate(now)}`);
   if (f.depTime) {
     const start = zonedToUtc(f.date, f.depTime, from?.tz || undefined);
     let end: number;

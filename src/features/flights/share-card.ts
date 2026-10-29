@@ -141,7 +141,7 @@ export async function renderShareCard(f: Flight, opts: ShareCardOptions): Promis
   // Brand
   ctx.fillStyle = C.text2;
   ctx.font = `600 34px ${SANS}`;
-  ctx.fillText('✈  FlightJournal', 72, 92);
+  ctx.fillText('✈  Window Seat', 72, 92);
 
   // Codes
   const codes = `${fromCode} → ${toCode}`;

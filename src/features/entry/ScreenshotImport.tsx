@@ -131,7 +131,7 @@ export function ScreenshotImport({
             <div className="ss-signin">
               <p className="ss-signin__title">Sign in to scan screenshots</p>
               <p className="ss-note">
-                Reading a screenshot uses your FlightJournal account, which keeps imports private and within your daily limit. Manual entry always works, even
+                Reading a screenshot uses your Window Seat account, which keeps imports private and within your daily limit. Manual entry always works, even
                 offline.
               </p>
               <div className="assist__actions">

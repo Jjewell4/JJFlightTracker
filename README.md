@@ -169,7 +169,7 @@ fills the editable form. It deliberately does not guess dates from arbitrary
 emails. CSV export now offers readable spreadsheet columns plus a separate
 Flightradar24 compatibility option. JSON remains the lossless backup format.
 
-## Live public FlightJournal pages
+## Live public Window Seat pages
 
 In **Settings → Public journal**, sign in, choose a handle such as `jordan`, enter
 a display name, preview, and enable sharing. The public URL is

@@ -1,4 +1,4 @@
-# FlightJournal — personal flight tracker PWA
+# Window Seat — personal flight tracker PWA
 
 Mobile-first, offline-capable personal flight log (a better "my.flightradar24"), deployed on Vercel
 from `main` (other branches don't deploy — see vercel.json).

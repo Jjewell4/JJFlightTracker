@@ -86,9 +86,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className={`shell${isMap ? ' shell--fullbleed' : ''}${isBare ? ' shell--bare' : ''}`}>
       <aside className="shell__sidebar" aria-label="Primary">
-        <Link to="/" className="shell__brand" aria-label="FlightJournal — home">
+        <Link to="/" className="shell__brand" aria-label="Window Seat — home">
           <BrandMark size={32} />
-          FlightJournal
+          Window Seat
         </Link>
         <Link to="/flights/new" className="shell__add-wide">
           <Icon name="plus" size={18} strokeWidth={2.25} /> Log a flight
@@ -107,9 +107,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main className="shell__main">
         {hasTopbar && (
           <header className="topbar">
-            <Link to="/" className="topbar__brand" aria-label="FlightJournal — home">
+            <Link to="/" className="topbar__brand" aria-label="Window Seat — home">
               <BrandMark size={30} />
-              FlightJournal
+              Window Seat
             </Link>
             <div className="topbar__actions">
               <NavLink to="/settings" className="topbar__btn" aria-label="Settings" title="Settings">

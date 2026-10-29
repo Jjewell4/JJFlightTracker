@@ -69,7 +69,7 @@ Four findings were addressed and then rechecked by that agent at 390px:
 The revised distance story replaces decorative planet tiles with compact
 comparisons and a next-milestone track. Percentages round consistently (e.g.
 2.078 lunar distances displays 2.08× and 8%, rather than 2.08× and 7%).
-FlightJournal branding now uses the favicon artwork in the app header/sidebar,
+Window Seat branding now uses the favicon artwork in the app header/sidebar,
 onboarding and public journal; existing storage and backup identifiers remain
 unchanged for compatibility.
 
