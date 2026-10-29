@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { extractScreenshot, screenshotStatus } from '../../../server/screenshot';
 import { parseScreenshotResult } from './schema';
-import { screenshotValues } from '@/features/entry/ScreenshotImport';
+import { screenshotValues } from '@/features/review/draft-legs';
 import { installReference } from '@/test/reference-fixture';
 beforeAll(installReference);
 const config = { geminiKey: 'test-only-secret', model: 'gemini-2.5-flash', supabaseUrl: 'https://test.invalid', supabaseKey: 'test-anon' };

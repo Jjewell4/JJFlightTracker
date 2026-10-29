@@ -39,6 +39,8 @@ import { DuplicateNotice, duplicateSentence } from './DuplicateNotice';
 import { findDuplicates } from './duplicates';
 import { useFlightLookup } from './useFlightLookup';
 import { announceLocalSave } from '@/services/sync/controller';
+import { markLegsHandled } from '@/services/screenshot/drafts';
+import type { DraftLegRef } from './ScreenshotImport';
 
 /** Results at or above this confidence auto-fill empty fields; below it they are offered with "Use these details". */
 const AUTO_FILL_MIN = 0.6;
@@ -59,11 +61,13 @@ export interface FlightFormProps {
   base?: Flight;
   flights: Flight[] | undefined;
   note?: string;
+  /** Opened from a screenshot draft's leg (To review → Edit): saving marks the leg done. */
+  draftLeg?: DraftLegRef;
 }
 
 const reduceMotion = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-export function FlightForm({ mode, initial, initialEdited, base, flights, note }: FlightFormProps) {
+export function FlightForm({ mode, initial, initialEdited, base, flights, note, draftLeg }: FlightFormProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const settings = useSettings();
@@ -84,7 +88,9 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
   const [savedLocally, setSavedLocally] = useState(false);
   const savingRef = useRef(false);
   const [saveError, setSaveError] = useState('');
-  const [screenshotReview, setScreenshotReview] = useState(false);
+  const [screenshotReview, setScreenshotReview] = useState(!!draftLeg);
+  /** The screenshot draft leg the form was filled from, if any. */
+  const [fromDraft, setFromDraft] = useState<DraftLegRef | undefined>(draftLeg);
   /** Highlighted (sparkle + glow) until the user changes them. */
   const [assisted, setAssisted] = useState<ReadonlySet<AssistKey>>(() => new Set());
   const [sheet, setSheet] = useState<SheetName>(null);
@@ -296,7 +302,8 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
     showAssisted(['date', 'from', 'to', ...(values.flightNumber ? (['flightNumber'] as const) : [])]);
   };
 
-  const applyScreenshot = (values: Partial<FormValues>) => {
+  const applyScreenshot = (values: Partial<FormValues>, from?: DraftLegRef) => {
+    setFromDraft(from);
     setV({
       ...emptyValues({ cabinClass: v.cabinClass, reason: v.reason }),
       ...values,
@@ -464,6 +471,7 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
         else navigate(`/flights/${base.id}`, { replace: true });
       } else {
         const saved = await addFlight(input);
+        if (fromDraft) void markLegsHandled(fromDraft.draftId, [fromDraft.index]);
         setSavedLocally(true);
         announceLocalSave();
         // Now there's data worth keeping: ask the browser not to evict it (fire-and-forget).

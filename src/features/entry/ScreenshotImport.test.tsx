@@ -3,6 +3,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installReference } from '@/test/reference-fixture';
+import { addFlight, db, deleteAllFlights, getAllFlights } from '@/lib/db';
+import { enrichFlight } from '@/lib/flight-utils';
 import { ScreenshotError } from '@/services/screenshot/client';
 import { ScreenshotImport } from './ScreenshotImport';
 
@@ -30,12 +32,14 @@ let root: Root;
 const onApply = vi.fn();
 const onClose = vi.fn();
 
-beforeEach(() => {
+beforeEach(async () => {
   mocks.phase = 'signed-in';
   mocks.readScreenshot.mockReset();
   mocks.checkScreenshotSetup.mockReset();
   onApply.mockReset();
   onClose.mockReset();
+  await deleteAllFlights();
+  await db.drafts.clear();
 });
 
 afterEach(async () => {
@@ -43,42 +47,45 @@ afterEach(async () => {
   host.remove();
 });
 
-async function mount(dirty = false) {
+async function mount() {
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
   await act(async () =>
     root.render(
       <HashRouter>
-        <ScreenshotImport open onClose={onClose} onApply={onApply} dirty={dirty} clock="12h" />
+        <ScreenshotImport open onClose={onClose} onApply={onApply} clock="12h" />
       </HashRouter>,
     ),
   );
 }
 
-const settle = () => act(async () => new Promise((r) => setTimeout(r, 20)));
+const settle = (ms = 30) => act(async () => new Promise((r) => setTimeout(r, ms)));
 const panel = () => document.querySelector<HTMLElement>('[role="dialog"]')!;
 const button = (text: string) => [...panel().querySelectorAll<HTMLElement>('button, a')].find((b) => b.textContent?.trim() === text)!;
+const checkboxes = () => [...panel().querySelectorAll<HTMLInputElement>('.dleg__check')];
 
-async function chooseFile() {
+async function chooseFiles(n = 1) {
   const input = panel().querySelector<HTMLInputElement>('input[type="file"]')!;
-  const file = new File(['x'], 'pass.png', { type: 'image/png' });
-  Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+  const files = Array.from({ length: n }, (_, i) => new File(['x'], `pass-${i}.png`, { type: 'image/png' }));
+  Object.defineProperty(input, 'files', { configurable: true, value: files });
   await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
+  await settle();
   await settle();
 }
 
 const flight = {
-  date: '2026-10-27',
-  from: 'SAN',
-  to: 'JFK',
-  flightNumber: 'B6124',
-  depTime: '07:05',
-  arrTime: '15:42',
+  date: '2026-10-21',
+  from: 'MCO',
+  to: 'SFO',
+  flightNumber: 'UA2620',
+  depTime: '18:59',
+  arrTime: '21:50',
   arrDayOffset: null,
-  aircraftType: 'A321',
-  seatNumber: '14A',
+  aircraftType: 'B38M',
+  seatNumber: '12A',
 };
+const back = { ...flight, date: '2026-10-25', from: 'SFO', to: 'MCO', flightNumber: 'UA2621', depTime: '08:00', arrTime: '16:20', seatNumber: '' };
 
 describe('ScreenshotImport sheet', () => {
   it('asks signed-out users to sign in', async () => {
@@ -89,44 +96,115 @@ describe('ScreenshotImport sheet', () => {
     expect(panel().querySelector('input[type="file"]')).toBeNull();
   });
 
-  it('shows the privacy note before choosing, reads right after, and fills the form from a result', async () => {
+  it('reads right after choosing and saves a flight straight from the result', async () => {
     mocks.readScreenshot.mockResolvedValue({ flights: [flight], warnings: ['Year not visible'] });
     await mount();
     expect(panel().textContent).toContain('sent to Google Gemini');
-    expect(panel().querySelector<HTMLInputElement>('input[type="file"]')!.accept).toBe('image/*');
-    await chooseFile();
+    expect(panel().querySelector<HTMLInputElement>('input[type="file"]')!.multiple).toBe(true);
+    await chooseFiles();
     expect(mocks.readScreenshot).toHaveBeenCalledOnce();
     expect(panel().textContent).toContain('Found 1 flight');
     expect(panel().textContent).toContain('Year not visible');
-    expect(panel().textContent).toContain('7:05 AM → 3:42 PM');
-    await act(async () => button('Use this flight').click());
-    expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ from: 'KSAN', to: 'KJFK', date: '2026-10-27', depTime: '07:05', seatNumber: '14A' }));
-    expect(button('Fill form again')).toBeDefined();
+    expect(panel().textContent).toContain('6:59 PM → 9:50 PM');
+    expect(checkboxes()[0].checked).toBe(true);
+    await act(async () => button('Save 1 flight').click());
+    await settle();
+    const saved = await getAllFlights();
+    expect(saved).toHaveLength(1);
+    expect(saved[0]).toMatchObject({ from: 'KMCO', to: 'KSFO', date: '2026-10-21', source: 'screenshot', seatNumber: '12A' });
+    expect(saved[0].tripId).toBeUndefined();
+    expect(panel().textContent).toContain('Flight saved');
+    // Every leg saved: the draft is gone from To review.
+    expect(await db.drafts.count()).toBe(0);
   });
 
-  it('uses replace wording when the form already has edits', async () => {
+  it('can open a leg in the form instead', async () => {
     mocks.readScreenshot.mockResolvedValue({ flights: [flight], warnings: [] });
-    await mount(true);
-    await chooseFile();
-    expect(button('Replace form with this flight')).toBeDefined();
+    await mount();
+    await chooseFiles();
+    await act(async () => button('Edit').click());
+    const draft = (await db.drafts.toArray())[0];
+    expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ from: 'KMCO', to: 'KSFO', date: '2026-10-21', depTime: '18:59' }), { draftId: draft.id, index: 0 });
   });
 
-  it('can cancel a read in progress and read again', async () => {
+  it('saves an itinerary as one trip with a suggested name', async () => {
+    mocks.readScreenshot.mockResolvedValue({ flights: [flight, back], warnings: [] });
+    await mount();
+    await chooseFiles();
+    expect(panel().textContent).toContain('Found 2 flights');
+    const toggle = panel().querySelector<HTMLButtonElement>('[role="switch"]')!;
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+    const name = panel().querySelector<HTMLInputElement>('.dtrip input')!;
+    expect(name.value.length).toBeGreaterThan(0);
+    await act(async () => button('Save 2 flights as a trip').click());
+    await settle();
+    const saved = await getAllFlights();
+    expect(saved).toHaveLength(2);
+    expect(saved[0].tripId).toBeDefined();
+    expect(saved[0].tripId).toBe(saved[1].tripId);
+    expect(saved[0].tripName).toBe(name.value);
+    expect(button('View trip').getAttribute('href')).toBe(`#/trips/${saved[0].tripId}`);
+  });
+
+  it('leaves flights already in the log unticked', async () => {
+    await addFlight(enrichFlight({ date: '2026-10-21', datePrecision: 'day', from: 'KMCO', to: 'KSFO', flightNumber: 'UA2620', source: 'manual' }));
+    mocks.readScreenshot.mockResolvedValue({ flights: [flight, back], warnings: [] });
+    await mount();
+    await chooseFiles();
+    await settle();
+    expect(checkboxes().map((c) => c.checked)).toEqual([false, true]);
+    expect(panel().textContent).toContain('Already in your log');
+    expect(button('Save 1 flight')).toBeDefined();
+  });
+
+  it('marks legs that need details and keeps them out of the save', async () => {
+    mocks.readScreenshot.mockResolvedValue({ flights: [{ ...flight, date: '' }], warnings: [] });
+    await mount();
+    await chooseFiles();
+    expect(checkboxes()[0].disabled).toBe(true);
+    expect(panel().textContent).toContain('Needs the date');
+    expect(button('Fix')).toBeDefined();
+    expect(button('Select flights to save')).toBeDefined();
+  });
+
+  it('keeps reading in the background after the sheet is closed', async () => {
+    let finish: (v: unknown) => void = () => {};
+    mocks.readScreenshot.mockImplementation(() => new Promise((r) => (finish = r)));
+    await mount();
+    await chooseFiles();
+    expect(panel().textContent).toContain('Reading flight details');
+    expect(panel().textContent).toContain('keeps reading in the background');
+    await act(async () => button('Continue in background').click());
+    expect(onClose).toHaveBeenCalled();
+    await act(async () => finish({ flights: [flight], warnings: [] }));
+    await settle();
+    const [draft] = await db.drafts.toArray();
+    expect(draft).toMatchObject({ status: 'ready', result: { flights: [flight] } });
+    expect(draft.image).toBeUndefined();
+  });
+
+  it('can cancel a read in progress', async () => {
     mocks.readScreenshot.mockImplementation(
-      (_: string, signal: AbortSignal) =>
-        new Promise((_r, reject) => signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))),
+      (_: string, signal: AbortSignal) => new Promise((_r, reject) => signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))),
     );
     await mount();
-    await chooseFile();
-    expect(panel().textContent).toContain('Reading flight details');
+    await chooseFiles();
     await act(async () => button('Cancel').click());
     await settle();
     expect(mocks.readScreenshot.mock.calls[0][1].aborted).toBe(true);
+    expect(await db.drafts.count()).toBe(0);
     expect(panel().querySelector('[role="alert"]')).toBeNull();
+    expect(panel().querySelector('.ss-choose')).not.toBeNull();
+  });
+
+  it('reads several screenshots at once into To review', async () => {
     mocks.readScreenshot.mockResolvedValue({ flights: [flight], warnings: [] });
-    await act(async () => button('Read flight details').click());
+    await mount();
+    await chooseFiles(3);
+    expect(panel().textContent).toContain('Reading 3 screenshots');
+    expect(button('Open To review').getAttribute('href')).toBe('#/review');
     await settle();
-    expect(panel().textContent).toContain('Found 1 flight');
+    expect(await db.drafts.count()).toBe(3);
   });
 
   it('offers "Check setup" for server setup errors and lists each check', async () => {
@@ -140,7 +218,7 @@ describe('ScreenshotImport sheet', () => {
       ],
     });
     await mount();
-    await chooseFile();
+    await chooseFiles();
     expect(panel().querySelector('[role="alert"]')!.textContent).toContain('GEMINI_API_KEY is missing');
     await act(async () => button('Check setup').click());
     await settle();
@@ -150,12 +228,15 @@ describe('ScreenshotImport sheet', () => {
     expect(panel().textContent).toContain('Fix the items marked ✗');
   });
 
-  it('does not offer the setup check for other errors', async () => {
-    mocks.readScreenshot.mockRejectedValue(new ScreenshotError('quota', 'Daily limit reached.'));
+  it('does not offer the setup check for other errors, and can retry', async () => {
+    mocks.readScreenshot.mockRejectedValueOnce(new ScreenshotError('quota', 'Daily limit reached.'));
     await mount();
-    await chooseFile();
+    await chooseFiles();
     expect(panel().textContent).toContain('Daily limit reached.');
     expect(button('Check setup')).toBeUndefined();
-    expect(button('Try again')).toBeDefined();
+    mocks.readScreenshot.mockResolvedValueOnce({ flights: [flight], warnings: [] });
+    await act(async () => button('Try again').click());
+    await settle();
+    expect(panel().textContent).toContain('Found 1 flight');
   });
 });

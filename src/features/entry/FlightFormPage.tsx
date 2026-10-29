@@ -2,16 +2,19 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
 import { useReferenceReady } from '@/data/reference';
 import { useFlight, useFlights } from '@/lib/db';
+import { useDraft } from '@/services/screenshot/drafts';
+import { legFormValues } from '@/features/review/draft-legs';
 import { airportCode } from '@/lib/flight-utils';
 import { formatFlightDate } from '@/lib/time';
 import type { Flight } from '@/lib/types';
 import { FlightForm } from './FlightForm';
-import { duplicateValues, emptyValues, flightToValues, nonEmptyGroups, returnValues, type FormValues } from './form-model';
+import { duplicateValues, emptyValues, FILL_KEYS, flightToValues, nonEmptyGroups, returnValues, type FormValues } from './form-model';
 import { getEntryDefaults } from './prefs';
 import './FlightFormPage.css';
 
 /**
- * /flights/new (optionally ?return=<id> or ?duplicate=<id>) and /flights/:id/edit.
+ * /flights/new (optionally ?return=<id>, ?duplicate=<id> or ?draft=<id>&leg=<n> from To review)
+ * and /flights/:id/edit.
  * Waits for reference data and the source flight, then mounts a fresh form.
  */
 export default function FlightFormPage() {
@@ -20,11 +23,14 @@ export default function FlightFormPage() {
   const returnId = id ? null : params.get('return');
   const duplicateId = id || returnId ? null : params.get('duplicate');
   const sourceId = id ?? returnId ?? duplicateId ?? undefined;
+  const draftId = id || sourceId ? null : params.get('draft');
+  const legIndex = Number(params.get('leg'));
   const source = useFlight(sourceId);
+  const draft = useDraft(draftId);
   const flights = useFlights();
   const ready = useReferenceReady();
 
-  if (!ready || (sourceId && source === undefined)) return <FormSkeleton edit={!!id} />;
+  if (!ready || (sourceId && source === undefined) || (draftId && draft === undefined)) return <FormSkeleton edit={!!id} />;
 
   if (id && !source) {
     return (
@@ -45,6 +51,7 @@ export default function FlightFormPage() {
   let initial: FormValues;
   let initialEdited: string[] = [];
   let note: string | undefined;
+  const leg = draft && Number.isInteger(legIndex) ? draft.result?.flights[legIndex] : undefined;
   if (id && src) {
     initial = flightToValues(src);
     initialEdited = [...nonEmptyGroups(initial), ...(initial.seatType ? ['seatType'] : [])];
@@ -56,19 +63,24 @@ export default function FlightFormPage() {
     initial = duplicateValues(src);
     initialEdited = [...nonEmptyGroups(initial), ...(initial.seatType ? ['seatType'] : [])];
     note = `Copy of ${describe(src)}`;
+  } else if (draft && leg) {
+    initial = legFormValues(leg, getEntryDefaults());
+    initialEdited = [...FILL_KEYS, 'seatType'];
+    note = 'From your screenshot';
   } else {
     initial = emptyValues(getEntryDefaults());
   }
 
   return (
     <FlightForm
-      key={`${id ?? ''}|${returnId ?? ''}|${duplicateId ?? ''}`}
+      key={`${id ?? ''}|${returnId ?? ''}|${duplicateId ?? ''}|${draftId ?? ''}|${leg ? legIndex : ''}`}
       mode={id ? 'edit' : 'new'}
       initial={initial}
       initialEdited={initialEdited}
       base={id ? src : undefined}
       flights={flights}
       note={note}
+      draftLeg={draft && leg ? { draftId: draft.id, index: legIndex } : undefined}
     />
   );
 }

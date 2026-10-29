@@ -21,6 +21,7 @@ const PasswordPage = lazy(() => import('@/features/account/PasswordPage'));
 const AccountPage = lazy(() => import('@/features/account/AccountPage'));
 const WelcomePage = lazy(() => import('@/features/account/WelcomePage'));
 const TripPage = lazy(() => import('@/features/trips/TripPage'));
+const ReviewPage = lazy(() => import('@/features/review/ReviewPage'));
 const AirportPage = lazy(() => import('@/features/explore/AirportPage'));
 const AirlinePage = lazy(() => import('@/features/explore/AirlinePage'));
 
@@ -42,6 +43,8 @@ export function App() {
               <Route path="/flights/:id" element={<FlightDetailPage />} />
               <Route path="/flights/:id/edit" element={<FlightFormPage />} />
               <Route path="/trips/:id" element={<TripPage />} />
+              <Route path="/review" element={<ReviewPage />} />
+              <Route path="/review/:id" element={<ReviewPage />} />
               <Route path="/airports/:ident" element={<AirportPage />} />
               <Route path="/airlines/:key" element={<AirlinePage />} />
               <Route path="/map" element={<MapPage />} />

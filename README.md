@@ -219,12 +219,17 @@ Supabase project or Vercel routing configuration.
 
 ## Screenshot flight import (Gemini)
 
-On **Log a flight → Import a screenshot**, signed-in users can select a PNG, JPEG,
-or WebP image, preview it, and explicitly send it to Gemini. Extracted segments
-are reviewed individually and then copied into the normal editable flight form.
-Nothing is saved until the user taps **Save flight**. Missing years and unknown
-airport codes remain blank. Lookup suggestions cannot overwrite extracted fields
-without user interaction. Flights retain a `screenshot` source in backups.
+On **Log a flight → Scan screenshot**, signed-in users choose one or several images
+(booking, boarding pass or status page). Each becomes a **draft** that is read by Gemini in
+the background — close the sheet any time; the result waits in **To review** (a card on Home
+and a count on the Scan button, plus a toast when it's ready). Drafts stay on the device and
+an interrupted read is retried the next time the app opens.
+
+Review a draft by ticking the flights to keep: complete flights can be saved straight away,
+several at once, and an itinerary can be saved **as a trip** with a suggested name
+("Weekend in Chicago", "Lisbon & Porto"). Flights already in the log are left unticked,
+and legs missing a date or airport open in the normal flight form to fix. Nothing is saved
+until you tap Save. Flights retain a `screenshot` source in backups.
 
 Deployment on Vercel:
 
@@ -237,8 +242,9 @@ Deployment on Vercel:
    If you created the key in Google Cloud Console, give it **no application restrictions**
    (server calls have no referrer) and make sure the **Generative Language API** is enabled.
 3. Optionally set **`GEMINI_MODEL`**. If unset (recommended) the server uses
-   `gemini-flash-latest`, falling back to `gemini-2.5-flash` and `gemini-2.5-flash-lite`
-   when a model isn't available to your key.
+   `gemini-flash-latest` with low thinking, falling back to `gemini-flash-lite-latest`,
+   `gemini-2.5-flash` and `gemini-2.5-flash-lite` when a model isn't available to your key.
+   If a read runs long (~26 s), the rest of the time goes to a lite model instead of failing.
 4. Ensure Vercel has the same `SUPABASE_URL` and `SUPABASE_ANON_KEY` / publishable key
    used for cloud sync. A service-role key is neither required nor used.
 5. **Redeploy** (environment variables only apply to new deployments), then in the app open
@@ -256,6 +262,7 @@ Troubleshooting messages map to causes:
 | No Gemini model worked with this API key | Set `GEMINI_MODEL` to a model listed in AI Studio |
 | usage limits aren't installed | Run `supabase/screenshot-import.sql` |
 | Gemini's usage limit for this API key is used up | Free-tier quota; wait or raise it in AI Studio |
+| Gemini took too long to answer | Retry; crop the screenshot to the flight details |
 
 `api/extract-flight.ts` is a Vercel Node function with a 60-second duration limit.
 It authenticates the bearer token with Supabase, consumes a durable atomic quota,

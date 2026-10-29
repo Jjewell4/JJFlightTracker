@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, type ReactNode } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { isOnboarded } from '@/features/account/onboarding';
 import { clearNotice, useCloudSync } from '@/services/sync/controller';
+import { DraftNotifier } from '@/features/review/DraftNotifier';
 import { AccountButton, SidebarAccount } from './AccountButton';
 import { Icon, type IconName } from './Icon';
 import './AppShell.css';
@@ -120,6 +121,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
         {children}
       </main>
+
+      {!isBare && <DraftNotifier />}
 
       {sync.notice && (
         <div className="shell__notice" role="status" aria-live="polite" onClick={clearNotice}>

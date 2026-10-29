@@ -24,6 +24,7 @@ import {
 import { FlightRow, FlightRowSkeleton } from './FlightRow';
 import { SearchBar } from './SearchBar';
 import { SummaryHero, SummaryHeroSkeleton } from './SummaryHero';
+import { ReviewBanner } from '@/features/review/ReviewBanner';
 import { UpcomingCard } from './UpcomingCard';
 import { OnThisDay } from './OnThisDay';
 import { LogViewSwitch, TripsList, useLogView } from '@/features/trips/TripsList';
@@ -160,6 +161,8 @@ export function FlightsPage() {
       {view === 'trips' ? <TripsList flights={all} unit={unit} today={today} /> : <>
 
       {!archive && <SummaryHero summary={summary} unit={unit} upcoming={upcoming.length} />}
+
+      {home && <ReviewBanner className="rbanner--home" />}
 
       {!archive && !filtering && shownUpcoming.length > 0 && (
         <section className="flights__upcoming" aria-labelledby="upcoming-title">

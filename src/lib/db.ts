@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { DEFAULT_SETTINGS, type Flight, type FlightInput, type Settings } from './types';
+import { DEFAULT_SETTINGS, type Flight, type FlightInput, type ImportDraft, type Settings } from './types';
 
 interface KV {
   key: string;
@@ -18,6 +18,8 @@ class FlightDB extends Dexie {
   flights!: EntityTable<Flight, 'id'>;
   kv!: EntityTable<KV, 'key'>;
   syncMeta!: EntityTable<SyncMeta, 'id'>;
+  /** Screenshot imports waiting in "To review" (device-only, not synced or backed up). */
+  drafts!: EntityTable<ImportDraft, 'id'>;
 
   constructor() {
     super('jordan-flight-tracker');
@@ -26,12 +28,13 @@ class FlightDB extends Dexie {
       kv: 'key',
     });
     this.version(2).stores({ syncMeta: 'id' });
+    this.version(3).stores({ drafts: 'id, createdAt, status' });
   }
 }
 
 export const db = new FlightDB();
 
-const newId = () =>
+export const newId = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;

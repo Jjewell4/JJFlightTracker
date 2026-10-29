@@ -139,3 +139,39 @@ export const DEFAULT_SETTINGS: Settings = {
   enableAdsbdb: true,
   showAirlineLogos: true,
 };
+
+/** A flight read from a screenshot (or, later, a forwarded email) that hasn't been saved yet. */
+export interface DraftLeg {
+  /** YYYY-MM-DD, or '' when the year/date wasn't visible. */
+  date: string;
+  /** Airport codes as read (IATA/ICAO), '' when unknown. */
+  from: string;
+  to: string;
+  flightNumber: string;
+  depTime: string;
+  arrTime: string;
+  arrDayOffset: number | null;
+  aircraftType: string;
+  seatNumber: string;
+}
+
+/**
+ * An import waiting in "To review": created as soon as a screenshot is chosen and read in the
+ * background, so nobody has to watch a spinner. Stored on this device only (never synced).
+ */
+export interface ImportDraft {
+  id: string;
+  source: 'screenshot';
+  status: 'reading' | 'ready' | 'failed';
+  createdAt: number;
+  updatedAt: number;
+  /** Prepared JPEG data URL, kept on this device until it has been read (for retries). */
+  image?: string;
+  /** Small preview for the review list. */
+  thumb?: string;
+  result?: { flights: DraftLeg[]; warnings: string[] };
+  error?: { code: string; message: string };
+  /** Indexes of `result.flights` already saved or skipped. */
+  handled?: number[];
+}
+

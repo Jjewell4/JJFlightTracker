@@ -7,6 +7,9 @@ Local-first: flights live in IndexedDB on the device and sync to Supabase when s
 privacy-filtered Supabase RPC (`supabase/public-profiles.sql`). One serverless function,
 `api/extract-flight.ts` (+ `server/screenshot.ts`), reads flight screenshots with Gemini;
 `GET` on it returns setup diagnostics. Server secrets (GEMINI_API_KEY) never get a VITE_ prefix.
+Screenshot imports become device-only **drafts** (Dexie `drafts` table, `src/services/screenshot/drafts.ts`)
+read in the background and reviewed in **To review** (`src/features/review/`: pick legs, save several
+at once, optionally as a trip). Interrupted reads resume on the next launch.
 
 ## Stack
 - Vite 8 + React 19 + TypeScript (strict), `react-router-dom` v7 with **HashRouter** (static hosting / GitHub Pages).
@@ -28,6 +31,8 @@ privacy-filtered Supabase RPC (`supabase/public-profiles.sql`). One serverless f
 ## Layout
 - `src/lib/types.ts` — domain types (Flight, Airport, Airline, Settings). Shared contract: add fields, never rename.
 - `src/lib/db.ts` — Dexie DB + repository functions + hooks (`useFlights`, `useFlight`, `useSettings`).
+- `src/lib/trips.ts` — trip detection (`detectTrips`), automatic names (`suggestTripName`, `tripTitle`),
+  `tripFromLegs` for naming unsaved legs. Saved trips are a shared `tripId`/`tripName` on each leg.
 - `src/data/reference.ts` — airport/airline/aircraft datasets, sync lookups after `loadReference()`,
   ranked search (`searchAirports`, `searchAirlines`, `searchAircraftTypes`), `useReferenceReady()`.
 - `src/lib/geo.ts` (distance, great-circle arcs), `src/lib/time.ts` (tz-aware durations, formatting),

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon, type IconName } from '@/components/Icon';
+import { Switch } from '@/components/Switch';
+import { clearDrafts } from '@/services/screenshot/drafts';
 import { useInstallPrompt } from '@/components/PwaPrompts';
 import { allCountries, useReferenceReady } from '@/data/reference';
 import { seedSampleFlights } from '@/dev/sample-data';
@@ -61,14 +63,6 @@ function Segmented<T extends string>({ value, options, onChange, label }: { valu
         </button>
       ))}
     </div>
-  );
-}
-
-function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
-  return (
-    <button type="button" role="switch" aria-checked={checked} aria-label={label} className="switch" onClick={() => onChange(!checked)}>
-      <span className="switch__thumb" />
-    </button>
   );
 }
 
@@ -133,6 +127,7 @@ export default function SettingsPage() {
     try {
       if (confirm === 'delete') {
         await deleteAllFlights();
+        await clearDrafts();
         say('All flights deleted.');
       } else if (confirm === 'sample') {
         const n = await seedSampleFlights();

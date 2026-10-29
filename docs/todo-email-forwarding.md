@@ -68,6 +68,11 @@ App: "To review" inbox (badge) → open item → choose flights → fills the no
   or restrict to service role).
 
 ### App
+
+> Since this plan was written, screenshot imports gained a **To review** inbox
+> (`src/features/review/`, device-only drafts in Dexie). Email items should land in the same
+> inbox: fetch pending `email_inbox` rows for signed-in users, map them to `ImportDraft`-shaped
+> items (`source: 'email'`), and reuse `DraftPanel`/`saveLegs` for multi-leg + "save as a trip".
 - Settings → **Email import**: show/copy personal address, rotate token, list allowed senders,
   setup status (like the screenshot "Check setup").
 - **To review** inbox: entry point on Home (small badge card only when items are pending) and in
