@@ -45,6 +45,8 @@ const PATHS = {
   logout: 'M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11',
   shield: 'M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6Z',
   devices: 'M4 6a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v7H4ZM2 17h12M18 9h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z',
+  keyboard: 'M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2ZM6.5 9h.01M10.5 9h.01M14.5 9h.01M18 9h.01M6.5 12.5h.01M10.5 12.5h.01M14.5 12.5h.01M18 12.5h.01M8 16h8',
+  scan: 'M3 7.5V5a2 2 0 0 1 2-2h2.5M16.5 3H19a2 2 0 0 1 2 2v2.5M21 16.5V19a2 2 0 0 1-2 2h-2.5M7.5 21H5a2 2 0 0 1-2-2v-2.5M7 12h10',
 } as const;
 
 export type IconName = keyof typeof PATHS;

@@ -48,12 +48,15 @@ export function DateField({
   precision,
   onChange,
   error,
+  filled,
 }: {
   id: string;
   date: string;
   precision: DatePrecision;
   onChange: (date: string) => void;
   error?: string;
+  /** Just filled in for the user (quick entry / screenshot): highlight it. */
+  filled?: boolean;
 }) {
   const today = todayLocal();
   const yesterday = addDays(today, -1);
@@ -66,7 +69,7 @@ export function DateField({
     <div className="entry-field">
       <div className="entry-field__label-row">
         <label className="field__label" htmlFor={id}>
-          Date
+          Date {filled && <Icon name="sparkle" size={12} className="sparkle-icon" />}
         </label>
         {precision === 'day' && (
           <div className="entry-quick" role="group" aria-label="Quick dates">
@@ -79,7 +82,7 @@ export function DateField({
           </div>
         )}
       </div>
-      <div className={`date-field${error ? ' has-error' : ''}`}>
+      <div className={`date-field${error ? ' has-error' : ''}${filled ? ' is-filled' : ''}`}>
         <span className="date-field__icon" aria-hidden="true">
           <Icon name="calendar" size={20} />
         </span>

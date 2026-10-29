@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AirlineLogo } from '@/components/AirlineLogo';
 import { Icon } from '@/components/Icon';
-import { getAirline } from '@/data/reference';
+import { getAircraftType, getAirline } from '@/data/reference';
 import { addFlight, deleteFlight, updateFlight, useSettings } from '@/lib/db';
 import { enrichFlight, parseFlightNumber } from '@/lib/flight-utils';
 import { todayLocal } from '@/lib/time';
@@ -34,8 +34,7 @@ import {
 } from './form-model';
 import { usageStats } from './history-stats';
 import { getDetailsOpen, saveDetailsOpen, saveEntryDefaults } from './prefs';
-import { QuickEntry } from './QuickEntry';
-import { ScreenshotImport } from './ScreenshotImport';
+import { EntryAssist } from './EntryAssist';
 import { useFlightLookup } from './useFlightLookup';
 import { announceLocalSave } from '@/services/sync/controller';
 
@@ -44,6 +43,8 @@ const AUTO_FILL_MIN = 0.6;
 const PREFIX = 'prefix';
 
 type SheetName = 'from' | 'to' | 'airline' | 'aircraft' | null;
+/** Fields filled by quick entry or a screenshot: fill groups plus date / flight number / seat. */
+type AssistKey = FillKey | 'date' | 'flightNumber' | 'seat';
 /** Fill group → origin: 'prefix' (airline inferred from flight number) or the lookup result key. */
 type AutoMap = Map<FillKey, string>;
 
@@ -82,6 +83,8 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
   const savingRef = useRef(false);
   const [saveError, setSaveError] = useState('');
   const [screenshotReview, setScreenshotReview] = useState(false);
+  /** Highlighted (sparkle + glow) until the user changes them. */
+  const [assisted, setAssisted] = useState<ReadonlySet<AssistKey>>(() => new Set());
   const [sheet, setSheet] = useState<SheetName>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -121,8 +124,18 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
     return early;
   }, [v, submitted]);
 
+  const unassist = useCallback((...keys: AssistKey[]) => {
+    setAssisted((s) => {
+      if (!keys.some((k) => s.has(k))) return s;
+      const n = new Set(s);
+      keys.forEach((k) => n.delete(k));
+      return n;
+    });
+  }, []);
+
   /** Records a manual edit: the group is now the user's and lookups will never overwrite it. */
   const touch = useCallback((...keys: string[]) => {
+    unassist(...(keys as AssistKey[]));
     setEdited((s) => {
       const n = new Set(s);
       keys.forEach((k) => n.add(k));
@@ -134,7 +147,7 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
       keys.forEach((k) => n.delete(k as FillKey));
       return n;
     });
-  }, []);
+  }, [unassist]);
 
   const patch = useCallback((p: Partial<FormValues>) => setV((cur) => ({ ...cur, ...p })), []);
 
@@ -188,37 +201,96 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
   const showCard = armed && outcome?.status === 'found' && dismissed !== outcome && !lookup.loading;
   const active = showCard ? (outcome.results.find((r) => r.key === activeKey) ?? outcome.results[0]) : undefined;
   const filledFromActive = active ? [...auto].filter(([, src]) => src === active.key).map(([k]) => k) : [];
-  const isFilled = (k: FillKey) => {
-    const src = auto.get(k);
+  const isFilled = (k: AssistKey) => {
+    if (assisted.has(k)) return true;
+    const src = auto.get(k as FillKey);
     return !!src && src !== PREFIX;
   };
 
   // ---------- field handlers ----------
 
-  const setFlightNumber = (raw: string) => {
+  /** `cur` with a new flight number, inferring the airline from its prefix unless the user picked one. */
+  const withFlightNumber = (cur: FormValues, raw: string): { next: FormValues; nextAuto: AutoMap } => {
+    const { edited: ed, auto: au } = state.current;
     const cleaned = raw.toUpperCase().replace(/[^A-Z0-9 ]/g, '');
-    setArmed(true);
-    const { v: cur, edited: ed, auto: au } = state.current;
     const next = { ...cur, flightNumber: cleaned };
+    let nextAuto = au;
     if (!ed.has('airline')) {
       const inferred = inferAirline(cleaned);
       const src = au.get('airline');
       if (inferred && (isEmptyField(cur, 'airline') || src)) {
         next.airline = inferred;
-        setAuto(new Map(au).set('airline', PREFIX));
+        nextAuto = new Map(au).set('airline', PREFIX);
       } else if (!inferred && src === PREFIX) {
         next.airline = undefined;
-        const n = new Map(au);
-        n.delete('airline');
-        setAuto(n);
+        nextAuto = new Map(au);
+        nextAuto.delete('airline');
       }
     }
+    return { next, nextAuto };
+  };
+
+  const setFlightNumber = (raw: string) => {
+    setArmed(true);
+    unassist('flightNumber');
+    const { next, nextAuto } = withFlightNumber(state.current.v, raw);
+    if (nextAuto !== state.current.auto) setAuto(nextAuto);
     setV(next);
   };
 
   const setDate = (date: string) => {
     patch({ date });
+    unassist('date');
     setArmed(true);
+  };
+
+  // ---------- quick entry / screenshot ----------
+
+  /** After a fill from a sheet: highlight what changed and bring the top of the form into view. */
+  const showAssisted = (keys: AssistKey[]) => {
+    setAssisted(new Set(keys));
+    // Let the sheet finish closing (it restores focus to its button) before scrolling.
+    setTimeout(() => window.scrollTo({ top: 0, behavior: reduceMotion() ? 'auto' : 'smooth' }), 260);
+  };
+
+  const applyQuickEntry = (values: Partial<FormValues>) => {
+    // A new route/date makes the old arrival day meaningless: back to inferring it.
+    let next: FormValues = { ...state.current.v, ...values, arrDayOffset: undefined };
+    if (values.flightNumber) {
+      const r = withFlightNumber(next, prettyFlightNumber(values.flightNumber));
+      next = r.next;
+      if (r.nextAuto !== state.current.auto) setAuto(r.nextAuto);
+      setArmed(true); // look the flight up for times / aircraft
+    }
+    setV(next);
+    touch('from', 'to');
+    showAssisted(['date', 'from', 'to', ...(values.flightNumber ? (['flightNumber'] as const) : [])]);
+  };
+
+  const applyScreenshot = (values: Partial<FormValues>) => {
+    setV({
+      ...emptyValues({ cabinClass: v.cabinClass, reason: v.reason }),
+      ...values,
+      flightNumber: prettyFlightNumber(values.flightNumber),
+      aircraftName: values.aircraftName || (getAircraftType(values.aircraftType)?.name ?? ''),
+      seatType: inferSeatType(values.seatNumber, values.aircraftType),
+    });
+    setEdited(new Set(['airline', 'from', 'to', 'times', 'aircraft', 'registration', 'seatType']));
+    setAuto(new Map());
+    setArmed(false);
+    setScreenshotReview(true);
+    setSubmitted(false);
+    if (values.aircraftType || values.seatNumber) setDetailsOpen(true);
+    const keys: AssistKey[] = [];
+    if (values.date) keys.push('date');
+    if (values.flightNumber) keys.push('flightNumber');
+    if (values.airline) keys.push('airline');
+    if (values.from) keys.push('from');
+    if (values.to) keys.push('to');
+    if (values.depTime || values.arrTime) keys.push('times');
+    if (values.aircraftType) keys.push('aircraft');
+    if (values.seatNumber) keys.push('seat');
+    showAssisted(keys);
   };
 
   const setPrecision = (p: DatePrecision) => {
@@ -248,6 +320,7 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
   };
 
   const setSeatNumber = (seatNumber: string) => {
+    unassist('seat');
     setV((cur) => ({
       ...cur,
       seatNumber,
@@ -395,23 +468,26 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
         <span className="entry-header__btn" aria-hidden="true" />
       </header>
 
-      {mode === 'new' && !dirty && <QuickEntry onApply={(values) => { patch(values); touch('from', 'to'); }} />}
-      {mode === 'new' && !saving && <ScreenshotImport dirty={dirty} onApply={(values) => {
-        setV({ ...emptyValues({ cabinClass: v.cabinClass, reason: v.reason }), ...values });
-        setEdited(new Set(['airline', 'from', 'to', 'times', 'aircraft', 'registration', 'seatType']));
-        setAuto(new Map()); setArmed(false); setScreenshotReview(true); setSubmitted(false);
-        if (values.aircraftType || values.seatNumber) setDetailsOpen(true);
-      }} />}
-      {screenshotReview && <p className="entry-header__note" role="status">From your screenshot — review all fields below. Missing dates and airports must be filled before saving.</p>}
-      <form className="entry-form" onSubmit={onSubmit} noValidate>
+      {mode === 'new' && <EntryAssist dirty={dirty} clock={settings.clock} onQuick={applyQuickEntry} onScreenshot={applyScreenshot} />}
+      <form className={`entry-form${mode === 'new' ? ' entry-form--assist' : ''}`} onSubmit={onSubmit} noValidate>
+        {screenshotReview && (
+          <p className="entry-banner" role="status">
+            <Icon name="sparkle" size={16} />
+            <span>
+              <strong>Filled from your screenshot.</strong> Check each field before saving — AI can misread details.
+              {(!v.date || !v.from || !v.to) && ' Add the missing date or airports.'}
+            </span>
+          </p>
+        )}
         <section className="entry-card flight-card" aria-label="Date and flight number">
-          <DateField id="entry-date" date={v.date} precision={v.datePrecision} onChange={setDate} error={errors.date} />
+          <DateField id="entry-date" date={v.date} precision={v.datePrecision} onChange={setDate} error={errors.date} filled={isFilled('date')} />
 
           <div className="entry-field">
             <label className="field__label" htmlFor="entry-fn">
               Flight number <span className="subtle">· optional</span>
+              {isFilled('flightNumber') && <Icon name="sparkle" size={12} className="sparkle-icon" />}
             </label>
-            <div className={`fn-input${errors.flightNumber ? ' has-error' : ''}`}>
+            <div className={`fn-input${errors.flightNumber ? ' has-error' : ''}${isFilled('flightNumber') ? ' is-filled' : ''}`}>
               <input
                 ref={fnRef}
                 id="entry-fn"
@@ -495,7 +571,7 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
           toRef={toRef}
         />
 
-        {v.datePrecision === 'day' && <TimesCard v={v} onChange={setTimes} filled={isFilled('times')} error={errors.times} />}
+        {v.datePrecision === 'day' && <TimesCard v={v} onChange={setTimes} clock={settings.clock} filled={isFilled('times')} error={errors.times} />}
 
         <DetailsSection
           v={v}
@@ -509,7 +585,7 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
           onSeatType={setSeatType}
           onPrecision={setPrecision}
           onPickAircraft={() => setSheet('aircraft')}
-          filled={{ aircraft: isFilled('aircraft'), registration: isFilled('registration') }}
+          filled={{ aircraft: isFilled('aircraft'), registration: isFilled('registration'), seat: isFilled('seat') }}
         />
 
         {mode === 'edit' && (

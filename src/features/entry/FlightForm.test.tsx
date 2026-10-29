@@ -63,7 +63,7 @@ async function openForm() {
   await settle();
 }
 
-const button = (text: string) => [...document.querySelectorAll('button')].find((b) => b.textContent === text || b.getAttribute('aria-label') === text)!;
+const button = (text: string) => [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === text || b.getAttribute('aria-label') === text)!;
 const dialog = () => document.querySelector('[role="alertdialog"]');
 
 function typeInto(input: HTMLInputElement, value: string) {
@@ -73,6 +73,26 @@ function typeInto(input: HTMLInputElement, value: string) {
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
+
+/** Sets a time through the picker sheet ("Type" mode). Setting departure moves on to arrival: pass `arr` or it is left for later. */
+async function setTimes(dep: string, arr?: string) {
+  await act(async () => document.querySelector<HTMLButtonElement>('#entry-dep')!.click());
+  await settle();
+  await act(async () => button('Type').click());
+  typeInto(document.querySelector<HTMLInputElement>('.tp__input')!, dep);
+  await act(async () => button('Set departure time').click());
+  await settle();
+  if (arr === undefined) {
+    await act(async () => button('Later').click());
+  } else {
+    await act(async () => button('Type').click());
+    typeInto(document.querySelector<HTMLInputElement>('.tp__input')!, arr);
+    await act(async () => button('Set arrival time').click());
+  }
+  await settle();
+}
+
+const depText = () => document.querySelector('#entry-dep')?.textContent ?? '';
 
 describe('FlightForm unsaved-changes guard', () => {
   it('leaves straight away when nothing was edited', async () => {
@@ -86,8 +106,8 @@ describe('FlightForm unsaved-changes guard', () => {
 
   it('asks before discarding edits (Close button and system Back)', async () => {
     await openForm();
-    typeInto(document.querySelector<HTMLInputElement>('#entry-dep')!, '08:00');
-    await settle();
+    await setTimes('08:00');
+    expect(depText()).toContain('8:00 AM');
     expect((window.history.state as { __overlay?: string }).__overlay).toBeTruthy();
 
     await act(async () => button('Close').click());
@@ -96,8 +116,7 @@ describe('FlightForm unsaved-changes guard', () => {
 
     await act(async () => button('Keep editing').click());
     await settle();
-    expect(document.querySelector('#entry-dep')).not.toBeNull();
-    expect(document.querySelector<HTMLInputElement>('#entry-dep')!.value).toBe('08:00');
+    expect(depText()).toContain('8:00 AM');
 
     // Android Back behaves the same way.
     await act(async () => window.history.back());
@@ -115,9 +134,8 @@ describe('FlightForm unsaved-changes guard', () => {
     const persist = vi.fn(async () => true);
     Object.defineProperty(navigator, 'storage', { configurable: true, value: { persist, persisted: async () => false } });
     await openForm();
-    typeInto(document.querySelector<HTMLInputElement>('#entry-dep')!, '08:00');
-    typeInto(document.querySelector<HTMLInputElement>('#entry-arr')!, '09:30');
-    await settle();
+    await setTimes('08:00', '09:30');
+    expect(document.querySelector('.times-card__duration')?.textContent).toContain('1h 30m');
     await act(async () => button('Save flight').click());
     await settle();
     await settle();
@@ -169,8 +187,7 @@ async function openEdit(): Promise<Flight> {
 describe('FlightForm guard with edit/delete navigation', () => {
   it('saving an edit returns to the detail screen', async () => {
     const f = await openEdit();
-    typeInto(document.querySelector<HTMLInputElement>('#entry-dep')!, '08:00');
-    await settle();
+    await setTimes('08:00');
     await act(async () => button('Save changes').click());
     await settle();
     await settle();
@@ -180,8 +197,7 @@ describe('FlightForm guard with edit/delete navigation', () => {
 
   it('deleting with unsaved edits skips past the deleted flight', async () => {
     await openEdit();
-    typeInto(document.querySelector<HTMLInputElement>('#entry-dep')!, '08:00');
-    await settle();
+    await setTimes('08:00');
     await act(async () => button('Delete flight').click());
     await settle();
     const confirm = [...document.querySelectorAll('[role="alertdialog"] button')].find((b) => b.textContent === 'Delete flight') as HTMLButtonElement;
@@ -190,5 +206,41 @@ describe('FlightForm guard with edit/delete navigation', () => {
     await settle();
     expect(window.location.hash).toBe('#/');
     expect(host.textContent).toContain('Home screen');
+  });
+});
+
+describe('FlightForm fill shortcuts', () => {
+  it('opens quick entry in a sheet, validates, then fills and highlights the form', async () => {
+    await openForm();
+    // One compact row of shortcuts instead of inline panels.
+    expect(document.querySelector('.entry-assist')?.textContent).toBe('Scan screenshotQuick entry');
+    expect(document.querySelector('.qe-input')).toBeNull();
+    await act(async () => button('Quick entry').click());
+    await settle();
+    const input = document.querySelector<HTMLInputElement>('.qe-input')!;
+    expect(document.activeElement).toBe(input);
+    typeInto(input, 'SAN-QQQQ 2026-10-27');
+    await act(async () => button('Fill flight details').click());
+    expect(document.querySelector('[role="dialog"] [role="alert"]')?.textContent).toContain('Use two known airport codes');
+    typeInto(input, 'LAX to JFK 2026-10-27 B6124');
+    await act(async () => button('Fill flight details').click());
+    await settle();
+    expect(document.querySelector('.qe-input')?.closest('.sheet:not(.is-closing)')).toBeFalsy();
+    const from = document.querySelector('.route-end--from')!;
+    expect(from.textContent).toContain('LAX');
+    expect(document.querySelector('.route-end--to')!.textContent).toContain('JFK');
+    expect(from.classList).toContain('is-filled');
+    expect(document.querySelector('.date-field')!.classList).toContain('is-filled');
+    expect(document.querySelector<HTMLInputElement>('#entry-fn')!.value).toBe('B6 124');
+    // Editing a highlighted field clears its highlight.
+    await act(async () => button('Today').click());
+    expect(document.querySelector('.date-field')!.classList).not.toContain('is-filled');
+  });
+
+  it('opens the screenshot scanner in a sheet (sign-in prompt when signed out)', async () => {
+    await openForm();
+    await act(async () => button('Scan screenshot').click());
+    await settle();
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Sign in to scan screenshots');
   });
 });

@@ -116,7 +116,7 @@ export function DetailsSection({
   onSeatType: (t: SeatType | undefined) => void;
   onPrecision: (p: DatePrecision) => void;
   onPickAircraft: () => void;
-  filled: { aircraft?: boolean; registration?: boolean };
+  filled: { aircraft?: boolean; registration?: boolean; seat?: boolean };
 }) {
   const panelId = useId();
   const seatGuess = inferSeatType(v.seatNumber, v.aircraftType);
@@ -166,9 +166,9 @@ export function DetailsSection({
                 maxLength={10}
               />
             </div>
-            <div className="entry-field entry-field--seat">
+            <div className={`entry-field entry-field--seat${filled.seat ? ' is-filled' : ''}`}>
               <label className="field__label" htmlFor="entry-seat">
-                Seat
+                Seat {filled.seat && <Icon name="sparkle" size={12} className="sparkle-icon" />}
               </label>
               <input
                 id="entry-seat"
