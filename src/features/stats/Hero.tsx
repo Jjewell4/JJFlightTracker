@@ -1,9 +1,9 @@
 import { useId } from 'react';
 import { isLand } from '@/features/flights/projection';
 import type { FlightStats, Totals, YearScope } from '@/lib/stats';
-import { MONTH_LABELS } from '@/lib/stats';
 import { Icon } from '@/components/Icon';
-import { Sparkline } from './charts/Sparkline';
+import { TrendBars } from './charts/TrendBars';
+import { trendData } from './trend';
 import { CountUp } from './parts';
 import {
   fmt1,
@@ -20,6 +20,8 @@ interface Props {
   unit: DistanceUnit;
   prev?: Totals;
   firstYear?: number;
+  /** No recorded times (public journals): time in the air is a distance estimate. */
+  timeEstimated?: boolean;
 }
 
 function Delta({
@@ -45,19 +47,14 @@ function Delta({
   );
 }
 
-export function Hero({ stats, scope, unit, prev, firstYear }: Props) {
+export function Hero({ stats, scope, unit, prev, firstYear, timeEstimated = false }: Props) {
   const t = stats.totals;
   const other: DistanceUnit = unit === 'mi' ? 'km' : 'mi';
-  const trend =
-    scope === 'all'
-      ? stats.byYear.map((y) => y.flights)
-      : stats.byMonth.map((m) => m.flights);
-  const trendStart =
-    scope === 'all' ? String(stats.byYear[0]?.year ?? '') : MONTH_LABELS[0];
-  const trendEnd =
-    scope === 'all'
-      ? String(stats.byYear[stats.byYear.length - 1]?.year ?? '')
-      : MONTH_LABELS[11];
+  const trend = trendData(stats, scope);
+  const perYear = scope === 'all';
+  const trendLabel = perYear
+    ? `Flights per year, ${trend.data[0]?.label ?? ''}–${trend.data[trend.data.length - 1]?.label ?? ''}`
+    : `Flights per month in ${scope}`;
   const prevYear = typeof scope === 'number' ? scope - 1 : 0;
   const hours = Math.floor(t.durationMin / 60);
   const mins = Math.round(t.durationMin % 60);
@@ -96,16 +93,17 @@ export function Hero({ stats, scope, unit, prev, firstYear }: Props) {
             <Delta now={t.flights} before={prev.flights} year={prevYear} />
           )}
         </p>
-        {trend.length > 1 && trend.some((v) => v > 0) && (
+        {trend.data.length > 1 && trend.data.some((d) => d.value > 0) && (
           <div className="stats-hero__trend">
-            <Sparkline values={trend} height={52} />
-            <div className="stats-hero__trend-axis" aria-hidden>
-              <span>{trendStart}</span>
-              <span>
-                {scope === 'all' ? 'flights per year' : 'flights per month'}
-              </span>
-              <span>{trendEnd}</span>
-            </div>
+            <TrendBars
+              data={trend.data}
+              highlightKey={trend.highlightKey}
+              partialKey={trend.highlightKey}
+              formatValue={(v) => `${fmtInt(v)} ${plural(v, 'flight')}`}
+              label={trendLabel}
+              caption={perYear ? 'flights per year' : 'flights per month'}
+              height={52}
+            />
           </div>
         )}
       </section>
@@ -129,15 +127,21 @@ export function Hero({ stats, scope, unit, prev, firstYear }: Props) {
         </Tile>
         <Tile
           icon="clock"
-          label="Time in the air"
+          label={timeEstimated ? 'Est. time in the air' : 'Time in the air'}
           value={hours}
           unit="h"
-          approx={t.estimatedDuration > t.flights * 0.1}
+          approx={timeEstimated || t.estimatedDuration > t.flights * 0.1}
         >
-          {mins} min ·{' '}
-          {t.days >= 2
-            ? `${fmt1(t.days)} days`
-            : `${fmt1(t.durationMin / 60)} hours`}
+          {timeEstimated ? (
+            `From distance · ${t.days >= 2 ? `${fmt1(t.days)} days` : `${fmt1(t.durationMin / 60)} hours`}`
+          ) : (
+            <>
+              {mins} min ·{' '}
+              {t.days >= 2
+                ? `${fmt1(t.days)} days`
+                : `${fmt1(t.durationMin / 60)} hours`}
+            </>
+          )}
           {prev && (
             <Delta
               now={t.durationMin / 60}

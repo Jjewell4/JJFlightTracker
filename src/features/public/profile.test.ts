@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { publicFlights, validHandle, publicHandleFromPath } from './profile';
+import { defaultDistanceUnit, publicFields, publicFlights, validHandle, publicHandleFromPath } from './profile';
+import { applyPatch, parseView } from './journal-state';
 import type { Flight } from '@/lib/types';
 const base = {
   id: 'private-id',
@@ -60,5 +61,28 @@ describe('public flight projection', () => {
     expect(publicHandleFromPath('/jordan')).toBe('jordan');
     expect(publicHandleFromPath('/assets/main.js')).toBeNull();
     expect(publicHandleFromPath('/')).toBeNull();
+  });
+});
+
+describe('public journal fields and view state', () => {
+  it('never offers private fields; exact dates only when shared', () => {
+    const month = publicFields(publicFlights([base], false, '2026-10-28'));
+    expect(month).toEqual({ times: false, cabin: false, seat: false, reason: false, registration: false, flightNumber: false, exactDates: false });
+    expect(publicFields(publicFlights([base], true, '2026-10-28')).exactDates).toBe(true);
+    expect(publicFields([]).exactDates).toBe(false);
+  });
+  it('picks a customary distance unit for visitors', () => {
+    expect(defaultDistanceUnit('en-US')).toBe('mi');
+    expect(defaultDistanceUnit('en-GB')).toBe('mi');
+    expect(defaultDistanceUnit('de-DE')).toBe('km');
+    expect(defaultDistanceUnit('not a locale')).toBe('km');
+  });
+  it('keeps journal views in the query string, separate from app hash routes', () => {
+    expect(parseView(null)).toBe('overview');
+    expect(parseView('map')).toBe('map');
+    expect(parseView('settings')).toBe('overview');
+    expect(applyPatch('', { view: 'stats', year: '2019' })).toBe('?view=stats&year=2019');
+    expect(applyPatch('?view=stats&year=2019', { year: null })).toBe('?view=stats');
+    expect(applyPatch('?view=map', { view: null })).toBe('');
   });
 });

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Icon, type IconName } from '@/components/Icon';
-import { useFlights, useSettings } from '@/lib/db';
+import { useFlightSource, withFlightSource, type FlightFields, type ViewParams } from '@/lib/flight-source';
 import { useReferenceReady } from '@/data/reference';
 import { flownFlights } from '@/lib/flight-utils';
 import { availableYears, computeStats, filterByYear, flightYear, summarizeTotals, type Insight, type YearScope } from '@/lib/stats';
 import type { Flight } from '@/lib/types';
+import { insightAvailable, statsSections } from './sections';
 import { Hero } from './Hero';
 import { TimeCharts } from './TimeCharts';
 import { Breakdowns } from './Breakdowns';
@@ -17,41 +18,67 @@ import { fmtInt, plural } from './format';
 import './charts/charts.css';
 import './StatsPage.css';
 
-export default function StatsPage() {
-  const all = useFlights();
+interface StatsPageProps {
+  /** Rendered inside another page (the public journal), which supplies its own heading. */
+  embedded?: boolean;
+}
+
+function StatsPage({ embedded = false }: StatsPageProps) {
+  const source = useFlightSource();
+  const all = source.flights;
   const refReady = useReferenceReady();
-  const settings = useSettings();
   // Stats describe flights already flown; upcoming trips are listed on the Flights tab.
   const flights = useMemo(() => (all && refReady ? flownFlights(all) : undefined), [all, refReady]);
 
-  if (!flights || !all) return <StatsSkeleton />;
-  if (!flights.length) return <StatsEmpty upcoming={all.length} />;
-  return <StatsDashboard flights={flights} upcoming={all.length - flights.length} unit={settings.distanceUnit} clock={settings.clock} homeCountry={settings.homeCountry} />;
+  if (!flights || !all) return <StatsSkeleton embedded={embedded} />;
+  if (!flights.length) return <StatsEmpty upcoming={all.length} readOnly={source.readOnly} embedded={embedded} />;
+  return (
+    <StatsDashboard
+      flights={flights}
+      upcoming={all.length - flights.length}
+      unit={source.unit}
+      clock={source.clock}
+      homeCountry={source.homeCountry}
+      readOnly={source.readOnly}
+      fields={source.fields}
+      params={source.params}
+      embedded={embedded}
+    />
+  );
 }
 
-function useScope(years: number[]): [YearScope, (s: YearScope) => void] {
-  const [params, setParams] = useSearchParams();
+export default withFlightSource(StatsPage);
+
+function useScope(years: number[], params: ViewParams): [YearScope, (s: YearScope) => void] {
   const raw = params.get('year');
   const n = raw ? Number(raw) : NaN;
   const scope: YearScope = Number.isFinite(n) && years.includes(n) ? n : 'all';
-  const set = (s: YearScope) =>
-    setParams(
-      (p) => {
-        const next = new URLSearchParams(p);
-        if (s === 'all') next.delete('year');
-        else next.set('year', String(s));
-        return next;
-      },
-      { replace: true },
-    );
+  const set = (s: YearScope) => params.set('year', s === 'all' ? null : String(s));
   return [scope, set];
 }
 
-function StatsDashboard({ flights, upcoming, unit, clock, homeCountry }: { flights: Flight[]; upcoming: number; unit: 'mi' | 'km'; clock: '12h' | '24h'; homeCountry: string }) {
+interface DashboardProps {
+  flights: Flight[];
+  upcoming: number;
+  unit: 'mi' | 'km';
+  clock: '12h' | '24h';
+  homeCountry: string;
+  readOnly: boolean;
+  fields: FlightFields;
+  params: ViewParams;
+  embedded: boolean;
+}
+
+function StatsDashboard({ flights, upcoming, unit, clock, homeCountry, readOnly, fields, params, embedded }: DashboardProps) {
   const years = useMemo(() => availableYears(flights), [flights]);
-  const [scope, setScope] = useScope(years);
+  const [scope, setScope] = useScope(years, params);
   const scoped = useMemo(() => filterByYear(flights, scope), [flights, scope]);
-  const stats = useMemo(() => computeStats(scoped, { homeCountry, distanceUnit: unit }), [scoped, homeCountry, unit]);
+  const stats = useMemo(
+    () => computeStats(scoped, { homeCountry, distanceUnit: unit, audience: readOnly ? 'visitor' : 'owner' }),
+    [scoped, homeCountry, unit, readOnly],
+  );
+  const sections = useMemo(() => statsSections(fields, stats), [fields, stats]);
+  const insights = useMemo(() => stats.insights.filter((i) => insightAvailable(i.id, fields)), [stats.insights, fields]);
   const prev = useMemo(() => {
     if (scope === 'all') return undefined;
     const before = filterByYear(flights, scope - 1);
@@ -67,17 +94,21 @@ function StatsDashboard({ flights, upcoming, unit, clock, homeCountry }: { fligh
   const t = stats.totals;
 
   return (
-    <div className="stats">
-      <header className="page-header stats-header">
-        <div>
-          <h1 className="page-title">Stats</h1>
-          <p className="page-subtitle">
-            {fmtInt(flights.length)} {plural(flights.length, 'flight')} flown
-            {years.length > 1 ? ` · ${years[years.length - 1]}–${years[0]}` : years.length ? ` · ${years[0]}` : ''}
-            {upcoming > 0 && <span title="Upcoming flights are counted once they depart">{` · ${upcoming} upcoming`}</span>}
-          </p>
-        </div>
-      </header>
+    <div className={`stats${embedded ? ' stats--embedded' : ''}`}>
+      {embedded ? (
+        <h2 className="visually-hidden">Stats</h2>
+      ) : (
+        <header className="page-header stats-header">
+          <div>
+            <h1 className="page-title">Stats</h1>
+            <p className="page-subtitle">
+              {fmtInt(flights.length)} {plural(flights.length, 'flight')} flown
+              {years.length > 1 ? ` · ${years[years.length - 1]}–${years[0]}` : years.length ? ` · ${years[0]}` : ''}
+              {upcoming > 0 && <span title="Upcoming flights are counted once they depart">{` · ${upcoming} upcoming`}</span>}
+            </p>
+          </div>
+        </header>
+      )}
 
       <ScopeChips years={years} scope={scope} onChange={setScope} counts={countsByYear} total={flights.length} />
 
@@ -86,28 +117,36 @@ function StatsDashboard({ flights, upcoming, unit, clock, homeCountry }: { fligh
       </nav>
       <div className="stats-body" id="stats-summary">
         <div className="stats-top">
-          <Hero stats={stats} scope={scope} unit={unit} prev={prev} firstYear={years[years.length - 1]} />
+          <Hero stats={stats} scope={scope} unit={unit} prev={prev} firstYear={years[years.length - 1]} timeEstimated={sections.timeEstimated} />
         </div>
 
-        {stats.insights.length > 0 && <Insights items={stats.insights} />}
+        {insights.length > 0 && <Insights items={insights} />}
 
-        <div id="stats-patterns" /><TimeCharts stats={stats} scope={scope} unit={unit} clock={clock} currentYear={currentYear} />
-        <Breakdowns stats={stats} unit={unit} />
-        <Records stats={stats} unit={unit} />
-        <div id="stats-favorites" /><TopLists stats={stats} unit={unit} />
+        <div id="stats-patterns" /><TimeCharts stats={stats} scope={scope} unit={unit} clock={clock} currentYear={currentYear} sections={sections} readOnly={readOnly} />
+        <Breakdowns stats={stats} unit={unit} sections={sections} readOnly={readOnly} />
+        <Records stats={stats} unit={unit} sections={sections} readOnly={readOnly} />
+        <div id="stats-favorites" /><TopLists stats={stats} unit={unit} sections={sections} readOnly={readOnly} />
         <Places stats={stats} homeCountry={homeCountry} />
-        <Footprint stats={stats} />
+        <Footprint stats={stats} readOnly={readOnly} />
 
         <footer className="stats-notes">
           <Icon name="info" size={14} />
-          <p>
-            Distances are great-circle between airports.
-            {t.estimatedDuration - q.implausibleDuration > 0 &&
-              ` ${fmtInt(t.estimatedDuration - q.implausibleDuration)} ${plural(t.estimatedDuration - q.implausibleDuration, 'flight has', 'flights have')} no recorded time, so ${t.estimatedDuration - q.implausibleDuration === 1 ? 'its' : 'their'} time in the air is estimated from distance.`}
-            {q.implausibleDuration > 0 && ` ${fmtInt(q.implausibleDuration)} recorded ${plural(q.implausibleDuration, 'time looks', 'times look')} off for the distance (likely a time-zone mix-up) and ${q.implausibleDuration === 1 ? 'was' : 'were'} replaced by an estimate.`}
-            {q.unknownAirports > 0 && ` ${q.unknownAirports} unrecognized ${plural(q.unknownAirports, 'airport')} ${q.unknownAirports === 1 ? 'is' : 'are'} excluded from distance and places.`}
-            {q.yearPrecision + q.monthPrecision > 0 && ` ${q.yearPrecision + q.monthPrecision} ${plural(q.yearPrecision + q.monthPrecision, 'flight')} without an exact date ${q.yearPrecision + q.monthPrecision === 1 ? 'is' : 'are'} left out of day-of-week charts.`}
-          </p>
+          {readOnly ? (
+            <p>
+              Distances are great-circle between airports. Shared journals include only routes, {fields.exactDates ? 'dates' : 'months'}, airlines and aircraft, so time in the
+              air is estimated from distance{fields.exactDates ? '' : ' and day-of-week patterns aren’t shown'}.
+              {q.unknownAirports > 0 && ` ${q.unknownAirports} unrecognized ${plural(q.unknownAirports, 'airport')} ${q.unknownAirports === 1 ? 'is' : 'are'} excluded from distance and places.`}
+            </p>
+          ) : (
+            <p>
+              Distances are great-circle between airports.
+              {t.estimatedDuration - q.implausibleDuration > 0 &&
+                ` ${fmtInt(t.estimatedDuration - q.implausibleDuration)} ${plural(t.estimatedDuration - q.implausibleDuration, 'flight has', 'flights have')} no recorded time, so ${t.estimatedDuration - q.implausibleDuration === 1 ? 'its' : 'their'} time in the air is estimated from distance.`}
+              {q.implausibleDuration > 0 && ` ${fmtInt(q.implausibleDuration)} recorded ${plural(q.implausibleDuration, 'time looks', 'times look')} off for the distance (likely a time-zone mix-up) and ${q.implausibleDuration === 1 ? 'was' : 'were'} replaced by an estimate.`}
+              {q.unknownAirports > 0 && ` ${q.unknownAirports} unrecognized ${plural(q.unknownAirports, 'airport')} ${q.unknownAirports === 1 ? 'is' : 'are'} excluded from distance and places.`}
+              {q.yearPrecision + q.monthPrecision > 0 && ` ${q.yearPrecision + q.monthPrecision} ${plural(q.yearPrecision + q.monthPrecision, 'flight')} without an exact date ${q.yearPrecision + q.monthPrecision === 1 ? 'is' : 'are'} left out of day-of-week charts.`}
+            </p>
+          )}
         </footer>
       </div>
     </div>
@@ -156,12 +195,16 @@ function Insights({ items }: { items: Insight[] }) {
   );
 }
 
-function StatsEmpty({ upcoming = 0 }: { upcoming?: number }) {
+function StatsEmpty({ upcoming = 0, readOnly = false, embedded = false }: { upcoming?: number; readOnly?: boolean; embedded?: boolean }) {
   return (
     <div className="stats">
-      <header className="page-header">
-        <h1 className="page-title">Stats</h1>
-      </header>
+      {embedded ? (
+        <h2 className="visually-hidden">Stats</h2>
+      ) : (
+        <header className="page-header">
+          <h1 className="page-title">Stats</h1>
+        </header>
+      )}
       <div className="stats-empty card">
         <div className="stats-empty__art" aria-hidden>
           <svg viewBox="0 0 200 110" width="200" height="110">
@@ -173,31 +216,42 @@ function StatsEmpty({ upcoming = 0 }: { upcoming?: number }) {
             </g>
           </svg>
         </div>
-        <h2 className="empty__title">Your flying story starts here</h2>
-        <p className="muted stats-empty__text">
-          {upcoming > 0
-            ? `Stats count flights you’ve flown. Your ${upcoming === 1 ? 'upcoming flight' : `${upcoming} upcoming flights`} will show up here once ${upcoming === 1 ? 'it departs' : 'they depart'} — or import your history now.`
-            : 'Log a flight or import your history and this page fills up with distances, records, maps of where you’ve been and more.'}
-        </p>
-        <div className="stats-empty__actions">
-          <Link to="/flights/new" className="btn btn--primary btn--lg">
-            <Icon name="plus" size={18} /> Log a flight
-          </Link>
-          <Link to="/import" className="btn btn--lg">
-            <Icon name="upload" size={18} /> Import history
-          </Link>
-        </div>
+        {readOnly ? (
+          <>
+            <h2 className="empty__title">No flights shared yet</h2>
+            <p className="muted stats-empty__text">Statistics appear here once flights have been flown and shared.</p>
+          </>
+        ) : (
+          <>
+            <h2 className="empty__title">Your flying story starts here</h2>
+            <p className="muted stats-empty__text">
+              {upcoming > 0
+                ? `Stats count flights you’ve flown. Your ${upcoming === 1 ? 'upcoming flight' : `${upcoming} upcoming flights`} will show up here once ${upcoming === 1 ? 'it departs' : 'they depart'} — or import your history now.`
+                : 'Log a flight or import your history and this page fills up with distances, records, maps of where you’ve been and more.'}
+            </p>
+            <div className="stats-empty__actions">
+              <Link to="/flights/new" className="btn btn--primary btn--lg">
+                <Icon name="plus" size={18} /> Log a flight
+              </Link>
+              <Link to="/import" className="btn btn--lg">
+                <Icon name="upload" size={18} /> Import history
+              </Link>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
 }
 
-function StatsSkeleton() {
+function StatsSkeleton({ embedded = false }: { embedded?: boolean }) {
   return (
     <div className="stats" aria-busy="true" aria-label="Loading statistics">
-      <header className="page-header">
-        <h1 className="page-title">Stats</h1>
-      </header>
+      {!embedded && (
+        <header className="page-header">
+          <h1 className="page-title">Stats</h1>
+        </header>
+      )}
       <div className="stats-skel-chips">
         {[80, 56, 56, 56, 56].map((w, i) => (
           <div key={i} className="skeleton stats-skel-chip" style={{ width: w }} />

@@ -4,20 +4,32 @@ import { ColumnChart, type ColumnDatum } from './charts/ColumnChart';
 import { RadialHourChart } from './charts/RadialHourChart';
 import { CardHead, Section, Seg } from './parts';
 import { fmtCompact, fmtHour, fmtInt, fmtPct, plural, toUnit, type DistanceUnit } from './format';
+import type { StatsSections } from './sections';
 
 type Metric = 'flights' | 'distance' | 'hours';
 const FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const FULL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-export function TimeCharts({ stats, scope, unit, clock, currentYear }: { stats: FlightStats; scope: YearScope; unit: DistanceUnit; clock: '12h' | '24h'; currentYear: number }) {
+interface Props {
+  stats: FlightStats;
+  scope: YearScope;
+  unit: DistanceUnit;
+  clock: '12h' | '24h';
+  currentYear: number;
+  sections: StatsSections;
+  readOnly?: boolean;
+}
+
+export function TimeCharts({ stats, scope, unit, clock, currentYear, sections, readOnly = false }: Props) {
   const [metric, setMetric] = useState<Metric>('flights');
   const isAll = scope === 'all';
+  const estHours = sections.timeEstimated;
 
   const formatMetric = useMemo(() => {
     if (metric === 'distance') return (v: number) => `${fmtInt(v)} ${unit}`;
-    if (metric === 'hours') return (v: number) => `${fmtInt(v)} h`;
+    if (metric === 'hours') return (v: number) => `${estHours ? '≈ ' : ''}${fmtInt(v)} h`;
     return (v: number) => `${fmtInt(v)} ${plural(v, 'flight')}`;
-  }, [metric, unit]);
+  }, [metric, unit, estHours]);
   const formatTick = metric === 'distance' ? (v: number) => fmtCompact(v) : metric === 'hours' ? (v: number) => `${fmtCompact(v)}h` : (v: number) => fmtInt(v);
   const pick = (b: { flights: number; distanceKm: number; durationMin: number }) =>
     metric === 'flights' ? b.flights : metric === 'distance' ? Math.round(toUnit(b.distanceKm, unit)) : Math.round(b.durationMin / 60);
@@ -43,10 +55,10 @@ export function TimeCharts({ stats, scope, unit, clock, currentYear }: { stats: 
   const hourTotal = stats.hour.reduce((a, b) => a + b, 0);
   const hourPeak = stats.hour.indexOf(Math.max(...stats.hour));
 
-  const metricNoun = metric === 'flights' ? 'flights' : metric === 'distance' ? unit : 'hours';
+  const metricNoun = metric === 'flights' ? 'flights' : metric === 'distance' ? unit : estHours ? 'estimated hours' : 'hours';
 
   return (
-    <Section id="time" title="When you fly">
+    <Section id="time" title={readOnly ? 'Patterns' : 'When you fly'}>
       <div className="stats-grid stats-grid--time">
         <article className="card stats-card stats-card--wide">
           <CardHead
@@ -68,7 +80,7 @@ export function TimeCharts({ stats, scope, unit, clock, currentYear }: { stats: 
             options={[
               { value: 'flights', label: 'Flights' },
               { value: 'distance', label: 'Distance' },
-              { value: 'hours', label: 'Hours' },
+              { value: 'hours', label: estHours ? 'Est. hours' : 'Hours' },
             ]}
           />
           <ColumnChart
@@ -97,7 +109,7 @@ export function TimeCharts({ stats, scope, unit, clock, currentYear }: { stats: 
           </article>
         )}
 
-        {weekdayTotal > 0 && (
+        {sections.weekday && weekdayTotal > 0 && (
           <article className="card stats-card stats-card--col1">
             <CardHead
               title="Day of the week"
@@ -111,7 +123,7 @@ export function TimeCharts({ stats, scope, unit, clock, currentYear }: { stats: 
           </article>
         )}
 
-        {hourTotal > 0 && (
+        {sections.departureHour && hourTotal > 0 && (
           <article className="card stats-card stats-card--tall">
             <CardHead
               title="Departure time"

@@ -22,7 +22,7 @@ export function Places({ stats, homeCountry }: { stats: FlightStats; homeCountry
         <article className="card stats-card stats-card--wide">
           <CardHead
             title={`${countries.length} ${plural(countries.length, 'country', 'countries')}`}
-            subtitle={abroad > 0 ? `${abroad} beyond ${countries.find((c) => c.code === homeCountry.toUpperCase())?.name ?? 'home'} · sorted by flights` : 'Sorted by flights'}
+            subtitle={homeCountry && abroad > 0 ? `${abroad} beyond ${countries.find((c) => c.code === homeCountry.toUpperCase())?.name ?? 'home'} · sorted by flights` : 'Sorted by flights'}
           />
           <ul className="stats-flags">
             {visible.map((c) => (

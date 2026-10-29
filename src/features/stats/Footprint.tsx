@@ -10,7 +10,7 @@ const PER_CAPITA_T = 4.7;
 /** Rough CO₂ uptake of one mature tree per year. */
 const TREE_KG_PER_YEAR = 22;
 
-export function Footprint({ stats }: { stats: FlightStats }) {
+export function Footprint({ stats, readOnly = false }: { stats: FlightStats; readOnly?: boolean }) {
   const { totals, emissions } = stats;
   if (!(totals.co2Kg > 0)) return null;
   const t = totals.co2Kg / 1000;
@@ -26,7 +26,7 @@ export function Footprint({ stats }: { stats: FlightStats }) {
         <div className="stats-footprint__main">
           <CardHead
             title="Estimated CO₂"
-            subtitle="Your per-passenger share of each flight"
+            subtitle={readOnly ? 'Per-passenger share of each flight, as economy' : 'Your per-passenger share of each flight'}
             right={<Icon name="sparkle" size={20} className="stats-footprint__icon" />}
           />
           <p className="stats-footprint__value">

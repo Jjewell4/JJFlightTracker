@@ -1,4 +1,5 @@
-import type { Flight } from '@/lib/types';
+import type { Flight, Settings } from '@/lib/types';
+import type { FlightFields } from '@/lib/flight-source';
 import { todayLocal } from '@/lib/time';
 export const RESERVED_HANDLES = new Set([
   'account',
@@ -92,4 +93,33 @@ export function asFlights(flights: PublicFlight[]): Flight[] {
 }
 export function profileUrl(slug: string) {
   return `${window.location.origin}/${slug}`;
+}
+
+/**
+ * Fields a public journal can contain. The projection (here and in
+ * supabase/public-profiles.sql) only ever shares dates, airports, airlines and aircraft
+ * types, so everything else is unavailable; exact dates only when the owner opted in.
+ */
+export function publicFields(flights: Pick<PublicFlight, 'datePrecision'>[]): FlightFields {
+  return {
+    times: false,
+    cabin: false,
+    seat: false,
+    reason: false,
+    registration: false,
+    flightNumber: false,
+    exactDates: flights.some((f) => f.datePrecision === 'day'),
+  };
+}
+
+/** Visitors see miles where miles are customary, kilometres elsewhere. */
+export function defaultDistanceUnit(
+  locale = typeof navigator !== 'undefined' ? navigator.language : 'en-US',
+): Settings['distanceUnit'] {
+  try {
+    const region = new Intl.Locale(locale).maximize().region;
+    return region && ['US', 'GB', 'LR', 'MM'].includes(region) ? 'mi' : 'km';
+  } catch {
+    return 'km';
+  }
 }

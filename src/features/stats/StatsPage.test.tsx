@@ -63,6 +63,12 @@ describe('StatsPage', () => {
     expect(el.textContent).toContain('Records');
     expect(el.textContent).toContain('United Kingdom');
     expect(el.querySelector('a[href^="/flights/"]')).not.toBeNull();
+    // Flights per year as bars (not a smoothed line), with a value per bar for keyboard/tap.
+    expect(el.querySelector('.stats-hero [role="img"]')?.getAttribute('aria-label')).toBe('Flights per year, 2024–2025');
+    expect([...el.querySelectorAll('.stats-hero .viz-hit')].map((r) => r.getAttribute('aria-label'))).toEqual(['2024: 2 flights', '2025: 1 flight']);
+    // The owner keeps every section, including in-app links.
+    expect(el.textContent).toContain('Cabin class');
+    expect(el.textContent).toContain('Departure time');
 
     const chip2025 = [...el.querySelectorAll<HTMLButtonElement>('.stats-scope__chip')].find((b) => b.textContent?.startsWith('2025'))!;
     await act(async () => chip2025.click());

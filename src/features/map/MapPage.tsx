@@ -9,7 +9,7 @@ import type { FeatureCollection, LineString, Point } from 'geojson';
 import { Icon } from '@/components/Icon';
 import { useBackDismiss } from '@/components/useBackDismiss';
 import { useReferenceReady } from '@/data/reference';
-import { useFlights, useSettings } from '@/lib/db';
+import { useFlightSource, withFlightSource } from '@/lib/flight-source';
 import { flownFlights } from '@/lib/flight-utils';
 import { greatCirclePoints, kmToMiles } from '@/lib/geo';
 import { loadBasemap, type Basemap } from './basemap';
@@ -101,12 +101,23 @@ function FitIcon() {
   );
 }
 
-export default function MapPage() {
+interface MapPageProps {
+  /**
+   * Rendered inside another page (the public journal) instead of the app shell: fills its
+   * container and ignores the app's tab bar. Insets can be tuned with the
+   * `--map-inset-top` / `--map-inset-bottom` custom properties.
+   */
+  embedded?: boolean;
+}
+
+function MapPage({ embedded = false }: MapPageProps) {
   const ready = useReferenceReady();
+  const source = useFlightSource();
   // Only flown flights are drawn and counted (upcoming trips live on the Flights tab).
-  const allFlights = useFlights();
+  const allFlights = source.flights;
   const flights = useMemo(() => allFlights && flownFlights(allFlights), [allFlights, ready]);
-  const settings = useSettings();
+  const settings = useMemo(() => ({ distanceUnit: source.unit, clock: source.clock }), [source.unit, source.clock]);
+  const { readOnly, showFlights } = source;
   const theme = useMapTheme();
   const basemap = useBasemap();
   const [prefs, setPrefs] = usePrefs();
@@ -162,7 +173,7 @@ export default function MapPage() {
     // Layout box of the sheet (offset* ignore its entrance transform animation).
     const el = withSheet ? sheetRef.current : null;
     const sheet = el && el.offsetHeight > 0 ? { top: root.top + el.offsetTop, right: root.left + el.offsetLeft + el.offsetWidth } : undefined;
-    const tabbar = document.querySelector('.tabbar')?.getBoundingClientRect();
+    const tabbar = embedded ? undefined : document.querySelector('.tabbar')?.getBoundingClientRect();
     const tabbarTop = tabbar && tabbar.height > 0 ? tabbar.top : root.bottom;
     let bottomEdge = Math.min(bottomRef.current?.getBoundingClientRect().top ?? root.bottom, tabbarTop);
     // Side padding leaves room for IATA labels drawn beside edge airports.
@@ -173,7 +184,7 @@ export default function MapPage() {
       else bottomEdge = Math.min(bottomEdge, sheet.top);
     }
     return { top, bottom: root.bottom - bottomEdge + 20, left, right: side };
-  }, []);
+  }, [embedded]);
 
   // ---------- map lifecycle ----------
   const basemapApplied = useRef<Basemap | null>(null);
@@ -316,7 +327,7 @@ export default function MapPage() {
   return (
     <div
       ref={pageRef}
-      className={`map-page${sheetOpen ? ' has-sheet' : ''}`}
+      className={`map-page${embedded ? ' map-page--embedded' : ''}${sheetOpen ? ' has-sheet' : ''}`}
       style={{ '--map-space': theme.space, '--map-ocean': theme.ocean } as CSSProperties}
     >
       <div ref={containerRef} className="map-canvas" hidden={showStatic} />
@@ -410,7 +421,7 @@ export default function MapPage() {
         <div ref={bottomRef} className="map-bottom">
           <div className="map-glass map-stats" aria-live="polite">
             {loading || !s ? (
-              <span className="map-stats__loading">Loading your flights…</span>
+              <span className="map-stats__loading">{readOnly ? 'Loading flights…' : 'Loading your flights…'}</span>
             ) : (
               <>
                 <div className="map-stats__row">
@@ -449,6 +460,8 @@ export default function MapPage() {
           key={`a-${airportAgg.airport.ident}`}
           agg={airportAgg}
           year={year}
+          readOnly={readOnly}
+          onShowFlights={showFlights}
           onClose={() => setPick(null)}
           onSelectRoute={(id) => setPick({ kind: 'route', id })}
         />
@@ -460,6 +473,7 @@ export default function MapPage() {
           route={routeAgg}
           year={year}
           settings={settings}
+          readOnly={readOnly}
           onClose={() => setPick(null)}
           onSelectAirport={(id) => setPick({ kind: 'airport', id })}
         />
@@ -471,16 +485,25 @@ export default function MapPage() {
             <div className="map-empty__icon" aria-hidden>
               <Icon name="plane" size={26} />
             </div>
-            <h2 className="empty__title">Your map is waiting</h2>
-            <p className="muted">Log or import flights and every route you’ve flown will light up here.</p>
-            <div className="map-empty__actions">
-              <Link to="/flights/new" className="btn btn--primary btn--lg">
-                <Icon name="plus" size={18} /> Log a flight
-              </Link>
-              <Link to="/import" className="btn btn--lg">
-                <Icon name="upload" size={18} /> Import
-              </Link>
-            </div>
+            {readOnly ? (
+              <>
+                <h2 className="empty__title">No routes shared yet</h2>
+                <p className="muted">Flights will light up here once they’ve been flown and shared.</p>
+              </>
+            ) : (
+              <>
+                <h2 className="empty__title">Your map is waiting</h2>
+                <p className="muted">Log or import flights and every route you’ve flown will light up here.</p>
+                <div className="map-empty__actions">
+                  <Link to="/flights/new" className="btn btn--primary btn--lg">
+                    <Icon name="plus" size={18} /> Log a flight
+                  </Link>
+                  <Link to="/import" className="btn btn--lg">
+                    <Icon name="upload" size={18} /> Import
+                  </Link>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -494,3 +517,5 @@ export default function MapPage() {
     </div>
   );
 }
+
+export default withFlightSource(MapPage);

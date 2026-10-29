@@ -1,148 +1,156 @@
-import { useMemo, useState } from 'react';
-import { useReferenceReady, getAirline, getAirport } from '@/data/reference';
-import { airportCode } from '@/lib/flight-utils';
-import { todayLocal, formatFlightDate } from '@/lib/time';
-import {
-  computeSummary,
-  formatDistance,
-} from '@/features/flights/flight-logic';
-import { JourneyMap } from '@/features/flights/JourneyMap';
-import { asFlights, type PublicProfile } from './profile';
+import { lazy, Suspense, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { Icon, type IconName } from '@/components/Icon';
+import { PageLoader } from '@/components/PageLoader';
+import { useReferenceReady } from '@/data/reference';
+import { FlightSourceProvider, type FlightSource } from '@/lib/flight-source';
+import { computeStats } from '@/lib/stats';
+import type { Settings } from '@/lib/types';
+import { asFlights, defaultDistanceUnit, publicFields, type PublicProfile } from './profile';
+import { applyPatch, JOURNAL_VIEWS, parseView, useJournalParams, type JournalView, type ParamPatch } from './journal-state';
+import { JournalLink, type JournalNav } from './JournalLink';
+import { PublicOverview } from './PublicOverview';
+import { PublicFlightList } from './PublicFlightList';
 import './public.css';
-import '@/features/flights/Overview.css';
+
+// The full map and stats screens are shared with the owner's app and loaded on demand.
+const MapPage = lazy(() => import('@/features/map/MapPage'));
+const StatsPage = lazy(() => import('@/features/stats/StatsPage'));
+
+const VIEW_META: Record<JournalView, { label: string; icon: IconName }> = {
+  overview: { label: 'Overview', icon: 'home' },
+  map: { label: 'Map', icon: 'globe' },
+  stats: { label: 'Stats', icon: 'chart' },
+  flights: { label: 'Flights', icon: 'list' },
+};
+
+const updatedFmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+/**
+ * A read-only flight journal: overview, interactive map, full stats and flight history
+ * for one public profile. Used by the public `/<handle>` page and by the owner's preview
+ * in Settings (`preview`), which shows exactly what visitors will see.
+ */
 export function PublicDashboard({
   profile,
   preview = false,
+  brand,
+  notice,
+  unit: unitProp,
 }: {
   profile: PublicProfile;
   preview?: boolean;
+  /** Brand link shown in the page bar (public page only). */
+  brand?: ReactNode;
+  /** Status line shown under the header (e.g. connection interrupted). */
+  notice?: ReactNode;
+  /** Distance unit; defaults to the visitor's locale. */
+  unit?: Settings['distanceUnit'];
 }) {
   const ready = useReferenceReady();
-  const [query, setQuery] = useState('');
-  const [limit, setLimit] = useState(30);
-  const flights = useMemo(
-    () =>
-      asFlights(profile.flights).sort((a, b) => b.date.localeCompare(a.date)),
-    [profile.flights],
+  const params = useJournalParams(!preview);
+  const view = parseView(params.get('view'));
+  const unit = unitProp ?? defaultDistanceUnit();
+  const flights = useMemo(() => asFlights(profile.flights).sort((a, b) => b.date.localeCompare(a.date)), [profile.flights]);
+  const fields = useMemo(() => publicFields(profile.flights), [profile.flights]);
+  // `ready` is a dependency because airport lookups only resolve once reference data loads.
+  const stats = useMemo(() => (ready ? computeStats(flights, { distanceUnit: unit, audience: 'visitor' }) : undefined), [flights, unit, ready]);
+
+  const nav = useMemo<JournalNav>(
+    () => ({
+      go: (patch) => params.update(patch, 'view' in patch ? 'push' : 'replace'),
+      href: (patch) => (preview ? undefined : `${window.location.pathname}${applyPatch(window.location.search, patch)}`),
+    }),
+    [params, preview],
   );
-  const summary = useMemo(
-    () => computeSummary(flights, todayLocal()),
-    [flights, ready],
+
+  const source = useMemo<FlightSource>(
+    () => ({
+      flights,
+      readOnly: true,
+      unit,
+      clock: '12h',
+      homeCountry: '',
+      fields,
+      params,
+      showFlights: ({ airport, year }) => params.update({ view: 'flights', airport: airport ?? null, year: year == null ? null : String(year) }, 'push'),
+    }),
+    [flights, unit, fields, params],
   );
-  const filtered = useMemo(
-    () =>
-      flights.filter((f) =>
-        `${airportCode(f.from)} ${airportCode(f.to)} ${getAirport(f.from)?.city || ''} ${getAirport(f.to)?.city || ''} ${getAirport(f.from)?.name || ''} ${getAirport(f.to)?.name || ''} ${getAirline(f.airlineIcao || f.airlineIata)?.name || ''} ${f.date} ${formatFlightDate(f.date, f.datePrecision)}`
-          .toLowerCase()
-          .includes(query.toLowerCase()),
-      ),
-    [flights, query, ready],
-  );
-  if (!ready) return <p role="status">Loading airport information…</p>;
+
+  // Each view opens at its top.
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    if (!preview) window.scrollTo(0, 0);
+  }, [view, preview]);
+
+  const years = stats?.byYear;
+  const span = years?.length ? (years.length > 1 ? `${years[0].year}–${years[years.length - 1].year}` : String(years[0].year)) : '';
+  const updated = updatedFmt.format(new Date(profile.published_at));
+  const viewPatch = (v: JournalView): ParamPatch => ({ view: v === 'overview' ? null : v });
+
   return (
-    <article className="public-dashboard">
-      <header className="public-hero">
-        <p className="public-eyebrow">
-          {preview ? 'PUBLIC PROFILE PREVIEW' : 'FLIGHT JOURNAL'}
-        </p>
-        <h1>{profile.display_name}</h1>
-        <p>A life in flight.</p>
-        <dl className="public-totals">
-          <div>
-            <dt>Flights</dt>
-            <dd>{summary.flights.toLocaleString()}</dd>
-          </div>
-          <div>
-            <dt>Distance</dt>
-            <dd>{formatDistance(summary.distanceKm, 'mi')}</dd>
-          </div>
-          <div>
-            <dt>Airports</dt>
-            <dd>{summary.airports}</dd>
-          </div>
-          <div>
-            <dt>Countries</dt>
-            <dd>{summary.countries}</dd>
-          </div>
-        </dl>
-      </header>
-      <section className="card public-map" aria-label="Flight routes">
-        <JourneyMap flights={flights} />
-        <p>{summary.airports} airports. Countless memories.</p>
-      </section>
-      <section>
-        <div className="public-section-heading">
-          <h2>Flight history</h2>
-          <span>{filtered.length} flights</span>
+    <FlightSourceProvider value={source}>
+      <article className={`pj${preview ? ' pj--preview' : ''}`} data-view={view}>
+        <div className="pj-top">
+          {brand && <div className="pj-brand">{brand}</div>}
+          {preview && <p className="pj-eyebrow">Public journal preview</p>}
+          <nav className="pj-nav" aria-label="Journal sections">
+            <div className="pj-nav__track">
+              {JOURNAL_VIEWS.map((v) => (
+                <JournalLink key={v} nav={nav} to={viewPatch(v)} current={view === v} className="pj-tab">
+                  <Icon name={VIEW_META[v].icon} size={16} />
+                  <span>{VIEW_META[v].label}</span>
+                </JournalLink>
+              ))}
+            </div>
+          </nav>
         </div>
-        <label className="field">
-          <span className="field__label">Find a flight</span>
-          <input
-            className="input"
-            type="search"
-            placeholder="City, airport, airline or date"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setLimit(30);
-            }}
-          />
-        </label>
-        <ul className="public-flight-list">
-          {filtered.slice(0, limit).map((f) => (
-            <li key={f.id}>
-              <div>
-                <strong
-                  className="code"
-                  aria-label={`From ${getAirport(f.from)?.city || airportCode(f.from)} (${airportCode(f.from)}) to ${getAirport(f.to)?.city || airportCode(f.to)} (${airportCode(f.to)})`}
-                >
-                  {airportCode(f.from)} <span aria-hidden="true">→</span>{' '}
-                  {airportCode(f.to)}
-                </strong>
-                <span>
-                  {getAirport(f.from)?.city || f.from} →{' '}
-                  {getAirport(f.to)?.city || f.to}
-                </span>
-                <span>
-                  {getAirline(f.airlineIcao || f.airlineIata)?.name ||
-                    'Airline not recorded'}
-                  {f.aircraftType ? ` · ${f.aircraftType}` : ''}
-                </span>
-              </div>
-              <time
-                dateTime={
-                  f.datePrecision === 'year'
-                    ? f.date.slice(0, 4)
-                    : f.datePrecision === 'month'
-                      ? f.date.slice(0, 7)
-                      : f.date
-                }
-              >
-                {formatFlightDate(f.date, f.datePrecision)}
-              </time>
-            </li>
-          ))}
-        </ul>
-        {!filtered.length && (
-          <p className="public-empty">
-            {query
-              ? 'No flights match your search.'
-              : 'No flights have been shared yet.'}
+        <header className="pj-title">
+          <h1>{profile.display_name}</h1>
+          <p className="pj-meta">
+            <span>
+              {flights.length.toLocaleString('en-US')} {flights.length === 1 ? 'flight' : 'flights'}
+              {span && ` · ${span}`}
+            </span>
+            <span className="pj-meta__live">
+              <i aria-hidden /> {preview ? 'Preview of your public journal' : `Updated ${updated}`}
+            </span>
           </p>
-        )}
-        {filtered.length > limit && (
-          <button
-            className="btn btn--block"
-            onClick={() => setLimit((n) => n + 30)}
-          >
-            Show more flights
-          </button>
-        )}
-      </section>
-      <footer className="public-footer">
-        Updated {new Date(profile.published_at).toLocaleDateString()} · Live
-        journal; updates automatically from synced flights.
-      </footer>
-    </article>
+          {notice}
+        </header>
+
+        <div className="pj-panel">
+          {!ready || !stats ? (
+            <p role="status" className="pj-loading">
+              Loading airport information…
+            </p>
+          ) : view === 'map' ? (
+            <div className="pj-map">
+              <Suspense fallback={<PageLoader />}>
+                <MapPage embedded />
+              </Suspense>
+            </div>
+          ) : (
+            <div className="pj-content">
+              {view === 'overview' && <PublicOverview flights={flights} stats={stats} unit={unit} nav={nav} />}
+              {view === 'stats' && (
+                <Suspense fallback={<PageLoader />}>
+                  <StatsPage embedded />
+                </Suspense>
+              )}
+              {view === 'flights' && <PublicFlightList flights={flights} params={params} />}
+              <footer className="pj-footer">
+                {preview ? 'Visitors see this journal live' : `Updated ${updated} · Live journal`} · Shares routes, {fields.exactDates ? 'dates' : 'months'}, airlines and
+                aircraft types only.
+              </footer>
+            </div>
+          )}
+        </div>
+      </article>
+    </FlightSourceProvider>
   );
 }

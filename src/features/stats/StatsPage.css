@@ -12,7 +12,8 @@
 /* ---------- scope chips (sticky) ---------- */
 .stats-scope {
   position: sticky;
-  top: var(--safe-top);
+  /* Hosts with their own sticky header (public journal) set --stats-sticky-top. */
+  top: var(--stats-sticky-top, var(--safe-top));
   z-index: 20;
   margin: 0 calc(var(--space-4) * -1) var(--space-3);
   background: color-mix(in srgb, var(--bg) 82%, transparent);
@@ -182,14 +183,6 @@
 }
 .stats-hero__trend {
   margin-top: var(--space-4);
-}
-.stats-hero__trend-axis {
-  display: flex;
-  justify-content: space-between;
-  margin-top: var(--space-1);
-  font-size: 11px;
-  color: var(--text-3);
-  font-variant-numeric: tabular-nums;
 }
 
 .stats-delta {
@@ -907,7 +900,7 @@
 
 @media (min-width: 960px) {
   .stats-scope {
-    top: 0;
+    top: var(--stats-sticky-top, 0px);
     margin: 0 0 var(--space-4);
     background: color-mix(in srgb, var(--bg) 88%, transparent);
   }
@@ -1008,7 +1001,9 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
-.stats-jump { display:flex; flex-wrap:wrap; gap:var(--space-2); margin-block:var(--space-3) var(--space-6); }
-.stats-jump button { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-pill); color:var(--text-2); padding:var(--space-3) var(--space-4); min-height:44px; cursor:pointer; }
+.stats-jump { display:flex; gap:var(--space-2); margin:var(--space-2) calc(-1 * var(--space-4)) var(--space-5); padding:0 var(--space-4); overflow-x:auto; scrollbar-width:none; }
+.stats-jump::-webkit-scrollbar { display:none; }
+.stats-jump button { flex:none; background:transparent; border:1px solid var(--border); border-radius:var(--radius-pill); color:var(--text-2); padding:0 var(--space-4); min-height:44px; font-size:var(--text-sm); font-weight:550; cursor:pointer; }
+@media (min-width: 960px) { .stats-jump { margin-inline:0; padding:0; flex-wrap:wrap; } }
 .stats-jump button:hover { color:var(--accent); border-color:var(--accent); }
-[id^="stats-"] { scroll-margin-top:var(--space-6); }
+[id^="stats-"] { scroll-margin-top:var(--stats-scroll-margin, var(--space-6)); }

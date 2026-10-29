@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { todayLocal } from '@/lib/time';
-import { useFlights } from '@/lib/db';
+import { useFlights, useSettings } from '@/lib/db';
 import { useCloudSync, syncBeforeSharing } from '@/services/sync/controller';
 import { ConfirmSheet } from '@/components/Sheet';
 import {
@@ -22,6 +22,7 @@ import './public.css';
 export function PublicSharing() {
   const sync = useCloudSync();
   const flights = useFlights();
+  const settings = useSettings();
   const [saved, setSaved] = useState<PublicProfile | null>(null);
   const [slug, setSlug] = useState('');
   const [name, setName] = useState('');
@@ -111,7 +112,8 @@ export function PublicSharing() {
       <h2 className="section-title sgroup__title">Public journal</h2>
       <div className="card public-sharing">
         <p>
-          Share a live, read-only dashboard and flight history at your own URL.
+          Share a live, read-only journal — map, stats and flight history — at
+          your own URL.
         </p>
         {sync.phase !== 'signed-in' ? (
           <p className="field__hint">
@@ -271,7 +273,11 @@ export function PublicSharing() {
                 )}
                 {preview && (
                   <div className="public-preview">
-                    <PublicDashboard profile={candidate} preview />
+                    <PublicDashboard
+                      profile={candidate}
+                      preview
+                      unit={settings.distanceUnit}
+                    />
                   </div>
                 )}
               </>

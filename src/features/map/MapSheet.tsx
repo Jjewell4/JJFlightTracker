@@ -50,6 +50,8 @@ const Sheet = forwardRef<HTMLDivElement, SheetProps>(function Sheet({ onClose, c
   );
 });
 
+type SheetSettings = Pick<Settings, 'distanceUnit' | 'clock'>;
+
 const fmtDist = (km: number, unit: Settings['distanceUnit']) =>
   `${Math.round(unit === 'mi' ? kmToMiles(km) : km).toLocaleString('en-US')} ${unit}`;
 
@@ -61,8 +63,17 @@ const times = (n: number) => `${n} ${n === 1 ? 'flight' : 'flights'}`;
 
 export const AirportSheet = forwardRef<
   HTMLDivElement,
-  { agg: AirportAgg; year: number | null; onClose: () => void; onSelectRoute: (key: string) => void }
->(function AirportSheet({ agg, year, onClose, onSelectRoute }, ref) {
+  {
+    agg: AirportAgg;
+    year: number | null;
+    /** Visitor view: never links into the owner's app. */
+    readOnly?: boolean;
+    /** Hosting page's flight list (public journal); replaces the in-app link. */
+    onShowFlights?: (filter: { airport?: string; year?: number | null }) => void;
+    onClose: () => void;
+    onSelectRoute: (key: string) => void;
+  }
+>(function AirportSheet({ agg, year, readOnly = false, onShowFlights, onClose, onSelectRoute }, ref) {
   const { airport: a } = agg;
   const top = agg.destinations.slice(0, 6);
   const max = top[0]?.count ?? 1;
@@ -127,29 +138,50 @@ export const AirportSheet = forwardRef<
         </>
       )}
 
-      <Link to={`/?${params}`} className="btn btn--block map-card__cta">
-        View {times(agg.visits)}
-        <Icon name="chevron" size={16} />
-      </Link>
+      {onShowFlights ? (
+        <button type="button" className="btn btn--block map-card__cta" onClick={() => onShowFlights({ airport: a.ident, year })}>
+          View {times(agg.visits)}
+          <Icon name="chevron" size={16} />
+        </button>
+      ) : (
+        !readOnly && (
+          <Link to={`/?${params}`} className="btn btn--block map-card__cta">
+            View {times(agg.visits)}
+            <Icon name="chevron" size={16} />
+          </Link>
+        )
+      )}
     </Sheet>
   );
 });
 
 // ---------- route ----------
 
-function FlightRow({ f, route, clock }: { f: Flight; route: RouteAgg; clock: Settings['clock'] }) {
+function FlightRow({ f, route, clock, readOnly }: { f: Flight; route: RouteAgg; clock: Settings['clock']; readOnly: boolean }) {
   const forward = f.from === route.a.ident;
   const [from, to] = forward ? [route.a, route.b] : [route.b, route.a];
   const airline = flightAirlineName(f);
   const dep = formatTime(f.depTime, clock);
+  const body = (
+    <>
+      <span className="map-flight__date">{formatFlightDate(f.date, f.datePrecision)}</span>
+      <span className="map-flight__dir code">
+        {from.iata || from.ident} → {to.iata || to.ident}
+      </span>
+      <span className="map-flight__meta subtle">{[f.flightNumber, airline, readOnly ? f.aircraftType : undefined, dep].filter(Boolean).join(' · ')}</span>
+    </>
+  );
+  // Shared journals have no flight pages: rows are plain text there.
+  if (readOnly)
+    return (
+      <li>
+        <div className="map-flight map-flight--static">{body}</div>
+      </li>
+    );
   return (
     <li>
       <Link to={`/flights/${f.id}`} className="map-flight">
-        <span className="map-flight__date">{formatFlightDate(f.date, f.datePrecision)}</span>
-        <span className="map-flight__dir code">
-          {from.iata || from.ident} → {to.iata || to.ident}
-        </span>
-        <span className="map-flight__meta subtle">{[f.flightNumber, airline, dep].filter(Boolean).join(' · ')}</span>
+        {body}
         <Icon name="chevron" size={16} className="map-flight__chev" />
       </Link>
     </li>
@@ -158,8 +190,8 @@ function FlightRow({ f, route, clock }: { f: Flight; route: RouteAgg; clock: Set
 
 export const RouteSheet = forwardRef<
   HTMLDivElement,
-  { route: RouteAgg; year: number | null; settings: Settings; onClose: () => void; onSelectAirport: (ident: string) => void }
->(function RouteSheet({ route, year, settings, onClose, onSelectAirport }, ref) {
+  { route: RouteAgg; year: number | null; settings: SheetSettings; readOnly?: boolean; onClose: () => void; onSelectAirport: (ident: string) => void }
+>(function RouteSheet({ route, year, settings, readOnly = false, onClose, onSelectAirport }, ref) {
   const [all, setAll] = useState(false);
   const shown = all ? route.flights : route.flights.slice(0, 8);
   const { a, b } = route;
@@ -217,7 +249,7 @@ export const RouteSheet = forwardRef<
       <h3 className="map-card__section">Flights</h3>
       <ul className="map-flights">
         {shown.map((f) => (
-          <FlightRow key={f.id} f={f} route={route} clock={settings.clock} />
+          <FlightRow key={f.id} f={f} route={route} clock={settings.clock} readOnly={readOnly} />
         ))}
       </ul>
       {route.flights.length > shown.length && (

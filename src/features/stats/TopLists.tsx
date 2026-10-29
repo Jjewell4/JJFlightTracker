@@ -5,6 +5,7 @@ import { Icon } from '@/components/Icon';
 import type { FlightStats, RankedRoute } from '@/lib/stats';
 import { CardHead, Section } from './parts';
 import { fmtDistance, fmtInt, plural, type DistanceUnit } from './format';
+import type { StatsSections } from './sections';
 
 interface Row {
   key: string;
@@ -78,7 +79,7 @@ export const orientRoute =
   (r: RankedRoute): RankedRoute =>
     (visits.get(r.b) ?? 0) > (visits.get(r.a) ?? 0) ? { ...r, a: r.b, b: r.a, airportA: r.airportB, airportB: r.airportA } : r;
 
-export function TopLists({ stats, unit }: { stats: FlightStats; unit: DistanceUnit }) {
+export function TopLists({ stats, unit, sections, readOnly = false }: { stats: FlightStats; unit: DistanceUnit; sections: StatsSections; readOnly?: boolean }) {
   const visits = new Map(stats.airports.map((a) => [a.key, a.count]));
   const airports: Row[] = stats.airports.map((a) => ({
     key: a.key,
@@ -124,7 +125,7 @@ export function TopLists({ stats, unit }: { stats: FlightStats; unit: DistanceUn
     primary: <span className="code">{r.key}</span>,
     secondary: [r.aircraftName ?? r.aircraftType, r.airlineName].filter(Boolean).join(' · ') || undefined,
     count: r.count,
-    href: `/flights/${r.lastFlightId}`,
+    href: readOnly ? undefined : `/flights/${r.lastFlightId}`,
   }));
 
   return (
@@ -134,7 +135,14 @@ export function TopLists({ stats, unit }: { stats: FlightStats; unit: DistanceUn
         <RankList title="Airlines" subtitle={`${fmtInt(stats.unique.airlines)} ${plural(stats.unique.airlines, 'airline')} flown`} rows={airlines} noun={['flight', 'flights']} />
         <RankList title="Routes" subtitle={`${fmtInt(stats.unique.routes)} unique · both directions combined`} rows={routes} noun={['flight', 'flights']} />
         <RankList title="Aircraft" subtitle={`${fmtInt(stats.unique.aircraft)} ${plural(stats.unique.aircraft, 'type')}`} rows={aircraft} noun={['flight', 'flights']} />
-        <RankList title="Tail numbers" subtitle={`${fmtInt(stats.unique.registrations)} individual ${plural(stats.unique.registrations, 'airframe')} · tap for the latest flight`} rows={regs} noun={['flight', 'flights']} />
+        {sections.registrations && (
+          <RankList
+            title="Tail numbers"
+            subtitle={`${fmtInt(stats.unique.registrations)} individual ${plural(stats.unique.registrations, 'airframe')}${readOnly ? '' : ' · tap for the latest flight'}`}
+            rows={regs}
+            noun={['flight', 'flights']}
+          />
+        )}
       </div>
     </Section>
   );

@@ -8,6 +8,7 @@ import type { FlightStats } from '@/lib/stats';
 import { Section } from './parts';
 import { orientRoute } from './TopLists';
 import { fmtDistance, fmtInt, fmtYearMonth, plural, type DistanceUnit } from './format';
+import type { StatsSections } from './sections';
 
 interface Rec {
   id: string;
@@ -28,16 +29,16 @@ const route = (f: Flight) => (
 );
 const when = (f: Flight) => formatFlightDate(f.date, f.datePrecision);
 
-export function Records({ stats, unit }: { stats: FlightStats; unit: DistanceUnit }) {
+export function Records({ stats, unit, sections, readOnly = false }: { stats: FlightStats; unit: DistanceUnit; sections: StatsSections; readOnly?: boolean }) {
   const r = stats.records;
   const recs: Rec[] = [];
   if (r.longestDistance)
     recs.push({ id: 'longest', icon: 'globe', label: 'Longest flight', value: fmtDistance(r.longestDistance.value, unit), flight: r.longestDistance.flight, tone: 'amber' });
   if (r.shortestDistance && r.shortestDistance.flight.id !== r.longestDistance?.flight.id)
     recs.push({ id: 'shortest', icon: 'landing', label: 'Shortest flight', value: fmtDistance(r.shortestDistance.value, unit), flight: r.shortestDistance.flight });
-  if (r.longestDuration && r.longestDuration.flight.id !== r.longestDistance?.flight.id)
+  if (sections.durationRecords && r.longestDuration && r.longestDuration.flight.id !== r.longestDistance?.flight.id)
     recs.push({ id: 'longest-time', icon: 'clock', label: 'Most time aloft', value: `${r.longestDuration.estimated ? '≈ ' : ''}${formatDuration(r.longestDuration.value)}`, flight: r.longestDuration.flight, tone: 'amber' });
-  if (r.shortestDuration && r.shortestDuration.flight.id !== r.longestDuration?.flight.id && r.shortestDuration.flight.id !== r.shortestDistance?.flight.id)
+  if (sections.durationRecords && r.shortestDuration && r.shortestDuration.flight.id !== r.longestDuration?.flight.id && r.shortestDuration.flight.id !== r.shortestDistance?.flight.id)
     recs.push({ id: 'shortest-time', icon: 'clock', label: 'Quickest hop', value: `${r.shortestDuration.estimated ? '≈ ' : ''}${formatDuration(r.shortestDuration.value)}`, flight: r.shortestDuration.flight });
   if (r.first) recs.push({ id: 'first', icon: 'takeoff', label: 'First flight', value: when(r.first), flight: r.first });
   if (r.latest && r.latest.id !== r.first?.id) recs.push({ id: 'latest', icon: 'landing', label: 'Most recent', value: when(r.latest), flight: r.latest });
@@ -53,7 +54,7 @@ export function Records({ stats, unit }: { stats: FlightStats; unit: DistanceUni
       value: `${r.longestMonthStreak.months} months`,
       detail: `${fmtYearMonth(r.longestMonthStreak.start)} – ${fmtYearMonth(r.longestMonthStreak.end)}, flying every month`,
     });
-  if (r.busiestDay)
+  if (sections.busiestDay && r.busiestDay)
     recs.push({ id: 'day', icon: 'refresh', label: 'Busiest day', value: `${r.busiestDay.flights} flights`, detail: formatFlightDate(r.busiestDay.date) });
   if (r.mostFlownRoute && r.mostFlownRoute.count > 1) {
     const route = orientRoute(new Map(stats.airports.map((a) => [a.key, a.count])))(r.mostFlownRoute);
@@ -96,10 +97,11 @@ export function Records({ stats, unit }: { stats: FlightStats; unit: DistanceUni
                   rec.detail
                 )}
               </p>
-              {rec.flight && <Icon name="chevron" size={16} className="stats-record__chev" />}
+              {rec.flight && !readOnly && <Icon name="chevron" size={16} className="stats-record__chev" />}
             </>
           );
-          return rec.flight ? (
+          // Shared journals have no flight pages, so records there never link anywhere.
+          return rec.flight && !readOnly ? (
             <Link key={rec.id} to={`/flights/${rec.flight.id}`} className="stats-record card card--interactive" aria-label={`${rec.label}: ${typeof rec.value === 'string' ? rec.value : ''}, open flight`}>
               {inner}
             </Link>

@@ -812,6 +812,7 @@ export interface Insight {
 export function computeInsights(
   s: Pick<FlightStats, 'totals' | 'seat' | 'weekday' | 'hour' | 'cabin' | 'reason' | 'haul'>,
   unit: 'mi' | 'km' = 'km',
+  audience: StatsOptions['audience'] = 'owner',
 ): Insight[] {
   const out: Insight[] = [];
   const pct = (x: number) => `${Math.round(x * 100)}%`;
@@ -826,7 +827,7 @@ export function computeInsights(
     const max = Math.max(...s.weekday);
     const i = s.weekday.indexOf(max);
     const full = ['Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays', 'Sundays'][i];
-    out.push({ id: 'weekday', title: `${full} are for flying`, detail: `${pct(max / weekdayTotal)} of your flights depart on a ${full.slice(0, -1)}` });
+    out.push({ id: 'weekday', title: `${full} are for flying`, detail: `${pct(max / weekdayTotal)} of ${audience === 'visitor' ? '' : 'your '}flights depart on a ${full.slice(0, -1)}` });
   }
   const hourTotal = s.hour.reduce((a, b) => a + b, 0);
   if (hourTotal >= 5) {
@@ -874,6 +875,8 @@ export interface StatsOptions {
   homeCountry?: string;
   /** Unit for distances quoted in insight sentences (default km). */
   distanceUnit?: 'mi' | 'km';
+  /** Who reads the sentences: the log's owner ("your flights") or a visitor (neutral). */
+  audience?: 'owner' | 'visitor';
 }
 
 export interface FlightStats {
@@ -955,7 +958,7 @@ export function computeStats(flights: Flight[], opts: StatsOptions = {}): Flight
     byYear: flightsByYear(rs),
     byMonth: flightsByMonth(rs),
     records: computeRecords(rs, { routes, airports }),
-    insights: computeInsights(partial, opts.distanceUnit),
+    insights: computeInsights(partial, opts.distanceUnit, opts.audience),
     emissions: emissionsSplit(rs),
     quality: {
       unknownAirports: unknownAirportKeys.size,

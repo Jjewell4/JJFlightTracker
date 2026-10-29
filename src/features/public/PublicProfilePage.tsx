@@ -2,6 +2,18 @@ import { useEffect, useState } from 'react';
 import { loadPublicProfile } from './api';
 import type { PublicProfile } from './profile';
 import { PublicDashboard } from './PublicDashboard';
+
+/** Polls return a fresh object every time; keep the old one when nothing changed. */
+function sameProfile(a: PublicProfile, b: PublicProfile) {
+  return (
+    a.slug === b.slug &&
+    a.display_name === b.display_name &&
+    a.published_at === b.published_at &&
+    a.exact_dates === b.exact_dates &&
+    JSON.stringify(a.flights) === JSON.stringify(b.flights)
+  );
+}
+
 export default function PublicProfilePage({ slug }: { slug: string }) {
   const [profile, setProfile] = useState<PublicProfile | null>();
   const [error, setError] = useState(false);
@@ -17,7 +29,7 @@ export default function PublicProfilePage({ slug }: { slug: string }) {
       try {
         const next = await loadPublicProfile(slug);
         if (live) {
-          setProfile(next);
+          setProfile((prev) => (prev && next && sameProfile(prev, next) ? prev : next));
           setError(false);
         }
       } catch {
@@ -47,18 +59,32 @@ export default function PublicProfilePage({ slug }: { slug: string }) {
       document.title = old;
     };
   }, [profile]);
+  const brand = (
+    <a className="public-brand" href="/">
+      <img src="/favicon.svg" width="28" height="28" alt="" /> FlightJournal
+    </a>
+  );
+  if (profile)
+    return (
+      <main className="public-page">
+        <PublicDashboard
+          profile={profile}
+          brand={brand}
+          notice={
+            error && (
+              <p role="status" className="pj-notice">
+                Connection interrupted. Showing the last loaded flights; updates
+                will resume automatically.
+              </p>
+            )
+          }
+        />
+      </main>
+    );
   return (
-    <main className="public-page">
-      <a className="public-brand" href="/">
-        <img src="/favicon.svg" width="28" height="28" alt="" /> FlightJournal
-      </a>
-      {error && profile && (
-        <p role="status">
-          Connection interrupted. Showing the last loaded flights; updates will
-          resume automatically.
-        </p>
-      )}
-      {error && !profile ? (
+    <main className="public-page public-page--state">
+      <div className="pj-bar">{brand}</div>
+      {error ? (
         <section className="public-empty">
           <h1>Couldn’t load this journal</h1>
           <p>Check your connection and try again.</p>
@@ -67,14 +93,14 @@ export default function PublicProfilePage({ slug }: { slug: string }) {
           </button>
         </section>
       ) : profile === undefined ? (
-        <p role="status">Loading flight journal…</p>
-      ) : profile === null ? (
+        <p role="status" className="public-empty">
+          Loading flight journal…
+        </p>
+      ) : (
         <section className="public-empty">
           <h1>This journal isn’t public</h1>
           <p>The URL may have changed, or the owner has stopped sharing.</p>
         </section>
-      ) : (
-        <PublicDashboard profile={profile} />
       )}
     </main>
   );

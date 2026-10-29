@@ -1,5 +1,12 @@
 /* ---------- Map screen ---------- */
+/*
+ * Overlay insets: in the app the map runs under the status bar and above the tab bar.
+ * Embedded maps (public journal) sit below their host's header and have no tab bar;
+ * hosts may override these custom properties.
+ */
 .map-page {
+  --map-inset-top: var(--safe-top);
+  --map-inset-bottom: calc(var(--tabbar-h) + var(--safe-bottom));
   position: relative;
   height: 100dvh;
   overflow: hidden;
@@ -9,6 +16,14 @@
     var(--map-space, var(--bg));
   -webkit-user-select: none;
   user-select: none;
+  /* Lets overlays adapt to narrow embedded maps (e.g. the public journal preview). */
+  container-type: inline-size;
+}
+
+.map-page--embedded {
+  --map-inset-top: 0px;
+  --map-inset-bottom: var(--safe-bottom);
+  height: 100%;
 }
 
 .map-canvas {
@@ -35,7 +50,7 @@
 .map-top {
   position: absolute;
   z-index: 10;
-  top: calc(var(--safe-top) + var(--space-3));
+  top: calc(var(--map-inset-top) + var(--space-3));
   left: var(--space-3);
   right: var(--space-3);
   display: flex;
@@ -265,7 +280,7 @@
   z-index: 5;
   left: var(--space-3);
   right: var(--space-3);
-  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + var(--space-3));
+  bottom: calc(var(--map-inset-bottom) + var(--space-3));
   display: flex;
   justify-content: center;
   pointer-events: none;
@@ -296,8 +311,8 @@
   margin: 0 8px;
   color: var(--text-3);
 }
-@media (max-width: 380px) {
-  /* Keep all four figures on one line on small Android phones. */
+@container (max-width: 380px) {
+  /* Keep all four figures on one line on small phones and narrow embedded maps. */
   .map-stats {
     padding-inline: var(--space-3);
   }
@@ -306,6 +321,17 @@
   }
   .map-stats__row > span + span::before {
     margin: 0 5px;
+  }
+}
+@container (max-width: 340px) {
+  /* Narrow embedded maps: two figures per line instead of a ragged wrap. */
+  .map-stats__row {
+    display: grid;
+    grid-template-columns: auto auto;
+    column-gap: var(--space-4);
+  }
+  .map-stats__row > span + span::before {
+    content: none;
   }
 }
 .map-stats__row b {
@@ -340,7 +366,7 @@
   z-index: 20;
   left: var(--space-2);
   right: var(--space-2);
-  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + var(--space-2));
+  bottom: calc(var(--map-inset-bottom) + var(--space-2));
   display: flex;
   flex-direction: column;
   max-height: min(52dvh, 540px);
@@ -642,6 +668,15 @@
   grid-area: chev;
   color: var(--text-3);
 }
+.map-flight--static {
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'date dir'
+    'meta meta';
+}
+.map-flight--static:active {
+  background: none;
+}
 
 /* ---------- empty / toast ---------- */
 .map-empty {
@@ -650,7 +685,7 @@
   z-index: 6;
   display: grid;
   place-items: center;
-  padding: var(--space-6) var(--space-4) calc(var(--tabbar-h) + var(--safe-bottom) + var(--space-6));
+  padding: var(--space-6) var(--space-4) calc(var(--map-inset-bottom) + var(--space-6));
   pointer-events: none;
 }
 .map-empty__card {
@@ -687,7 +722,7 @@
 .map-toast {
   position: absolute;
   z-index: 30;
-  top: calc(var(--safe-top) + 76px);
+  top: calc(var(--map-inset-top) + 76px);
   left: 50%;
   translate: -50% 0;
   display: flex;
@@ -709,7 +744,7 @@
 .map-canvas--static {
   display: grid;
   place-items: center;
-  padding: calc(var(--safe-top) + 80px) var(--space-2) calc(var(--tabbar-h) + var(--safe-bottom) + 90px);
+  padding: calc(var(--map-inset-top) + 80px) var(--space-2) calc(var(--map-inset-bottom) + 90px);
 }
 .map-static {
   width: 100%;
@@ -745,7 +780,7 @@
 }
 .map-static__note {
   position: absolute;
-  top: calc(var(--safe-top) + 76px);
+  top: calc(var(--map-inset-top) + 76px);
   left: 50%;
   translate: -50% 0;
   display: flex;
@@ -761,7 +796,7 @@
 /* On phones the attribution sits just above the stats pill (which sits above the tab bar). */
 .map-page .maplibregl-ctrl-bottom-right,
 .map-page .maplibregl-ctrl-bottom-left {
-  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 84px);
+  bottom: calc(var(--map-inset-bottom) + 84px);
 }
 .map-page .maplibregl-ctrl-attrib {
   font-family: var(--font-sans);
@@ -795,7 +830,7 @@
 /* ---------- wide screens ---------- */
 @media (min-width: 720px) {
   .map-top {
-    top: calc(var(--safe-top) + var(--space-4));
+    top: calc(var(--map-inset-top) + var(--space-4));
     left: var(--space-4);
     right: var(--space-4);
   }
@@ -807,7 +842,7 @@
     left: var(--space-4);
     right: auto;
     width: 400px;
-    max-height: calc(100% - var(--safe-top) - 180px);
+    max-height: calc(100% - var(--map-inset-top) - 180px);
   }
 }
 
@@ -829,4 +864,9 @@
   .map-canvas--static {
     padding-bottom: 90px;
   }
+}
+
+/* Embedded maps are shorter than the app's full screen: keep more of the map visible. */
+.map-page--embedded .map-sheet {
+  max-height: min(56%, 52dvh, 540px);
 }
