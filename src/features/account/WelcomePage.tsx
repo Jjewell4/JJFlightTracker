@@ -30,7 +30,7 @@ export default function WelcomePage() {
     <div className="welcome">
       <div className="welcome__inner animate-in">
         <div className="welcome__brand">
-          <img src={`${import.meta.env.BASE_URL}favicon.svg`} width="56" height="56" alt="" />
+          <img className="brand-mark brand-mark--hero" src={`${import.meta.env.BASE_URL}favicon.svg`} width="64" height="64" alt="" />
           <h1 className="welcome__title">FlightJournal</h1>
           <p className="welcome__tagline">Every flight, route and mile — beautifully kept.</p>
         </div>

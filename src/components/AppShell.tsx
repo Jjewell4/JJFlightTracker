@@ -13,24 +13,36 @@ interface NavItem {
   end?: boolean;
 }
 
-const NAV: NavItem[] = [
-  { to: '/', label: 'Home', icon: 'home', end: true },
-  { to: '/flights', label: 'Log', icon: 'plane', end: true },
-  { to: '/map', label: 'Map', icon: 'globe' },
-  { to: '/stats', label: 'Stats', icon: 'chart' },
-  { to: '/settings', label: 'More', icon: 'settings' },
-];
+const HOME: NavItem = { to: '/', label: 'Home', icon: 'home', end: true };
+const LOG: NavItem = { to: '/flights', label: 'Log', icon: 'plane', end: true };
+const MAP: NavItem = { to: '/map', label: 'Map', icon: 'globe' };
+const STATS: NavItem = { to: '/stats', label: 'Stats', icon: 'chart' };
+const SETTINGS: NavItem = { to: '/settings', label: 'Settings', icon: 'settings' };
+const IMPORT: NavItem = { to: '/import', label: 'Import', icon: 'upload' };
+
+/** Phone tab bar, either side of the centre "Log a flight" button. Settings lives in the top bar. */
+const TABS_LEFT = [HOME, LOG];
+const TABS_RIGHT = [MAP, STATS];
+/** Wide-screen sidebar. */
+const SIDE_NAV = [HOME, LOG, MAP, STATS, SETTINGS, IMPORT];
+
+/** The app mark (same artwork as the favicon and launcher icons). */
+function BrandMark({ size }: { size: number }) {
+  return <img className="brand-mark" src={`${import.meta.env.BASE_URL}favicon.svg`} width={size} height={size} alt="" />;
+}
 
 /**
- * Responsive app frame: bottom tab bar with a raised "add" button on phones,
- * left sidebar on wide screens. Pages render inside <main>.
+ * Responsive app frame. Phones: slim top bar (brand, settings, account) on the main tabs and a
+ * bottom tab bar with a raised centre "Log a flight" button. Wide screens: left sidebar.
+ * Pages render inside <main>.
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const isForm = pathname.startsWith('/flights/new') || pathname.endsWith('/edit');
   const isMap = pathname === '/map';
   const isBare = pathname === '/welcome';
-  // Top-level tabs get the slim app bar (logo → home, account avatar) on phones.
+  // Top-level tabs get the slim app bar (logo → home, settings, account) on phones. The map is
+  // full-bleed with its own controls; settings is one tab away from there.
   const hasTopbar = pathname === '/' || pathname === '/flights' || pathname === '/stats' || pathname === '/settings';
   const sync = useCloudSync();
 
@@ -74,36 +86,37 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className={`shell${isMap ? ' shell--fullbleed' : ''}${isBare ? ' shell--bare' : ''}`}>
       <aside className="shell__sidebar" aria-label="Primary">
         <Link to="/" className="shell__brand" aria-label="FlightJournal — home">
-          <img className="brand-icon" src={`${import.meta.env.BASE_URL}favicon.svg`} width="32" height="32" alt="" />
+          <BrandMark size={32} />
           FlightJournal
         </Link>
-        <NavLink to="/flights/new" className="shell__add-wide">
-          <Icon name="plus" size={18} /> Log a flight
-        </NavLink>
+        <Link to="/flights/new" className="shell__add-wide">
+          <Icon name="plus" size={18} strokeWidth={2.25} /> Log a flight
+        </Link>
         <nav className="shell__side-nav">
-          {NAV.map((n) => (
+          {SIDE_NAV.map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end} className="shell__side-link">
               <Icon name={n.icon} size={20} />
-              {n.label === 'More' ? 'Settings' : n.label}
+              {n.label}
             </NavLink>
           ))}
-          <NavLink to="/import" className="shell__side-link">
-            <Icon name="upload" size={20} />
-            Import
-          </NavLink>
         </nav>
         <SidebarAccount />
       </aside>
 
       <main className="shell__main">
         {hasTopbar && (
-          <div className="topbar">
+          <header className="topbar">
             <Link to="/" className="topbar__brand" aria-label="FlightJournal — home">
-              <img className="brand-icon" src={`${import.meta.env.BASE_URL}favicon.svg`} width="32" height="32" alt="" />
+              <BrandMark size={30} />
               FlightJournal
             </Link>
-            <AccountButton />
-          </div>
+            <div className="topbar__actions">
+              <NavLink to="/settings" className="topbar__btn" aria-label="Settings" title="Settings">
+                <Icon name="settings" size={22} />
+              </NavLink>
+              <AccountButton />
+            </div>
+          </header>
         )}
         {children}
       </main>
@@ -116,14 +129,24 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {!isForm && !isBare && (
         <nav className="tabbar" aria-label="Primary">
-          {NAV.map((n) => (
-            <NavLink key={n.to} to={n.to} end={n.end} className="tabbar__link">
-              <Icon name={n.icon} size={22} />
-              <span>{n.label}</span>
-            </NavLink>
-          ))}
+          {TABS_LEFT.map(tab)}
+          <Link to="/flights/new" className="tabbar__add" aria-label="Log a flight" title="Log a flight">
+            <span className="tabbar__add-disc">
+              <Icon name="plus" size={28} strokeWidth={2.5} />
+            </span>
+          </Link>
+          {TABS_RIGHT.map(tab)}
         </nav>
       )}
     </div>
+  );
+}
+
+function tab(n: NavItem) {
+  return (
+    <NavLink key={n.to} to={n.to} end={n.end} className="tabbar__link">
+      <Icon name={n.icon} size={24} />
+      <span>{n.label}</span>
+    </NavLink>
   );
 }

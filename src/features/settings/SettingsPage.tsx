@@ -153,7 +153,7 @@ export default function SettingsPage() {
     <div className="settings animate-in">
       <header className="page-header">
         <div>
-          <h1 className="page-title">More</h1>
+          <h1 className="page-title">Settings</h1>
           <p className="page-subtitle">Import, export and make the app yours.</p>
         </div>
       </header>

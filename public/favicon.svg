@@ -1,8 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <defs><linearGradient id="sky" x2="1" y2="1"><stop stop-color="#9fe1ff"/><stop offset="1" stop-color="#2f7bff"/></linearGradient></defs>
-  <rect width="512" height="512" rx="116" fill="#101829"/>
-  <g transform="translate(256 256) scale(0.94) translate(-256 -256)">
-    <circle cx="256" cy="256" r="166" fill="none" stroke="#5cc8ff" stroke-opacity=".22" stroke-width="12"/>
-    <path d="M118 353 Q179 407 330 300" fill="none" stroke="#ffb547" stroke-width="20" stroke-linecap="round"/>
-    <g transform="translate(274 239) rotate(38) scale(14) translate(-12 -12)"><path d="M10.2 21 12 19.5 13.8 21v-1.5l-1-1.2V13l8.2 3v-2L12.8 9V4.5a.8.8 0 0 0-1.6 0V9L3 14v2l8.2-3v5.3l-1 1.2z" fill="url(#sky)"/></g>
-  </g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs>
+  <radialGradient id="fj-bg" cx=".66" cy=".26" r=".95">
+    <stop offset="0" stop-color="#2a4c96"/><stop offset=".5" stop-color="#16295a"/><stop offset="1" stop-color="#0c1631"/>
+  </radialGradient>
+  <linearGradient id="fj-plane" gradientUnits="userSpaceOnUse" x1="0" y1="4" x2="0" y2="96">
+    <stop offset="0" stop-color="#d2f3ff"/><stop offset=".45" stop-color="#6fd0ff"/><stop offset="1" stop-color="#3a8dff"/>
+  </linearGradient>
+  <mask id="fj-ko" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+    <rect width="512" height="512" fill="#fff"/>
+    <path transform="translate(304 174) scale(2.06) translate(-50 -50)" d="M50 4C55 4 57 9 57 16V36L95 58V66L57 56V76L72 86V93L54 89L52 96H48L46 89L28 93V86L43 76V56L5 66V58L43 36V16C43 9 45 4 50 4Z" fill="#000" stroke="#000" stroke-width="9.70873786407767" stroke-linejoin="round"/>
+  </mask></defs><rect width="512" height="512" rx="112" fill="url(#fj-bg)"/><g transform="translate(256 256) scale(1) translate(-256 -256)"><g mask="url(#fj-ko)">
+    <path d="M304 234V324A73 73 0 0 1 158 324" fill="none" stroke="#ffb547" stroke-width="50" stroke-linecap="round"/>
+    <circle cx="158" cy="324" r="42" fill="#ffb547"/><circle cx="158" cy="324" r="16" fill="#0c1631"/></g><path transform="translate(304 174) scale(2.06) translate(-50 -50)" d="M50 4C55 4 57 9 57 16V36L95 58V66L57 56V76L72 86V93L54 89L52 96H48L46 89L28 93V86L43 76V56L5 66V58L43 36V16C43 9 45 4 50 4Z" fill="url(#fj-plane)" stroke="url(#fj-plane)" stroke-width="3" stroke-linejoin="round"/></g></svg>

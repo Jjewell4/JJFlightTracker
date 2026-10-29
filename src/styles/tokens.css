@@ -38,7 +38,15 @@
   --dur: 220ms;
   --dur-slow: 400ms;
 
-  --tabbar-h: 64px;
+  /*
+   * Phone tab bar geometry. --tabbar-h is the space reserved above the bottom edge — the bar plus
+   * the part of the raised "Log a flight" button above it — so page padding and every overlay
+   * pinned above the tab bar (toasts, update prompt, the map's stats card…) clears the button.
+   */
+  --tabbar-bar-h: 64px;
+  --tabbar-raise: 14px;
+  --tabbar-h: calc(var(--tabbar-bar-h) + var(--tabbar-raise));
+  --tabbar-add: 56px;
   --header-h: 56px;
   --content-max: 1120px;
   --safe-top: env(safe-area-inset-top, 0px);
@@ -165,4 +173,10 @@
   --starfield-opacity: 0;
   --scrim: rgba(10, 16, 30, 0.35);
   color-scheme: light;
+}
+
+@media (min-width: 960px) {
+  :root {
+    --tabbar-raise: 0px;
+  }
 }
