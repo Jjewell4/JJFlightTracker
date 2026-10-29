@@ -23,6 +23,8 @@ export interface StatsSections {
   durationRecords: boolean;
   /** "Busiest day" record — needs day-precision dates. */
   busiestDay: boolean;
+  /** "Time away" travel calendar — needs day-precision dates (trips are built from them). */
+  calendar: boolean;
   /** Time in the air is always a distance-based estimate (no recorded times). */
   timeEstimated: boolean;
 }
@@ -39,6 +41,7 @@ export function statsSections(fields: FlightFields, stats: Pick<FlightStats, 'we
     registrations: fields.registration && stats.registrations.length > 0,
     durationRecords: fields.times,
     busiestDay: fields.exactDates,
+    calendar: fields.exactDates && sum(stats.weekday) > 0,
     timeEstimated: !fields.times,
   };
 }

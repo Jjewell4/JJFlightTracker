@@ -9,6 +9,7 @@ import type { Flight } from '@/lib/types';
 import { insightAvailable, statsSections } from './sections';
 import { Hero } from './Hero';
 import { TimeCharts } from './TimeCharts';
+import { TravelCalendar } from './TravelCalendar';
 import { Breakdowns } from './Breakdowns';
 import { TopLists } from './TopLists';
 import { Records } from './Records';
@@ -84,6 +85,11 @@ function StatsDashboard({ flights, upcoming, unit, clock, homeCountry, readOnly,
     const before = filterByYear(flights, scope - 1);
     return before.length ? summarizeTotals(before) : undefined;
   }, [flights, scope]);
+  // Lifetime distance through the end of the selected year, for the Earth/Moon tile.
+  const lifetimeKm = useMemo(
+    () => (scope === 'all' ? undefined : summarizeTotals(flights.filter((f) => flightYear(f) <= scope)).distanceKm),
+    [flights, scope],
+  );
   const countsByYear = useMemo(() => {
     const m = new Map<number, number>();
     for (const f of flights) m.set(flightYear(f), (m.get(flightYear(f)) ?? 0) + 1);
@@ -117,12 +123,13 @@ function StatsDashboard({ flights, upcoming, unit, clock, homeCountry, readOnly,
       </nav>
       <div className="stats-body" id="stats-summary">
         <div className="stats-top">
-          <Hero stats={stats} scope={scope} unit={unit} prev={prev} firstYear={years[years.length - 1]} timeEstimated={sections.timeEstimated} />
+          <Hero stats={stats} scope={scope} unit={unit} prev={prev} firstYear={years[years.length - 1]} timeEstimated={sections.timeEstimated} lifetimeKm={lifetimeKm} />
         </div>
 
         {insights.length > 0 && <Insights items={insights} />}
 
         <div id="stats-patterns" /><TimeCharts stats={stats} scope={scope} unit={unit} clock={clock} currentYear={currentYear} sections={sections} readOnly={readOnly} />
+        {sections.calendar && <TravelCalendar flights={flights} scope={scope} readOnly={readOnly} />}
         <Breakdowns stats={stats} unit={unit} sections={sections} readOnly={readOnly} />
         <Records stats={stats} unit={unit} sections={sections} readOnly={readOnly} />
         <div id="stats-favorites" /><TopLists stats={stats} unit={unit} sections={sections} readOnly={readOnly} />

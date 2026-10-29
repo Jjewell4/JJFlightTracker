@@ -17,6 +17,7 @@ describe('stats section availability', () => {
       registrations: true,
       durationRecords: true,
       busiestDay: true,
+      calendar: true,
       timeEstimated: false,
     });
     // Charts that would be empty are skipped, but the categorical prompts stay.
@@ -35,14 +36,17 @@ describe('stats section availability', () => {
       registrations: false,
       durationRecords: false,
       busiestDay: false,
+      calendar: false,
       timeEstimated: true,
     });
   });
 
   it('shows day-of-week patterns only when the owner shares exact dates', () => {
     const exact = publicFields([{ datePrecision: 'day' }, { datePrecision: 'year' }]);
-    expect(statsSections(exact, withData)).toMatchObject({ weekday: true, busiestDay: true, departureHour: false, timeEstimated: true });
+    expect(statsSections(exact, withData)).toMatchObject({ weekday: true, busiestDay: true, calendar: true, departureHour: false, timeEstimated: true });
     expect(statsSections(exact, noData).weekday).toBe(false);
+    // No day-precision flights in scope: no calendar either.
+    expect(statsSections(exact, noData).calendar).toBe(false);
   });
 
   it('drops insights about fields a source does not have', () => {

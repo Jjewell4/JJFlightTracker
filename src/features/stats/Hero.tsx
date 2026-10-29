@@ -4,11 +4,11 @@ import type { FlightStats, Totals, YearScope } from '@/lib/stats';
 import { Icon } from '@/components/Icon';
 import { TrendBars } from './charts/TrendBars';
 import { trendData } from './trend';
+import { ARC_PATH, EARTH_LAP_KM, MOON_KM, journeyModel, pointOnArc } from './journey';
 import { CountUp } from './parts';
 import {
   fmt1,
   fmtInt,
-  fmtTimes,
   plural,
   toUnit,
   type DistanceUnit,
@@ -22,6 +22,8 @@ interface Props {
   firstYear?: number;
   /** No recorded times (public journals): time in the air is a distance estimate. */
   timeEstimated?: boolean;
+  /** Lifetime distance through the end of the selected year (single-year scope). */
+  lifetimeKm?: number;
 }
 
 function Delta({
@@ -47,7 +49,7 @@ function Delta({
   );
 }
 
-export function Hero({ stats, scope, unit, prev, firstYear, timeEstimated = false }: Props) {
+export function Hero({ stats, scope, unit, prev, firstYear, timeEstimated = false, lifetimeKm }: Props) {
   const t = stats.totals;
   const other: DistanceUnit = unit === 'mi' ? 'km' : 'mi';
   const trend = trendData(stats, scope);
@@ -175,7 +177,7 @@ export function Hero({ stats, scope, unit, prev, firstYear, timeEstimated = fals
         </Tile>
       </div>
 
-      <Journey totals={t} unit={unit} />
+      <Journey totals={t} unit={unit} scope={scope} lifetimeKm={lifetimeKm} prevKm={prev?.distanceKm} />
     </>
   );
 }
@@ -242,45 +244,51 @@ const earthLand = (() => {
   return dots.join('');
 })();
 
-/** The original Earth-to-Moon arc, with clearer planet detail and milestone semantics. */
+/**
+ * Earth-to-Moon journey: how far the selected scope's flying would take you. The plane sits at
+ * the real fraction of the way to the Moon, the ring around the Earth fills with the current lap,
+ * and for a single year the progress bar shows the lifetime total at the end of that year.
+ */
 export function Journey({
   totals,
   unit,
+  scope = 'all',
+  lifetimeKm,
+  prevKm,
 }: {
   totals: Totals;
   unit: DistanceUnit;
+  scope?: YearScope;
+  lifetimeKm?: number;
+  prevKm?: number;
 }) {
   const id = useId().replace(/:/g, '');
-  const trips = Math.max(0, Number.isFinite(totals.toMoon) ? totals.toMoon : 0);
-  const completed = Math.floor(trips),
-    progress = trips - completed;
-  const percentage = Math.min(99, Math.round(progress * 100));
+  const m = journeyModel(totals.distanceKm, { scope, unit, lifetimeKm, prevKm });
+  const plane = pointOnArc(Math.max(0.05, m.arcProgress));
+  const traveled = Math.max(0, Math.min(1, m.arcProgress));
   return (
-    <section
-      className="stats-journey card celestial-journey"
-      aria-label="Distance comparisons"
-    >
+    <section className="stats-journey card celestial-journey" aria-label={`Distance comparisons, ${m.heading.toLowerCase()}`}>
+      <p className="celestial-journey__heading">
+        <span>{m.heading}</span>
+        <strong className="tabular">{m.distanceLabel}</strong>
+      </p>
       <div className="celestial-journey__numbers">
         <div>
           <strong>
-            {fmtTimes(totals.aroundEarth)}
-            <small>×</small>
+            {m.earth.value}
+            <small>{m.earth.suffix}</small>
           </strong>
-          <span>around the Earth</span>
+          <span>{m.earth.caption}</span>
         </div>
         <div>
           <strong>
-            {fmtTimes(trips)}
-            <small>×</small>
+            {m.moonCmp.value}
+            <small>{m.moonCmp.suffix}</small>
           </strong>
-          <span>the distance to the Moon</span>
+          <span>{m.moonCmp.caption}</span>
         </div>
       </div>
-      <svg
-        viewBox="0 0 400 178"
-        className="celestial-journey__art"
-        aria-hidden="true"
-      >
+      <svg viewBox="0 0 400 178" className="celestial-journey__art" aria-hidden="true">
         <defs>
           <radialGradient id={`${id}-earth`} cx="28%" cy="25%" r="85%">
             <stop stopColor="var(--accent)" />
@@ -291,9 +299,9 @@ export function Journey({
             <stop stopColor="var(--text)" />
             <stop offset="1" stopColor="var(--text-3)" />
           </radialGradient>
-          <linearGradient id={`${id}-route`}>
+          <linearGradient id={`${id}-route`} gradientUnits="userSpaceOnUse" x1="83" y1="0" x2="324" y2="0">
             <stop stopColor="var(--accent)" />
-            <stop offset=".3" stopColor="var(--accent-2)" />
+            <stop offset=".35" stopColor="var(--accent-2)" />
             <stop offset="1" stopColor="var(--accent-2)" />
           </linearGradient>
         </defs>
@@ -304,68 +312,50 @@ export function Journey({
           <circle cx="361" cy="26" r="1" />
           <path d="M176 133v6m-3-3h6M304 16v6m-3-3h6" />
         </g>
-        <circle
-          cx="58"
-          cy="117"
-          r="43"
-          className="celestial-journey__atmosphere"
-        />
+        <circle cx="58" cy="117" r="43" className="celestial-journey__atmosphere" />
+        {m.lapProgress > 0.01 && (
+          <circle
+            cx="58"
+            cy="117"
+            r="43"
+            pathLength={1}
+            strokeDasharray={`${m.lapProgress} 1`}
+            transform="rotate(-90 58 117)"
+            className="celestial-journey__lap"
+          />
+        )}
         <circle cx="58" cy="117" r="34" fill={`url(#${id}-earth)`} />
         <path d={earthLand} className="celestial-journey__land" />
-        <path
-          d="M83 94Q203 -7 324 66"
-          className="celestial-journey__route-glow"
-        />
-        <path
-          d="M83 94Q203 -7 324 66"
-          fill="none"
-          stroke={`url(#${id}-route)`}
-          strokeWidth="2.2"
-          strokeLinecap="round"
-        />
+        <path d={ARC_PATH} className="celestial-journey__route-rest" pathLength={1} />
+        {traveled > 0 && (
+          <>
+            <path d={ARC_PATH} className="celestial-journey__route-glow" pathLength={1} strokeDasharray={`${traveled} 1`} />
+            <path d={ARC_PATH} fill="none" stroke={`url(#${id}-route)`} strokeWidth="2.4" strokeLinecap="round" pathLength={1} strokeDasharray={`${traveled} 1`} />
+          </>
+        )}
         <circle cx="83" cy="94" r="3" className="celestial-journey__origin" />
-        <g
-          transform="translate(285 47) rotate(112) translate(-11 -11)"
-          className="celestial-journey__plane"
-        >
-          <Icon name="plane" size={22} />
-        </g>
-        <circle
-          cx="345"
-          cy="74"
-          r="22"
-          className="celestial-journey__moon-halo"
-        />
+        {m.km > 0 && (
+          <g transform={`translate(${plane.x.toFixed(1)} ${plane.y.toFixed(1)}) rotate(${(plane.angle + 90).toFixed(1)}) translate(-11 -11)`} className="celestial-journey__plane">
+            <Icon name="plane" size={22} />
+          </g>
+        )}
+        <circle cx="345" cy="74" r="22" className="celestial-journey__moon-halo" />
         <circle cx="345" cy="74" r="18" fill={`url(#${id}-moon)`} />
         <g className="celestial-journey__craters">
           <circle cx="339" cy="69" r="4" />
           <circle cx="351" cy="79" r="5" />
           <circle cx="352" cy="64" r="2" />
         </g>
-        <text
-          x="58"
-          y="171"
-          textAnchor="middle"
-          className="celestial-journey__planet-label"
-        >
+        <text x="58" y="171" textAnchor="middle" className="celestial-journey__planet-label">
           EARTH
         </text>
-        <text
-          x="345"
-          y="115"
-          textAnchor="middle"
-          className="celestial-journey__planet-label"
-        >
+        <text x="345" y="115" textAnchor="middle" className="celestial-journey__planet-label">
           MOON
         </text>
       </svg>
       <div className="celestial-journey__milestone">
-        <span>
-          {completed
-            ? `${completed} complete · next: ${completed + 1}× to the Moon`
-            : 'Your first lunar distance'}
-        </span>
-        <strong>{percentage}%</strong>
+        <span>{m.milestone}</span>
+        <strong>{m.percentLabel}</strong>
       </div>
       <div
         className="celestial-journey__progress"
@@ -373,14 +363,13 @@ export function Journey({
         aria-label="Progress toward next lunar distance"
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuenow={percentage}
+        aria-valuenow={m.percent}
       >
-        <span style={{ width: `${progress * 100}%` }} />
+        <span style={{ width: `${m.percent}%` }} />
       </div>
+      {m.context && <p className="celestial-journey__context">{m.context}</p>}
       <p className="celestial-journey__note">
-        {fmtInt(toUnit(40_075, unit))} {unit} per Earth lap ·{' '}
-        {fmtInt(toUnit(384_400, unit))} {unit} to the Moon. Illustration not to
-        scale.
+        {fmtInt(toUnit(EARTH_LAP_KM, unit))} {unit} per Earth lap · {fmtInt(toUnit(MOON_KM, unit))} {unit} to the Moon. Illustration not to scale.
       </p>
     </section>
   );
