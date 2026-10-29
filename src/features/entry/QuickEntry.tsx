@@ -3,7 +3,6 @@ import { Icon } from '@/components/Icon';
 import { Sheet } from '@/components/Sheet';
 import type { FormValues } from './form-model';
 import { parseQuickEntry } from './quick-entry';
-import { useKeyboardInset } from './useKeyboardInset';
 
 /** "Quick entry" bottom sheet: type a route + ISO date (+ flight number) to fill the form. */
 export function QuickEntry({
@@ -22,7 +21,6 @@ export function QuickEntry({
   const inputRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState('');
   const [error, setError] = useState(false);
-  useKeyboardInset(open);
 
   useEffect(() => {
     if (open) setError(false);

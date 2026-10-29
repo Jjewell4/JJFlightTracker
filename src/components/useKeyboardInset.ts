@@ -1,20 +1,20 @@
-import { useEffect } from 'react';
+import { useEffect, type RefObject } from 'react';
 
 /**
- * While `active`, publishes the on-screen keyboard's height as `--entry-kb` on <html>, so a
- * bottom sheet holding a text field can sit above the keyboard. Android Chrome (and installed
- * PWAs) only shrink the visual viewport when the keyboard opens, which would otherwise leave the
- * sheet's buttons hidden behind it.
+ * While `active`, publishes the on-screen keyboard's height as `--kb` on `target`, so a bottom
+ * sheet holding a text field sits above the keyboard as soon as it opens. Android Chrome (and
+ * installed PWAs) only shrink the visual viewport when the keyboard opens, which would otherwise
+ * leave the field and the sheet's buttons hidden behind it until the page scrolls.
  */
-export function useKeyboardInset(active: boolean): void {
+export function useKeyboardInset(active: boolean, target: RefObject<HTMLElement | null>): void {
   useEffect(() => {
     const vv = typeof window !== 'undefined' ? window.visualViewport : null;
-    if (!active || !vv) return;
-    const root = document.documentElement;
+    const el = target.current;
+    if (!active || !vv || !el) return;
     const update = () => {
       const inset = window.innerHeight - vv.height - vv.offsetTop;
       // Ignore small changes (browser toolbars), only a keyboard is this tall.
-      root.style.setProperty('--entry-kb', inset > 80 ? `${Math.round(inset)}px` : '0px');
+      el.style.setProperty('--kb', inset > 80 ? `${Math.round(inset)}px` : '0px');
     };
     update();
     vv.addEventListener('resize', update);
@@ -22,7 +22,7 @@ export function useKeyboardInset(active: boolean): void {
     return () => {
       vv.removeEventListener('resize', update);
       vv.removeEventListener('scroll', update);
-      root.style.removeProperty('--entry-kb');
+      el.style.removeProperty('--kb');
     };
-  }, [active]);
+  }, [active, target]);
 }

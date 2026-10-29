@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, ty
 import { createPortal } from 'react-dom';
 import { Icon, type IconName } from './Icon';
 import { useBackDismiss } from './useBackDismiss';
+import { useKeyboardInset } from './useKeyboardInset';
 import './Sheet.css';
 
 const EXIT_MS = 240;
@@ -38,6 +39,7 @@ export function Sheet({
 }) {
   const [mounted, setMounted] = useState(open);
   const [closing, setClosing] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
@@ -49,6 +51,7 @@ export function Sheet({
   };
 
   useBackDismiss(open, requestClose);
+  useKeyboardInset(open && mounted && variant === 'bottom', rootRef);
 
   // Mount/unmount with exit animation.
   useEffect(() => {
@@ -113,7 +116,7 @@ export function Sheet({
   };
 
   return createPortal(
-    <div className={`sheet sheet--${variant}${closing ? ' is-closing' : ''} ${className}`} onKeyDown={onKeyDown}>
+    <div ref={rootRef} className={`sheet sheet--${variant}${closing ? ' is-closing' : ''} ${className}`} onKeyDown={onKeyDown}>
       <div className="sheet__scrim" onClick={requestClose} aria-hidden="true" />
       <div ref={panelRef} className="sheet__panel" role={role} aria-modal="true" aria-label={label} aria-labelledby={labelledBy} tabIndex={-1}>
         {children}

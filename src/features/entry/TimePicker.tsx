@@ -4,7 +4,6 @@ import { Icon } from '@/components/Icon';
 import { Sheet } from '@/components/Sheet';
 import { formatDuration, formatTime, isValidTime } from '@/lib/time';
 import { needsMeridiem, parseTimeInput, splitTime, toTime, type ArrivalEstimate, type Meridiem } from './time-input';
-import { useKeyboardInset } from './useKeyboardInset';
 import './TimePicker.css';
 
 /** Row height of a wheel option, in px (keep in sync with --wheel-item in TimePicker.css). */
@@ -283,7 +282,6 @@ function TimePickerBody({
   const inputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const twelve = clock === '12h';
-  useKeyboardInset(mode === 'type');
 
   // Moved straight on from departure: the button that had focus is gone, so start here.
   useEffect(() => {

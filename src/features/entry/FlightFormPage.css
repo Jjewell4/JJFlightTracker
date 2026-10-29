@@ -1033,16 +1033,6 @@ button.entry-header__btn:active {
   color: var(--text);
 }
 
-/* bottom sheets opened from this screen: scroll when tall, ride above the phone keyboard */
-.entry-sheet.sheet--bottom .sheet__panel {
-  bottom: var(--entry-kb, 0px);
-  max-height: calc(100vh - var(--entry-kb, 0px) - var(--safe-top) - var(--space-4));
-  max-height: calc(100dvh - var(--entry-kb, 0px) - var(--safe-top) - var(--space-4));
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  transition: bottom var(--dur) var(--ease-out);
-}
-
 .assist {
   display: flex;
   flex-direction: column;
