@@ -10,6 +10,7 @@ import { applyPatch, JOURNAL_VIEWS, parseView, useJournalParams, type JournalVie
 import { JournalLink, type JournalNav } from './JournalLink';
 import { PublicOverview } from './PublicOverview';
 import { PublicFlightList } from './PublicFlightList';
+import { PublicTripList } from './PublicTripList';
 import './public.css';
 
 // The full map and stats screens are shared with the owner's app and loaded on demand.
@@ -20,6 +21,7 @@ const VIEW_META: Record<JournalView, { label: string; icon: IconName }> = {
   overview: { label: 'Overview', icon: 'home' },
   map: { label: 'Map', icon: 'globe' },
   stats: { label: 'Stats', icon: 'chart' },
+  trips: { label: 'Trips', icon: 'suitcase' },
   flights: { label: 'Flights', icon: 'list' },
 };
 
@@ -52,6 +54,9 @@ export function PublicDashboard({
   const unit = unitProp ?? defaultDistanceUnit();
   const flights = useMemo(() => asFlights(profile.flights).sort((a, b) => b.date.localeCompare(a.date)), [profile.flights]);
   const fields = useMemo(() => publicFields(profile.flights), [profile.flights]);
+  // The Trips tab only appears when the owner has saved trips.
+  const hasTrips = useMemo(() => flights.some((f) => f.tripId), [flights]);
+  const views = JOURNAL_VIEWS.filter((v) => v !== 'trips' || hasTrips);
   // `ready` is a dependency because airport lookups only resolve once reference data loads.
   const stats = useMemo(() => (ready ? computeStats(flights, { distanceUnit: unit, audience: 'visitor' }) : undefined), [flights, unit, ready]);
 
@@ -100,7 +105,7 @@ export function PublicDashboard({
           {preview && <p className="pj-eyebrow">Public journal preview</p>}
           <nav className="pj-nav" aria-label="Journal sections">
             <div className="pj-nav__track">
-              {JOURNAL_VIEWS.map((v) => (
+              {views.map((v) => (
                 <JournalLink key={v} nav={nav} to={viewPatch(v)} current={view === v} className="pj-tab">
                   <Icon name={VIEW_META[v].icon} size={16} />
                   <span>{VIEW_META[v].label}</span>
@@ -142,10 +147,11 @@ export function PublicDashboard({
                   <StatsPage embedded />
                 </Suspense>
               )}
+              {view === 'trips' && <PublicTripList flights={flights} unit={unit} />}
               {view === 'flights' && <PublicFlightList flights={flights} params={params} />}
               <footer className="pj-footer">
-                {preview ? 'Visitors see this journal live' : `Updated ${updated} · Live journal`} · Shares routes, {fields.exactDates ? 'dates' : 'months'}, airlines and
-                aircraft types only.
+                {preview ? 'Visitors see this journal live' : `Updated ${updated} · Live journal`} · Shares routes, {fields.exactDates ? 'dates' : 'months'}, airlines,
+                aircraft types and saved trips only.
               </footer>
             </div>
           )}

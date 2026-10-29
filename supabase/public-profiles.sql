@@ -9,8 +9,8 @@ begin
  for f in select value from jsonb_array_elements(items) loop
   if jsonb_typeof(f)<>'object' then return false; end if;
   for k in select jsonb_object_keys(f) loop
-   if k not in ('date','datePrecision','from','to','airlineIcao','airlineIata','aircraftType') then return false; end if;
-   if jsonb_typeof(f->k)<>'string' or length(f->>k)>32 then return false; end if;
+   if k not in ('date','datePrecision','from','to','airlineIcao','airlineIata','aircraftType','tripId','tripName') then return false; end if;
+   if jsonb_typeof(f->k)<>'string' or length(f->>k)>(case k when 'tripName' then 80 when 'tripId' then 40 else 32 end) then return false; end if;
   end loop;
   if not (f ?& array['date','datePrecision','from','to']) then return false; end if;
   if (f->>'date') !~ '^\d{4}-\d{2}-\d{2}$' or (f->>'datePrecision') not in ('day','month','year') then return false; end if;
@@ -18,6 +18,7 @@ begin
    if to_char((f->>'date')::date,'YYYY-MM-DD') <> f->>'date' then return false; end if;
   exception when others then return false; end;
   if (f->>'from') !~ '^[A-Za-z0-9-]{2,12}$' or (f->>'to') !~ '^[A-Za-z0-9-]{2,12}$' then return false; end if;
+  if f ? 'tripId' and (f->>'tripId') !~ '^[A-Za-z0-9-]{1,40}$' then return false; end if;
  end loop;
  return true;
 end $$;
@@ -51,7 +52,10 @@ begin
  result=jsonb_strip_nulls(jsonb_build_object(
   'date',case when precision='year' then left(data->>'date',4)||'-01-01' when exact_dates then data->>'date' else left(data->>'date',7)||'-01' end,
   'datePrecision',case when precision='year' then 'year' when exact_dates then precision else 'month' end,
-  'from',data->>'from','to',data->>'to','airlineIcao',data->>'airlineIcao','airlineIata',data->>'airlineIata','aircraftType',data->>'aircraftType'
+  'from',data->>'from','to',data->>'to','airlineIcao',data->>'airlineIcao','airlineIata',data->>'airlineIata','aircraftType',data->>'aircraftType',
+  -- Saved trips (never suggestions): the grouping id and the name the owner gave it.
+  'tripId',case when data->>'tripId' ~ '^[A-Za-z0-9-]{1,40}$' then data->>'tripId' end,
+  'tripName',case when data->>'tripId' ~ '^[A-Za-z0-9-]{1,40}$' then nullif(left(trim(data->>'tripName'),80),'') end
  ));
  if not public.valid_public_flights(jsonb_build_array(result)) then return null; end if;
  return result;

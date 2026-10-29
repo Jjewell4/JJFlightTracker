@@ -133,3 +133,23 @@ it('upgrades existing snapshot journals without changing URLs or exact-date pref
     assert.equal(row.flights[0].from,'KSAN');assert.equal(row.flights[0].date,'2024-02-15');
   } finally {await db.close();}
 },30000);
+
+it('shares saved trip ids and names, and nothing else new', async () => {
+  const db = new PGlite();
+  await db.exec(
+    `create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; grant usage on schema auth to authenticated,anon; grant execute on function auth.uid() to authenticated,anon; insert into auth.users values ('00000000-0000-0000-0000-000000000001');`,
+  );
+  await db.exec(await readFile(new URL('../../../supabase/schema.sql', import.meta.url), 'utf8'));
+  await db.exec(await readFile(new URL('../../../supabase/public-profiles.sql', import.meta.url), 'utf8'));
+  await db.exec(
+    `insert into public.public_profiles(user_id,slug,display_name) values ('00000000-0000-0000-0000-000000000001','jordan','Jordan'); insert into public.flights(user_id,id,data,updated_at) values ('00000000-0000-0000-0000-000000000001','a','{"date":"2024-01-14","datePrecision":"day","from":"KSAN","to":"KLAX","tripId":"t-1","tripName":"Weekend in LA","note":"secret"}',1),('00000000-0000-0000-0000-000000000001','b','{"date":"2024-01-16","datePrecision":"day","from":"KLAX","to":"KSAN","tripId":"bad id!","tripName":"x"}',2);`,
+  );
+  const flights = (await db.query<{ flights: Record<string, string>[] }>("select flights from public.get_public_profile('jordan')")).rows[0].flights;
+  const byFrom = Object.fromEntries(flights.map((f) => [f.from, f]));
+  assert.equal(byFrom.KSAN.tripId, 't-1');
+  assert.equal(byFrom.KSAN.tripName, 'Weekend in LA');
+  assert.equal(byFrom.KSAN.note, undefined);
+  assert.equal(byFrom.KLAX.tripId, undefined);
+  assert.equal(byFrom.KLAX.tripName, undefined);
+  await db.close();
+}, 30000);

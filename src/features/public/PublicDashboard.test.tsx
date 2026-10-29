@@ -86,6 +86,18 @@ describe('public journal', () => {
     expect(el.querySelector('.pj-tab[aria-current="page"]')?.textContent).toBe('Flights');
   });
 
+  it('shows saved trips (never suggestions) in a Trips tab, without leaving the page', async () => {
+    const trip = { tripId: 'trip-1', tripName: 'Weekend in Seattle' };
+    const el = await render('/jordan?view=trips', profile([month('2025-06', 'KSAN', 'KSEA', trip), month('2025-06', 'KSEA', 'KSAN', trip), ...FLIGHTS.slice(2)]));
+    expect([...el.querySelectorAll('.pj-tab')].map((t) => t.textContent)).toEqual(['Overview', 'Map', 'Stats', 'Trips', 'Flights']);
+    const cards = [...el.querySelectorAll<HTMLButtonElement>('.pj-trip')];
+    expect(cards).toHaveLength(1); // the London and New York round trips are only suggestions
+    expect(cards[0].textContent).toContain('Weekend in Seattle');
+    await act(async () => cards[0].click());
+    expect(el.querySelector('.pj-trip__legs')?.textContent).toContain('SAN → SEA');
+    expectNoPrivateLinks(el);
+  });
+
   it('shows stats that public data supports and hides the rest', async () => {
     const el = await render('/jordan?view=stats');
     const text = el.textContent ?? '';

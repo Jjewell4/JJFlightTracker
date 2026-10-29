@@ -10,6 +10,9 @@ privacy-filtered Supabase RPC (`supabase/public-profiles.sql`). One serverless f
 Screenshot imports become device-only **drafts** (Dexie `drafts` table, `src/services/screenshot/drafts.ts`)
 read in the background and reviewed in **To review** (`src/features/review/`: pick legs, save several
 at once, optionally as a trip). Interrupted reads resume on the next launch.
+Forwarded booking emails (`docs/email-import.md`: Cloudflare Email Worker → `api/inbound-email.ts`
++ `server/email.ts` → Supabase `email_inbox`) are pulled into the same drafts by
+`src/services/email/client.ts`. Public journals show saved trips (tripId/tripName) only.
 
 ## Stack
 - Vite 8 + React 19 + TypeScript (strict), `react-router-dom` v7 with **HashRouter** (static hosting / GitHub Pages).

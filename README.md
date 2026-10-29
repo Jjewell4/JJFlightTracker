@@ -217,6 +217,11 @@ live refresh, city search, failure recovery and unpublishing. It uses
 `/usr/bin/chromium` and blocks other remote hosts. It does not verify your deployed
 Supabase project or Vercel routing configuration.
 
+## Email import
+
+Forward booking emails to your personal address and review the flights in the app. Setup:
+[`docs/email-import.md`](docs/email-import.md).
+
 ## Screenshot flight import (Gemini)
 
 On **Log a flight → Scan screenshot**, signed-in users choose one or several images

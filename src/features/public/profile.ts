@@ -41,6 +41,8 @@ export type PublicFlight = Pick<
   | 'airlineIcao'
   | 'airlineIata'
   | 'aircraftType'
+  | 'tripId'
+  | 'tripName'
 >;
 export interface PublicProfile {
   slug: string;
@@ -80,6 +82,8 @@ export function publicFlights(
       ...(f.airlineIcao ? { airlineIcao: f.airlineIcao } : {}),
       ...(f.airlineIata ? { airlineIata: f.airlineIata } : {}),
       ...(f.aircraftType ? { aircraftType: f.aircraftType } : {}),
+      ...(f.tripId ? { tripId: f.tripId } : {}),
+      ...(f.tripId && f.tripName?.trim() ? { tripName: f.tripName.trim().slice(0, 80) } : {}),
     }));
 }
 export function asFlights(flights: PublicFlight[]): Flight[] {

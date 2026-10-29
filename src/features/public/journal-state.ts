@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ViewParams } from '@/lib/flight-source';
 
-export const JOURNAL_VIEWS = ['overview', 'map', 'stats', 'flights'] as const;
+export const JOURNAL_VIEWS = ['overview', 'map', 'stats', 'trips', 'flights'] as const;
 export type JournalView = (typeof JOURNAL_VIEWS)[number];
 
 export function parseView(raw: string | null): JournalView {
