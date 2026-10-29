@@ -100,6 +100,42 @@ export function useFlight(id: string | undefined): Flight | undefined | null {
   return useLiveQuery(async () => (id ? ((await db.flights.get(id)) ?? null) : null), [id]);
 }
 
+// ---------- trips ----------
+// A saved trip is just a shared `tripId` (+ `tripName`) on each leg, so it syncs with the
+// flights. Every write bumps `updatedAt` like updateFlight does, so sync pushes the change.
+
+/** Saves flights as one trip (a new tripId and the name on every leg). Returns the trip id. */
+export async function saveTrip(flightIds: string[], name: string): Promise<string> {
+  const tripId = newId();
+  const tripName = name.trim();
+  await db.transaction('rw', db.flights, async () => {
+    const legs = (await db.flights.bulkGet(flightIds)).filter((f): f is Flight => !!f);
+    if (!legs.length) throw new Error('None of these flights exist any more');
+    const now = Date.now();
+    await db.flights.bulkPut(legs.map((f) => compact({ ...f, tripId, tripName, updatedAt: now })));
+  });
+  return tripId;
+}
+
+async function updateTripLegs(tripId: string, patch: Pick<Flight, 'tripId' | 'tripName'>): Promise<number> {
+  return db.transaction('rw', db.flights, async () => {
+    const legs = await db.flights.filter((f) => f.tripId === tripId).toArray();
+    const now = Date.now();
+    await db.flights.bulkPut(legs.map((f) => compact({ ...f, ...patch, updatedAt: now })));
+    return legs.length;
+  });
+}
+
+/** Renames a saved trip (an empty name falls back to the automatic title). */
+export async function renameTrip(tripId: string, name: string): Promise<void> {
+  await updateTripLegs(tripId, { tripId, tripName: name.trim() });
+}
+
+/** Removes the trip grouping: clears tripId/tripName on its legs; the flights stay. */
+export async function unsaveTrip(tripId: string): Promise<number> {
+  return updateTripLegs(tripId, { tripId: undefined, tripName: undefined });
+}
+
 // ---------- settings ----------
 
 export async function getSettings(): Promise<Settings> {

@@ -94,3 +94,13 @@
   color: var(--text-3);
   flex: none;
 }
+
+/* Standalone home tiles (map above recent journeys; where-to-next at the end). */
+.overview__map--solo { margin-top: var(--space-5); }
+.overview__actions--solo { margin-top: var(--space-4); }
+@media (max-width: 640px) {
+  .overview__actions--solo { display: grid; grid-template-columns: 1fr 1fr; }
+  .overview__actions--solo h2,
+  .overview__actions--solo p { grid-column: 1 / -1; }
+  .overview__actions--solo .btn { font-size: var(--text-xs); padding-inline: var(--space-2); }
+}

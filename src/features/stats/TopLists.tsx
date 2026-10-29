@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { AirlineLogo } from '@/components/AirlineLogo';
 import { Icon } from '@/components/Icon';
 import type { FlightStats, RankedRoute } from '@/lib/stats';
+import { airlineHref, airportHref } from '@/features/explore/links';
 import { CardHead, Section } from './parts';
 import { fmtDistance, fmtInt, plural, type DistanceUnit } from './format';
 import type { StatsSections } from './sections';
@@ -87,6 +88,8 @@ export function TopLists({ stats, unit, sections, readOnly = false }: { stats: F
     primary: a.airport?.city || a.airport?.name || a.key,
     secondary: a.airport ? `${a.airport.name} · ${a.departures} dep · ${a.arrivals} arr` : 'Unknown airport',
     count: a.count,
+    // Public journals never link into the owner's app.
+    href: readOnly ? undefined : airportHref(a.key),
   }));
   const airlines: Row[] = stats.airlines.map((a) => ({
     key: a.key,
@@ -94,6 +97,7 @@ export function TopLists({ stats, unit, sections, readOnly = false }: { stats: F
     primary: a.name,
     secondary: [a.iata, a.icao].filter(Boolean).join(' · ') + (a.distanceKm ? ` · ${fmtDistance(a.distanceKm, unit)}` : ''),
     count: a.count,
+    href: readOnly ? undefined : airlineHref(a.key),
   }));
   const aircraft: Row[] = stats.aircraft.map((a) => ({
     key: a.key,

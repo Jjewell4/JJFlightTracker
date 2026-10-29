@@ -13,10 +13,13 @@ import { prettyFlightNumber, rowDate, shortCity } from './FlightRow';
 import { RouteMap } from './RouteMap';
 import { ConfirmSheet, Sheet } from '@/components/Sheet';
 import { goBackScreens } from '@/components/useBackDismiss';
-import { isUpcoming } from '@/lib/flight-utils';
+import { airlineKey, isUpcoming } from '@/lib/flight-utils';
+import { airlineHref, airportHref } from '@/features/explore/links';
+import '@/features/explore/links.css';
 import { downloadText } from '@/services/import/download';
 import { buildIcs, icsFileName, isTrackable, trackingLinks } from './flight-links';
 import { shareFlightImage } from './share-card';
+import { TripChip } from '@/features/trips/TripChip';
 import './FlightDetailPage.css';
 
 const SOURCE_LABEL: Record<FlightSource, string> = {
@@ -159,6 +162,7 @@ function FlightDetail({ flight: f, all, settings, onBack }: { flight: Flight; al
             </div>
           </section>
         )}
+      <TripChip flight={f} all={all} />
       <div className="detail__grid">
         <article className="pass animate-in" aria-label="Boarding pass">
           <div className="pass__top">
@@ -220,6 +224,7 @@ function FlightDetail({ flight: f, all, settings, onBack }: { flight: Flight; al
                 label="Airline"
                 wide
                 value={airline}
+                to={airlineKey(f) ? airlineHref(airlineKey(f)!) : undefined}
                 extra={f.airlineIata || f.airlineIcao ? <span className="pass__type">{[f.airlineIata, f.airlineIcao].filter(Boolean).join(' / ')}</span> : undefined}
               />
               <Field label="Reason" value={reasonLabel(f.reason)} />
@@ -320,10 +325,13 @@ function Endpoint({
   const suffix = airport?.country === 'US' ? airport.region : country && country.length <= 12 ? country : undefined;
   const place = airport ? [airport.city, suffix].filter(Boolean).join(', ') : ident;
   return (
-    <div className={`pass__end pass__end--${kind}`}>
+    <Link to={airportHref(ident)} className={`pass__end pass__end--${kind} pass__end--link`}>
       <span className="pass__label">{kind === 'from' ? 'Depart' : 'Arrive'}</span>
       <span className="pass__code">{code}</span>
-      <span className="pass__city">{place || shortCity(ident)}</span>
+      <span className="pass__city">
+        {place || shortCity(ident)}
+        <Icon name="chevron" size={13} className="xp-chev" />
+      </span>
       {airport?.name && <span className="pass__airport">{airport.name}</span>}
       <span className="pass__time tabular">
         {t ? (
@@ -337,7 +345,7 @@ function Endpoint({
         )}
       </span>
       {tz && <span className="pass__tz">{tz}</span>}
-    </div>
+    </Link>
   );
 }
 
@@ -349,6 +357,7 @@ function Field({
   wide,
   small,
   extra,
+  to,
 }: {
   label: string;
   value: string | undefined;
@@ -357,12 +366,21 @@ function Field({
   wide?: boolean;
   small?: boolean;
   extra?: ReactNode;
+  /** Makes the value a link (e.g. the airline's history page). */
+  to?: string;
 }) {
   return (
     <div className={`pass__field${wide ? ' pass__field--wide' : ''}`}>
       <dt className="pass__label">{label}</dt>
       <dd className={`pass__value${mono ? ' pass__value--mono' : ''}${small ? ' pass__value--small' : ''}${value ? '' : ' pass__value--empty'}`}>
-        {value ?? '—'}
+        {value && to ? (
+          <Link to={to} className="pass__value-link">
+            {value}
+            <Icon name="chevron" size={14} className="xp-chev" />
+          </Link>
+        ) : (
+          (value ?? '—')
+        )}
         {value && sub && <span className="pass__sub">{sub}</span>}
         {value && extra}
       </dd>

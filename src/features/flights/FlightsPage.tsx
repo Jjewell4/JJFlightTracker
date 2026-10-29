@@ -26,6 +26,7 @@ import { SearchBar } from './SearchBar';
 import { SummaryHero, SummaryHeroSkeleton } from './SummaryHero';
 import { UpcomingCard } from './UpcomingCard';
 import { OnThisDay } from './OnThisDay';
+import { LogViewSwitch, TripsList, useLogView } from '@/features/trips/TripsList';
 import './FlightsPage.css';
 import { JourneyMap } from './JourneyMap';
 import './FlightDetailPage.css';
@@ -57,6 +58,8 @@ export function FlightsPage() {
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, setSearchParams]);
+  // Log tab: "Flights | Trips" (?view=trips, else the view last used this session).
+  const [view, setView] = useLogView(archive);
   const q = useDeferredValue(query);
   const searchRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -131,6 +134,8 @@ export function FlightsPage() {
   const from = featured && getAirport(featured.from);
   const to = featured && getAirport(featured.to);
   const resultCount = shownPast.length + shownUpcoming.length;
+  // Home dashboard order: summary, upcoming, route map, recent journeys, memories, where to next.
+  const home = !archive && !filtering;
 
   return (
     <div
@@ -151,6 +156,8 @@ export function FlightsPage() {
           <p className="page-subtitle">{archive ? 'Every journey, easy to find.' : 'The places you’ve been. The journeys still ahead.'}</p>
         </div>
       </header>
+      {archive && <LogViewSwitch value={view} onChange={setView} />}
+      {view === 'trips' ? <TripsList flights={all} unit={unit} today={today} /> : <>
 
       {!archive && <SummaryHero summary={summary} unit={unit} upcoming={upcoming.length} />}
 
@@ -167,24 +174,14 @@ export function FlightsPage() {
         </section>
       )}
 
-      {!archive && !filtering && <OnThisDay memories={memories} />}
-
-      {!archive && !filtering && featured && from && to && (
-        <section className="overview" aria-label="Travel overview">
-          <Link to="/map" className="overview__map card">
-            <div className="overview__heading"><Icon name="globe" size={20} /><span>Your world, connected</span><Icon name="chevron" size={16} /></div>
-            <JourneyMap flights={past} />
-            <div className="overview__caption">{summary.airports} airports · {summary.countries} countries<span>Explore your map</span></div>
-          </Link>
-          <div className="overview__actions card">
-            <h2>Where to next?</h2><p>{upcoming.length ? 'Next up' : 'Last flown'}: {from.iata || from.ident} → {to.iata || to.ident}. Add a new journey or reuse this route.</p>
-            <Link className="btn btn--primary" to="/flights/new"><Icon name="plus" size={18} />Log a flight</Link>
-            <Link className="btn" to={`/flights/new?return=${encodeURIComponent(featured.id)}`}><Icon name="swap" size={18} />Add the return</Link>
-            <Link className="btn btn--ghost" to={`/flights/new?duplicate=${encodeURIComponent(featured.id)}`}>Fly this route again</Link>
-
-          </div>
-        </section>
+      {home && featured && from && to && (
+        <Link to="/map" className="overview__map overview__map--solo card" aria-label="Open your route map">
+          <div className="overview__heading"><Icon name="globe" size={20} /><span>Your route map</span><Icon name="chevron" size={16} /></div>
+          <JourneyMap flights={past} />
+          <div className="overview__caption">{summary.airports} airports · {summary.countries} countries<span>Open map</span></div>
+        </Link>
       )}
+
       <div className="overview__section-head"><h2 className="section-title">{archive || filtering ? 'Your flights' : 'Recent journeys'}</h2>{!archive && <Link to="/flights">View full log <Icon name="chevron" size={14} /></Link>}</div>
       {(archive || filtering) && <SearchBar ref={searchRef} query={query} onQuery={setQuery} filters={filters} onFilters={setFilters} options={options} />}
 
@@ -260,6 +257,18 @@ export function FlightsPage() {
         ))
       )}
       {!complete && (archive || filtering) && <button className="btn btn--block" onClick={() => setLimit((n) => { memory.limit = n + FIRST_PAINT; return memory.limit; })}>Show more flights ({shownPast.length - limit} remaining)</button>}
+
+      {home && <OnThisDay memories={memories} />}
+
+      {home && featured && from && to && (
+        <div className="overview__actions overview__actions--solo card">
+          <h2>Where to next?</h2><p>{upcoming.length ? 'Next up' : 'Last flown'}: {from.iata || from.ident} → {to.iata || to.ident}. Add a new journey or reuse this route.</p>
+          <Link className="btn btn--primary" to="/flights/new"><Icon name="plus" size={18} />Log a flight</Link>
+          <Link className="btn" to={`/flights/new?return=${encodeURIComponent(featured.id)}`}><Icon name="swap" size={18} />Add the return</Link>
+          <Link className="btn btn--ghost" to={`/flights/new?duplicate=${encodeURIComponent(featured.id)}`}>Fly this route again</Link>
+        </div>
+      )}
+      </>}
     </div>
   );
 }

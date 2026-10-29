@@ -3,7 +3,9 @@ import { forwardRef, useRef, useState, type PointerEvent, type ReactNode } from 
 import { Link } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
 import { getCountry } from '@/data/reference';
-import { flightAirlineName } from '@/lib/flight-utils';
+import { airlineKey, flightAirlineName } from '@/lib/flight-utils';
+import { airlineHref, airportHref } from '@/features/explore/links';
+import '@/features/explore/links.css';
 import { kmToMiles } from '@/lib/geo';
 import { formatFlightDate, formatTime } from '@/lib/time';
 import type { Airport, Flight, Settings } from '@/lib/types';
@@ -145,10 +147,16 @@ export const AirportSheet = forwardRef<
         </button>
       ) : (
         !readOnly && (
-          <Link to={`/?${params}`} className="btn btn--block map-card__cta">
-            View {times(agg.visits)}
-            <Icon name="chevron" size={16} />
-          </Link>
+          <div className="map-card__links">
+            <Link to={airportHref(a.ident)} className="btn btn--block map-card__cta">
+              <Icon name="clock" size={16} />
+              Airport history
+            </Link>
+            <Link to={`/?${params}`} className="btn btn--block map-card__cta">
+              View {times(agg.visits)}
+              <Icon name="chevron" size={16} />
+            </Link>
+          </div>
         )
       )}
     </Sheet>
@@ -237,12 +245,23 @@ export const RouteSheet = forwardRef<
 
       {route.airlines.length > 0 && (
         <div className="map-route__airlines">
-          {route.airlines.map((al) => (
-            <span key={al.key} className="badge">
-              {al.label}
-              <span className="subtle">{al.count}</span>
-            </span>
-          ))}
+          {route.airlines.map((al) => {
+            // Airline pages are in-app only: shared journals keep plain badges.
+            const sample = readOnly ? undefined : route.flights.find((f) => flightAirlineName(f) === al.label);
+            const key = sample && airlineKey(sample);
+            return key ? (
+              <Link key={al.key} to={airlineHref(key)} className="badge map-route__airline">
+                {al.label}
+                <span className="subtle">{al.count}</span>
+                <Icon name="chevron" size={12} className="xp-chev" />
+              </Link>
+            ) : (
+              <span key={al.key} className="badge">
+                {al.label}
+                <span className="subtle">{al.count}</span>
+              </span>
+            );
+          })}
         </div>
       )}
 
