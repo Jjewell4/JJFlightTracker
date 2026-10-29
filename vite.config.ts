@@ -57,6 +57,8 @@ export default defineConfig(({ mode }) => {
           globPatterns: ['**/*.{js,css,html,svg,png,woff2,json,webmanifest}'],
           maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
           navigateFallback: 'index.html',
+          // Server functions are never the app: opening /api/... in the browser must reach Vercel.
+          navigateFallbackDenylist: [/^\/api\//],
           cleanupOutdatedCaches: true,
           runtimeCaching: [
             {
