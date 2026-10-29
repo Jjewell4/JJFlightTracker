@@ -9,8 +9,6 @@
 -- The inbound function writes with the service-role key (server-side only); users manage their
 -- own rows through RLS.
 
-create extension if not exists pgcrypto;
-
 create table if not exists public.email_import_addresses (
   user_id uuid primary key references auth.users (id) on delete cascade,
   token text not null unique,
@@ -73,8 +71,8 @@ begin
   if auth.uid() is null then raise exception 'not signed in'; end if;
   select token into t from email_import_addresses where user_id = auth.uid();
   if t is null then
-    t := lower(substr(replace(encode(gen_random_bytes(9), 'base64'), '/', ''), 1, 10));
-    t := regexp_replace(t, '[^a-z0-9]', '', 'g');
+    -- gen_random_uuid() is built in (pgcrypto's gen_random_bytes lives outside public on Supabase).
+    t := substr(replace(gen_random_uuid()::text, '-', ''), 1, 12);
     insert into email_import_addresses (user_id, token) values (auth.uid(), t)
       on conflict (user_id) do update set token = email_import_addresses.token
       returning token into t;

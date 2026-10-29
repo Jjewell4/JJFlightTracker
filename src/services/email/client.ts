@@ -25,13 +25,14 @@ async function client() {
   return { sb, email: data.session.user.email?.toLowerCase() ?? '' };
 }
 
-const missingTable = (e: { code?: string; message?: string } | null) => !!e && (e.code === 'PGRST202' || e.code === 'PGRST205' || e.code === '42P01' || /does not exist|schema cache/i.test(e.message ?? ''));
+/** Only a missing table/function means "not installed"; other errors are shown as they are. */
+const missingTable = (e: { code?: string } | null) => !!e && (e.code === 'PGRST202' || e.code === 'PGRST205' || e.code === '42P01');
 
 export async function getForwardingAddress(rotate = false): Promise<string> {
   const { sb } = await client();
   const { data, error } = await sb.rpc(rotate ? 'rotate_email_import_address' : 'email_import_address');
   if (missingTable(error)) throw new EmailSetupError('Email import isn’t installed yet. Run supabase/email-import.sql in Supabase.');
-  if (error || typeof data !== 'string') throw new Error('Couldn’t load your forwarding address.');
+  if (error || typeof data !== 'string') throw new Error(`Couldn’t load your forwarding address${error?.message ? `: ${error.message}` : '.'}`);
   return forwardingAddress(data);
 }
 
