@@ -54,6 +54,11 @@ export interface Flight {
   reason?: FlightReason;
   note?: string;
 
+  /** Set when the user saves a (suggested) trip: every leg of the trip shares the id. */
+  tripId?: string;
+  /** Saved trip name, repeated on each leg so it syncs with the flights. */
+  tripName?: string;
+
   source: FlightSource;
   createdAt: number;
   updatedAt: number;

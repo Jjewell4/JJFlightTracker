@@ -20,6 +20,9 @@ const SettingsPage = lazy(() => import('@/features/settings/SettingsPage'));
 const PasswordPage = lazy(() => import('@/features/account/PasswordPage'));
 const AccountPage = lazy(() => import('@/features/account/AccountPage'));
 const WelcomePage = lazy(() => import('@/features/account/WelcomePage'));
+const TripPage = lazy(() => import('@/features/trips/TripPage'));
+const AirportPage = lazy(() => import('@/features/explore/AirportPage'));
+const AirlinePage = lazy(() => import('@/features/explore/AirlinePage'));
 
 export function App() {
   const publicHandle = publicHandleFromPath(window.location.pathname);
@@ -38,6 +41,9 @@ export function App() {
               <Route path="/flights/new" element={<FlightFormPage />} />
               <Route path="/flights/:id" element={<FlightDetailPage />} />
               <Route path="/flights/:id/edit" element={<FlightFormPage />} />
+              <Route path="/trips/:id" element={<TripPage />} />
+              <Route path="/airports/:ident" element={<AirportPage />} />
+              <Route path="/airlines/:key" element={<AirlinePage />} />
               <Route path="/map" element={<MapPage />} />
               <Route path="/stats" element={<StatsPage />} />
               <Route path="/import" element={<ImportPage />} />

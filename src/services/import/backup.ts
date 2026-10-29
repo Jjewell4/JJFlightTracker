@@ -76,7 +76,7 @@ export function sanitizeFlight(raw: unknown): ImportFlight | undefined {
   const r = raw as Record<string, unknown>;
   if (!isStr(r.from) || !isStr(r.to) || !isStr(r.date) || !isCalendarDate(r.date)) return undefined;
   const f: Record<string, unknown> = { ...r };
-  const strings = ['flightNumber', 'airlineIcao', 'airlineIata', 'airlineName', 'depTime', 'arrTime', 'aircraftType', 'aircraftName', 'registration', 'seatNumber', 'note'];
+  const strings = ['flightNumber', 'airlineIcao', 'airlineIata', 'airlineName', 'depTime', 'arrTime', 'aircraftType', 'aircraftName', 'registration', 'seatNumber', 'note', 'tripId', 'tripName'];
   for (const k of strings) if (f[k] !== undefined && typeof f[k] !== 'string') delete f[k];
   const numbers = ['arrDayOffset', 'durationMin', 'distanceKm', 'createdAt', 'updatedAt'];
   for (const k of numbers) if (f[k] !== undefined && (typeof f[k] !== 'number' || !Number.isFinite(f[k]))) delete f[k];
