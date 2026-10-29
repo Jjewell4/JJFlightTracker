@@ -35,6 +35,8 @@ import {
 import { usageStats } from './history-stats';
 import { getDetailsOpen, saveDetailsOpen, saveEntryDefaults } from './prefs';
 import { EntryAssist } from './EntryAssist';
+import { DuplicateNotice, duplicateSentence } from './DuplicateNotice';
+import { findDuplicates } from './duplicates';
 import { useFlightLookup } from './useFlightLookup';
 import { announceLocalSave } from '@/services/sync/controller';
 
@@ -88,6 +90,13 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
   const [sheet, setSheet] = useState<SheetName>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  /** Matching flights the user said are different ("It's a different flight" / "Save anyway"). */
+  const [ackedDuplicates, setAckedDuplicates] = useState<ReadonlySet<string>>(() => new Set());
+  const [confirmDuplicate, setConfirmDuplicate] = useState(false);
+  /** Existing flight the save confirmation is about (kept while the sheet animates out). */
+  const [duplicateOf, setDuplicateOf] = useState<Flight | null>(null);
+  /** "View it" on a duplicate while there are unsaved edits: asks before leaving. */
+  const [viewTarget, setViewTarget] = useState<Flight | null>(null);
   const [leaving, setLeaving] = useState(false);
   /** Set once the form is being left on purpose (saved, deleted, discarded): Back pops are expected. */
   const leavingRef = useRef(false);
@@ -95,7 +104,8 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
 
   // While there are unsaved edits, Back (Android back or the header/Cancel buttons) asks
   // before throwing them away. The guard owns one history entry; popping it opens the sheet.
-  useBackDismiss(dirty && !confirmDiscard && !leaving, () => {
+  // Confirm sheets opened from the form take over the guard's history entry while they're up.
+  useBackDismiss(dirty && !confirmDiscard && !confirmDuplicate && !viewTarget && !leaving, () => {
     if (!leavingRef.current) setConfirmDiscard(true);
   });
   const [detailsOpen, setDetailsOpen] = useState(() => {
@@ -123,6 +133,25 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
     if (all.times && v.depTime && v.arrTime) early.times = all.times;
     return early;
   }, [v, submitted]);
+
+  // Flights already in the log that these values may duplicate (the edited flight excluded).
+  const duplicates = useMemo(
+    () =>
+      findDuplicates(
+        { date: v.date, datePrecision: v.datePrecision, from: v.from, to: v.to, flightNumber: v.flightNumber, depTime: v.datePrecision === 'day' ? v.depTime : undefined },
+        flights,
+        { excludeId: base?.id },
+      ),
+    [v.date, v.datePrecision, v.from, v.to, v.flightNumber, v.depTime, flights, base?.id],
+  );
+  // Editing a flight that already had a twin: still pointed out, but saving other changes never asks.
+  const preexisting = useMemo(() => {
+    if (!base) return new Set<string>();
+    const q = { date: initial.date, datePrecision: initial.datePrecision, from: initial.from, to: initial.to, flightNumber: initial.flightNumber, depTime: initial.depTime };
+    return new Set(findDuplicates(q, flights, { excludeId: base.id }).filter((m) => m.kind === 'duplicate').map((m) => m.flight.id));
+  }, [base, initial, flights]);
+  const openDuplicates = useMemo(() => duplicates.filter((m) => !ackedDuplicates.has(m.flight.id)), [duplicates, ackedDuplicates]);
+  const acknowledgeDuplicates = (ids: string[]) => setAckedDuplicates((s) => new Set([...s, ...ids]));
 
   const unassist = useCallback((...keys: AssistKey[]) => {
     setAssisted((s) => {
@@ -378,7 +407,7 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
     }
   };
 
-  const onSubmit = async (e: React.FormEvent) => {
+  const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (savingRef.current) return;
     setSubmitted(true);
@@ -388,6 +417,35 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
       focusFirstError(errs);
       return;
     }
+    // A likely duplicate the user hasn't waved through: ask once before adding a second copy.
+    const dup = openDuplicates.find((m) => m.kind === 'duplicate' && !preexisting.has(m.flight.id));
+    if (dup) {
+      setDuplicateOf(dup.flight);
+      setConfirmDuplicate(true);
+      return;
+    }
+    void save();
+  };
+
+  const saveAnyway = async () => {
+    acknowledgeDuplicates(openDuplicates.filter((m) => m.kind === 'duplicate').map((m) => m.flight.id));
+    // The sheet stays up (busy) while saving: saving pops its history entry and moves on.
+    // Closing it first would pop that entry a second time.
+    if (!(await save())) setConfirmDuplicate(false);
+  };
+
+  const leaveToView = async () => {
+    if (!viewTarget) return;
+    const id = viewTarget.id;
+    leavingRef.current = true;
+    setLeaving(true);
+    await popOverlayEntries(); // the confirm sheet's own entry
+    navigate(`/flights/${id}`, { replace: true });
+  };
+
+  /** Saves and leaves the form; resolves false when saving failed. */
+  const save = async (): Promise<boolean> => {
+    if (savingRef.current) return false;
     savingRef.current = true;
     setSaving(true);
     const usedLookup = [...auto.values()].some((src) => src !== PREFIX);
@@ -415,6 +473,7 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
         saveEntryDefaults({ cabinClass: v.cabinClass, reason: v.reason });
         navigate(`/flights/${saved.id}`, { replace: true });
       }
+      return true;
     } catch (err) {
       console.error(err);
       leavingRef.current = false;
@@ -422,6 +481,7 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
       setSavedLocally(false);
       setSaving(false);
       setSaveError("Couldn't save this flight. Please try again.");
+      return false;
     }
   };
 
@@ -479,6 +539,19 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
             </span>
           </p>
         )}
+        <DuplicateNotice
+          matches={openDuplicates}
+          hint={
+            mode === 'new'
+              ? 'Saving this would add a second copy.'
+              : preexisting.has(openDuplicates[0]?.flight.id ?? '')
+                ? 'Both copies are in your log and count in your stats.'
+                : 'With these changes the two would match.'
+          }
+          onAcknowledge={() => acknowledgeDuplicates(openDuplicates.map((m) => m.flight.id))}
+          // With unsaved edits "View it" asks first (a plain link would leave right away).
+          onView={dirty ? setViewTarget : undefined}
+        />
         <section className="entry-card flight-card" aria-label="Date and flight number">
           <DateField id="entry-date" date={v.date} precision={v.datePrecision} onChange={setDate} error={errors.date} filled={isFilled('date')} />
 
@@ -571,6 +644,7 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
           toRef={toRef}
         />
 
+
         {v.datePrecision === 'day' && <TimesCard v={v} onChange={setTimes} clock={settings.clock} filled={isFilled('times')} error={errors.times} />}
 
         <DetailsSection
@@ -645,6 +719,33 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note }
         danger
         onConfirm={onDelete}
         onCancel={() => setConfirmDelete(false)}
+      />
+      <ConfirmSheet
+        open={confirmDuplicate}
+        title={mode === 'edit' ? 'Save a duplicate?' : 'Save a second copy?'}
+        message={
+          duplicateOf && (
+            <>
+              {duplicateSentence(duplicateOf)}.{' '}
+              {mode === 'edit' ? 'With these changes both flights will look the same in your log and stats.' : 'Saving this one too counts the flight twice in your stats.'}
+            </>
+          )
+        }
+        confirmLabel="Save anyway"
+        icon="copy"
+        busy={saving}
+        onConfirm={() => void saveAnyway()}
+        onCancel={() => setConfirmDuplicate(false)}
+      />
+      <ConfirmSheet
+        open={!!viewTarget}
+        title="Leave without saving?"
+        message={mode === 'edit' ? 'Your edits to this flight won’t be saved.' : 'The flight you’re entering here won’t be saved.'}
+        confirmLabel="View other flight"
+        cancelLabel="Keep editing"
+        icon="warning"
+        onConfirm={() => void leaveToView()}
+        onCancel={() => setViewTarget(null)}
       />
       <ConfirmSheet
         open={confirmDiscard}
