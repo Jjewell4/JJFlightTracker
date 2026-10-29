@@ -28,6 +28,8 @@ import {
 } from './map-data';
 import type { BaseMode, ColorMode, OverlayData, Selection } from './map-style';
 import { AirportSheet, RouteSheet } from './MapSheet';
+import { buildTimeline } from './replay';
+import { ReplayBar } from './ReplayBar';
 import { StaticMap } from './StaticMap';
 import { rampGradient, useMapTheme } from './theme';
 import './MapPage.css';
@@ -92,6 +94,15 @@ const MODES: { id: BaseMode; label: string; hint: string }[] = [
   { id: 'satellite', label: 'Satellite', hint: 'Imagery' },
 ];
 
+function ReplayIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M10 8.6v6.8a.5.5 0 0 0 .77.42l5.2-3.4a.5.5 0 0 0 0-.84l-5.2-3.4a.5.5 0 0 0-.77.42Z" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 function FitIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -127,6 +138,7 @@ function MapPage({ embedded = false }: MapPageProps) {
   const [toast, setToast] = useState<string | null>(null);
   const [webgl] = useState(() => webglSupported());
   const [mapFailed, setMapFailed] = useState(false);
+  const [replaying, setReplaying] = useState(false);
 
   const pageRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -151,6 +163,9 @@ function MapPage({ embedded = false }: MapPageProps) {
     () => ({ routes: routesFC, airports: airportsFC, visitedCountries: analysis?.countries ?? [] }),
     [routesFC, airportsFC, analysis],
   );
+
+  // Replay timeline for the current scope (built only while the replay is open).
+  const timeline = useMemo(() => (replaying && ready ? buildTimeline(filtered) : null), [replaying, ready, filtered]);
 
   const airportAgg = pick?.kind === 'airport' ? analysis?.airports.find((a) => a.airport.ident === pick.id) : undefined;
   const routeAgg = pick?.kind === 'route' ? analysis?.routes.find((r) => r.key === pick.id) : undefined;
@@ -301,8 +316,16 @@ function MapPage({ embedded = false }: MapPageProps) {
   // Android Back closes the detail sheet / style panel instead of leaving the map.
   const closePick = useCallback(() => setPick(null), []);
   const closePanel = useCallback(() => setPanelOpen(false), []);
+  const closeReplay = useCallback(() => setReplaying(false), []);
   useBackDismiss(pick !== null, closePick);
   useBackDismiss(panelOpen, closePanel);
+  useBackDismiss(replaying, closeReplay);
+
+  const openReplay = () => {
+    setPick(null);
+    setPanelOpen(false);
+    setReplaying(true);
+  };
 
   // Escape closes sheet/panel.
   useEffect(() => {
@@ -310,6 +333,7 @@ function MapPage({ embedded = false }: MapPageProps) {
       if (e.key !== 'Escape') return;
       setPanelOpen(false);
       setPick(null);
+      setReplaying(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -323,11 +347,16 @@ function MapPage({ embedded = false }: MapPageProps) {
   const maxCount = analysis?.routes[0]?.count ?? 1;
   const showStatic = !webgl || mapFailed;
   const sheetOpen = !!(airportAgg || routeAgg);
+  const canReplay = !showStatic && mapLoaded && !loading && !empty;
+  const replayMap = replaying && canReplay && timeline ? mapRef.current : null;
+  useEffect(() => {
+    if (replaying && !loading && (empty || showStatic)) setReplaying(false);
+  }, [replaying, loading, empty, showStatic]);
 
   return (
     <div
       ref={pageRef}
-      className={`map-page${embedded ? ' map-page--embedded' : ''}${sheetOpen ? ' has-sheet' : ''}`}
+      className={`map-page${embedded ? ' map-page--embedded' : ''}${sheetOpen ? ' has-sheet' : ''}${replayMap ? ' is-replaying' : ''}`}
       style={{ '--map-space': theme.space, '--map-ocean': theme.ocean } as CSSProperties}
     >
       <div ref={containerRef} className="map-canvas" hidden={showStatic} />
@@ -376,6 +405,18 @@ function MapPage({ embedded = false }: MapPageProps) {
           <button type="button" className="map-tool" aria-label="Fit all flights" onClick={fitAll} disabled={!bounds || showStatic}>
             <FitIcon />
           </button>
+          {!showStatic && !empty && (
+            <button
+              type="button"
+              className="map-tool"
+              aria-label={replaying ? 'Close replay' : 'Replay your flights'}
+              aria-pressed={replaying}
+              onClick={() => (replaying ? setReplaying(false) : openReplay())}
+              disabled={!canReplay}
+            >
+              <ReplayIcon />
+            </button>
+          )}
         </div>
 
         {panelOpen && (
@@ -417,7 +458,13 @@ function MapPage({ embedded = false }: MapPageProps) {
         )}
       </div>
 
-      {!empty && !sheetOpen && (
+      {replayMap && timeline && (
+        <div ref={bottomRef} className="map-bottom map-bottom--replay">
+          <ReplayBar map={replayMap} timeline={timeline} unit={settings.distanceUnit} years={years} year={year} onYear={setYear} onClose={closeReplay} />
+        </div>
+      )}
+
+      {!empty && !sheetOpen && !replayMap && (
         <div ref={bottomRef} className="map-bottom">
           <div className="map-glass map-stats" aria-live="polite">
             {loading || !s ? (

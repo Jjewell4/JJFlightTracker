@@ -12,7 +12,12 @@ import {
   buildStyle,
   glyphProtocol,
   OPENFREEMAP_STYLE,
+  AIRPORT_LAYERS,
   overlayPaint,
+  OVERLAY_SOURCES,
+  REPLAY_LAYERS,
+  replayAirportFilter,
+  ROUTE_LAYERS,
   routeFilter,
   setRemoteGlyphs,
   skyFor,
@@ -20,8 +25,11 @@ import {
   type BaseMode,
   type ColorMode,
   type OverlayData,
+  type ReplayData,
   type Selection,
 } from './map-style';
+
+const NON_TILE_SOURCES: readonly string[] = [...OVERLAY_SOURCES, 'land', 'admin1', 'graticule'];
 import type { MapTheme } from './theme';
 
 export type PickResult = { kind: 'airport'; id: string } | { kind: 'route'; id: string } | null;
@@ -34,6 +42,8 @@ export interface FlightMapState {
   globe: boolean;
   basemap: Basemap | null;
   data: OverlayData;
+  /** History replay overlay; null when not replaying. */
+  replay?: ReplayData | null;
 }
 
 export interface FlightMapCallbacks {
@@ -122,12 +132,13 @@ export class FlightMap {
     this.map.on('error', (e) => this.handleError(e as unknown as { error?: Error; sourceId?: string; tile?: unknown }));
     this.map.on('data', (e) => {
       const ev = e as unknown as { dataType?: string; sourceId?: string; tile?: unknown };
-      if (ev.dataType === 'source' && ev.tile && ev.sourceId && !['routes', 'airports', 'land', 'admin1', 'graticule'].includes(ev.sourceId)) this.tileOk++;
+      if (ev.dataType === 'source' && ev.tile && ev.sourceId && !NON_TILE_SOURCES.includes(ev.sourceId)) this.tileOk++;
     });
   }
 
   private pickAt(point: { x: number; y: number }): PickResult {
-    if (!this.map.getLayer('airports-dot')) return null;
+    // The replay is a view, not a browser: taps shouldn't open sheets over it.
+    if (this.state.replay || !this.map.getLayer('airports-dot')) return null;
     const box = (r: number): [[number, number], [number, number]] => [
       [point.x - r, point.y - r],
       [point.x + r, point.y + r],
@@ -145,7 +156,7 @@ export class FlightMap {
 
   private handleError(e: { error?: Error; sourceId?: string; tile?: unknown }) {
     const src = e.sourceId;
-    if (!src || ['routes', 'airports', 'land', 'admin1', 'graticule'].includes(src)) {
+    if (!src || NON_TILE_SOURCES.includes(src)) {
       if (e.error) console.warn('map error', e.error.message);
       return;
     }
@@ -237,7 +248,50 @@ export class FlightMap {
     this.safe(() => {
       if (prev.routes !== data.routes) (this.map.getSource('routes') as maplibregl.GeoJSONSource | undefined)?.setData(data.routes as GeoJSON.GeoJSON);
       if (prev.airports !== data.airports) (this.map.getSource('airports') as maplibregl.GeoJSONSource | undefined)?.setData(data.airports as GeoJSON.GeoJSON);
-      if (this.map.getLayer('land-visited')) this.map.setFilter('land-visited', visitedFilter(data.visitedCountries));
+      if (this.map.getLayer('land-visited') && !this.state.replay) this.map.setFilter('land-visited', visitedFilter(data.visitedCountries));
+    });
+  }
+
+  /** Enters (data) or leaves (null) replay mode: swaps the route layers for the replay ones. */
+  setReplay(replay: ReplayData | null) {
+    const was = !!this.state.replay;
+    this.state = { ...this.state, replay };
+    if (was !== !!replay) this.applyReplayMode();
+    if (replay) this.updateReplay(replay);
+    else this.safe(() => {
+      if (this.map.getLayer('land-visited')) this.map.setFilter('land-visited', visitedFilter(this.state.data.visitedCountries));
+    });
+  }
+
+  /**
+   * Pushes replay changes. Only the parts whose identity changed are sent to MapLibre,
+   * so a frame that just moves the plane costs one small setData.
+   */
+  updateReplay(next: Partial<ReplayData>) {
+    const prev = this.state.replay;
+    if (!prev) return;
+    const merged: ReplayData = { ...prev, ...next };
+    this.state = { ...this.state, replay: merged };
+    const first = next === prev;
+    this.safe(() => {
+      if (first || (next.past && next.past !== prev.past)) (this.map.getSource('replay-past') as maplibregl.GeoJSONSource | undefined)?.setData(merged.past as GeoJSON.GeoJSON);
+      if (first || (next.live && next.live !== prev.live)) (this.map.getSource('replay-live') as maplibregl.GeoJSONSource | undefined)?.setData(merged.live as GeoJSON.GeoJSON);
+      if (first || (next.airports && next.airports !== prev.airports)) {
+        const f = replayAirportFilter(merged);
+        for (const id of AIRPORT_LAYERS) if (this.map.getLayer(id)) this.map.setFilter(id, f);
+      }
+      if ((first || (next.countries && next.countries !== prev.countries)) && this.map.getLayer('land-visited')) {
+        this.map.setFilter('land-visited', visitedFilter(merged.countries));
+      }
+    });
+  }
+
+  private applyReplayMode() {
+    const on = !!this.state.replay;
+    this.safe(() => {
+      for (const id of ROUTE_LAYERS) if (this.map.getLayer(id)) this.map.setLayoutProperty(id, 'visibility', on ? 'none' : 'visible');
+      for (const id of REPLAY_LAYERS) if (this.map.getLayer(id)) this.map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+      if (!on) for (const id of AIRPORT_LAYERS) if (this.map.getLayer(id)) this.map.setFilter(id, null);
     });
   }
 
@@ -307,12 +361,14 @@ export class FlightMap {
     this.safe(() => {
       this.map.setFilter('routes-hl', f);
       this.map.setFilter('routes-hl-glow', f);
-      if (this.map.getLayer('land-visited')) this.map.setFilter('land-visited', visitedFilter(data.visitedCountries));
+      if (this.map.getLayer('land-visited') && !this.state.replay) this.map.setFilter('land-visited', visitedFilter(data.visitedCountries));
       (this.map.getSource('routes') as maplibregl.GeoJSONSource | undefined)?.setData(data.routes as GeoJSON.GeoJSON);
       (this.map.getSource('airports') as maplibregl.GeoJSONSource | undefined)?.setData(data.airports as GeoJSON.GeoJSON);
       this.map.setSky(skyFor(theme));
       this.map.setProjection({ type: this.state.globe ? 'globe' : 'mercator' });
     });
+    this.applyReplayMode();
+    if (this.state.replay) this.updateReplay(this.state.replay);
   }
 
   private applyOverlayPaint() {

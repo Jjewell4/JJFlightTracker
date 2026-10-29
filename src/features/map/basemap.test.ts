@@ -73,8 +73,26 @@ describe('style', () => {
     expect(s.projection).toEqual({ type: 'globe' });
     const ids = s.layers.map((l) => l.id);
     expect(ids[0]).toBe('bg');
-    expect(ids.slice(-3)).toEqual(['airports-glow', 'airports-dot', 'airports-label']);
+    expect(ids[ids.length - 1]).toBe('airports-label');
+    expect(ids.indexOf('airports-dot')).toBeGreaterThan(ids.indexOf('routes-hit'));
     expect(Object.keys(s.sources)).toEqual(expect.arrayContaining(['routes', 'airports', 'land']));
+    // Replay layers exist but stay hidden until a replay starts.
+    const hidden = s.layers.filter((l) => l.id.startsWith('replay-'));
+    expect(hidden.length).toBe(5);
+    expect(hidden.every((l) => (l.layout as { visibility?: string }).visibility === 'none')).toBe(true);
+  });
+
+  it('swaps route layers for replay layers while replaying', () => {
+    const fc = { type: 'FeatureCollection' as const, features: [] };
+    const replay = { past: fc, live: fc, airports: ['KSAN'], countries: ['MX'] };
+    const s = buildStyle({ mode: 'night', theme, colorMode: 'frequency', selection: null, globe: false, basemap: { land: fc, lines: fc } as never, data, replay });
+    const vis = (id: string) => (s.layers.find((l) => l.id === id)?.layout as { visibility?: string } | undefined)?.visibility;
+    expect(vis('routes-line')).toBe('none');
+    expect(vis('replay-trail')).toBe('visible');
+    const dot = s.layers.find((l) => l.id === 'airports-dot') as { filter?: unknown };
+    expect(JSON.stringify(dot.filter)).toContain('KSAN');
+    const visited = s.layers.find((l) => l.id === 'land-visited') as { filter?: unknown };
+    expect(JSON.stringify(visited.filter)).toContain('MX');
   });
 
   it('keeps the overlay when composing a remote style', () => {
@@ -83,7 +101,7 @@ describe('style', () => {
     expect(s.center).toBeUndefined();
     expect(s.layers[0].id).toBe('water');
     expect(s.layers.some((l) => l.id === 'routes-line')).toBe(true);
-    expect(Object.keys(s.sources)).toEqual(['omt', 'routes', 'airports']);
+    expect(Object.keys(s.sources)).toEqual(['omt', 'routes', 'airports', 'replay-past', 'replay-live']);
   });
 
   it('builds selection filters', () => {

@@ -29,7 +29,7 @@ export const ESRI_ATTRIBUTION =
 const NE_ATTRIBUTION = '<a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a>';
 
 /** Source ids owned by the flight overlay (kept across basemap switches). */
-export const OVERLAY_SOURCES = ['routes', 'airports'] as const;
+export const OVERLAY_SOURCES = ['routes', 'airports', 'replay-past', 'replay-live'] as const;
 
 export interface OverlayData {
   routes: FeatureCollection;
@@ -37,7 +37,29 @@ export interface OverlayData {
   visitedCountries: string[];
 }
 
+/** Live state of the history replay overlay (null when not replaying). */
+export interface ReplayData {
+  /** Faint arcs of routes completed so far. */
+  past: FeatureCollection;
+  /** In-flight trails ('trail' lines) and moving heads ('head' points). */
+  live: FeatureCollection;
+  /** Airport idents revealed so far. */
+  airports: string[];
+  /** Country codes visited so far (tints the land). */
+  countries: string[];
+}
+
+/** Regular route layers hidden while the replay draws its own. */
+export const ROUTE_LAYERS = ['routes-glow', 'routes-line', 'routes-hl-glow', 'routes-hl', 'routes-hit'] as const;
+export const REPLAY_LAYERS = ['replay-past', 'replay-trail-glow', 'replay-trail', 'replay-head-glow', 'replay-head'] as const;
+export const AIRPORT_LAYERS = ['airports-glow', 'airports-dot', 'airports-label'] as const;
+
+export function replayAirportFilter(replay: ReplayData | null | undefined): FilterSpecification | null {
+  return replay ? ['in', ['get', 'id'], ['literal', replay.airports]] : null;
+}
+
 export interface StyleOptions {
+  replay?: ReplayData | null;
   mode: BaseMode;
   theme: MapTheme;
   colorMode: ColorMode;
@@ -135,6 +157,60 @@ export function overlayPaint(theme: MapTheme, colorMode: ColorMode, sel: Selecti
       ]),
     },
     'routes-hit': { 'line-color': '#000', 'line-opacity': 0, 'line-width': 18 },
+    'replay-past': {
+      'line-color': theme.freqRamp[1],
+      'line-opacity': theme.dark || onImagery ? 0.42 : 0.5,
+      'line-width': zoomInterp([
+        [1, 0.8],
+        [5, 1.2],
+        [9, 2],
+      ]),
+    },
+    'replay-trail-glow': {
+      'line-color': theme.highlight,
+      'line-opacity': theme.dark || onImagery ? 0.5 : 0.3,
+      'line-width': zoomInterp([
+        [1, 6],
+        [5, 9],
+        [9, 14],
+      ]),
+      'line-blur': zoomInterp([
+        [1, 4],
+        [5, 6],
+        [9, 8],
+      ]),
+    },
+    'replay-trail': {
+      'line-color': theme.highlight,
+      'line-opacity': 1,
+      'line-width': zoomInterp([
+        [1, 1.8],
+        [5, 2.4],
+        [9, 3.4],
+      ]),
+    },
+    'replay-head-glow': {
+      'circle-color': theme.highlight,
+      'circle-opacity': theme.dark || onImagery ? 0.45 : 0.3,
+      'circle-radius': zoomInterp([
+        [1, 9],
+        [5, 13],
+        [9, 18],
+      ]),
+      'circle-blur': 1,
+      'circle-pitch-alignment': 'map',
+    },
+    'replay-head': {
+      'circle-color': theme.dotFill,
+      'circle-stroke-color': theme.highlight,
+      'circle-stroke-width': 2,
+      'circle-radius': zoomInterp([
+        [1, 3.2],
+        [5, 4.2],
+        [9, 5.5],
+      ]),
+      'circle-pitch-alignment': 'map',
+    },
     'airports-glow': {
       'circle-color': theme.glow,
       'circle-opacity': ['*', theme.dark || onImagery ? 0.42 : 0.22, dotOpacity],
@@ -198,20 +274,33 @@ export function skyFor(theme: MapTheme): SkySpecification {
 
 // ---------- layers ----------
 
-function overlayLayers(paint: PaintTable, sel: Selection): LayerSpecification[] {
+function overlayLayers(paint: PaintTable, sel: Selection, replay?: ReplayData | null): LayerSpecification[] {
   const hl = routeFilter(sel);
+  const routeVis = { visibility: replay ? 'none' : 'visible' } as const;
+  const replayVis = { visibility: replay ? 'visible' : 'none' } as const;
+  const apFilter = replayAirportFilter(replay);
+  const ap = apFilter ? { filter: apFilter } : {};
+  const line = { 'line-cap': 'round', 'line-join': 'round' } as const;
+  const isTrail: FilterSpecification = ['==', ['get', 'kind'], 'trail'];
+  const isHead: FilterSpecification = ['==', ['get', 'kind'], 'head'];
   return [
-    { id: 'routes-glow', type: 'line', source: 'routes', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: paint['routes-glow'] },
-    { id: 'routes-line', type: 'line', source: 'routes', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: paint['routes-line'] },
-    { id: 'routes-hl-glow', type: 'line', source: 'routes', filter: hl, layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: paint['routes-hl-glow'] },
-    { id: 'routes-hl', type: 'line', source: 'routes', filter: hl, layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: paint['routes-hl'] },
-    { id: 'routes-hit', type: 'line', source: 'routes', layout: { 'line-cap': 'round' }, paint: paint['routes-hit'] },
-    { id: 'airports-glow', type: 'circle', source: 'airports', paint: paint['airports-glow'] },
-    { id: 'airports-dot', type: 'circle', source: 'airports', paint: paint['airports-dot'] },
+    { id: 'routes-glow', type: 'line', source: 'routes', layout: { ...line, ...routeVis }, paint: paint['routes-glow'] },
+    { id: 'routes-line', type: 'line', source: 'routes', layout: { ...line, ...routeVis }, paint: paint['routes-line'] },
+    { id: 'routes-hl-glow', type: 'line', source: 'routes', filter: hl, layout: { ...line, ...routeVis }, paint: paint['routes-hl-glow'] },
+    { id: 'routes-hl', type: 'line', source: 'routes', filter: hl, layout: { ...line, ...routeVis }, paint: paint['routes-hl'] },
+    { id: 'routes-hit', type: 'line', source: 'routes', layout: { 'line-cap': 'round', ...routeVis }, paint: paint['routes-hit'] },
+    { id: 'replay-past', type: 'line', source: 'replay-past', layout: { ...line, ...replayVis }, paint: paint['replay-past'] },
+    { id: 'replay-trail-glow', type: 'line', source: 'replay-live', filter: isTrail, layout: { ...line, ...replayVis }, paint: paint['replay-trail-glow'] },
+    { id: 'replay-trail', type: 'line', source: 'replay-live', filter: isTrail, layout: { ...line, ...replayVis }, paint: paint['replay-trail'] },
+    { id: 'airports-glow', type: 'circle', source: 'airports', ...ap, paint: paint['airports-glow'] },
+    { id: 'airports-dot', type: 'circle', source: 'airports', ...ap, paint: paint['airports-dot'] },
+    { id: 'replay-head-glow', type: 'circle', source: 'replay-live', filter: isHead, layout: replayVis, paint: paint['replay-head-glow'] },
+    { id: 'replay-head', type: 'circle', source: 'replay-live', filter: isHead, layout: replayVis, paint: paint['replay-head'] },
     {
       id: 'airports-label',
       type: 'symbol',
       source: 'airports',
+      ...ap,
       layout: {
         'text-field': ['get', 'code'],
         'text-font': [LABEL_FONT],
@@ -256,17 +345,20 @@ export function visitedFilter(codes: string[]): FilterSpecification {
   return ['in', ['get', 'c'], ['literal', codes.length ? codes : ['__']]];
 }
 
-function overlaySources(data: OverlayData): Record<string, SourceSpecification> {
+function overlaySources(data: OverlayData, replay?: ReplayData | null): Record<string, SourceSpecification> {
   return {
     routes: { type: 'geojson', data: data.routes as GeoJSON.GeoJSON, tolerance: 0.25, buffer: 64 },
     airports: { type: 'geojson', data: data.airports as GeoJSON.GeoJSON },
+    'replay-past': { type: 'geojson', data: (replay?.past ?? EMPTY_FC) as GeoJSON.GeoJSON, tolerance: 0.25, buffer: 64 },
+    // Rewritten every frame while playing: keep tiling cheap.
+    'replay-live': { type: 'geojson', data: (replay?.live ?? EMPTY_FC) as GeoJSON.GeoJSON, tolerance: 0.4, buffer: 32, maxzoom: 10 },
   };
 }
 
 /** Composes the full style for a basemap mode with the flight overlay on top. */
 export function buildStyle(o: StyleOptions): StyleSpecification {
   const { theme, basemap } = o;
-  const overlay = overlayLayers(overlayPaint(theme, o.colorMode, o.selection, o.mode === 'satellite'), o.selection);
+  const overlay = overlayLayers(overlayPaint(theme, o.colorMode, o.selection, o.mode === 'satellite'), o.selection, o.replay);
   const base: Pick<StyleSpecification, 'version' | 'glyphs' | 'projection' | 'sky'> = {
     version: 8,
     glyphs: GLYPHS_URL,
@@ -280,7 +372,7 @@ export function buildStyle(o: StyleOptions): StyleSpecification {
     return {
       ...remote,
       ...base,
-      sources: { ...remote.sources, ...overlaySources(o.data) },
+      sources: { ...remote.sources, ...overlaySources(o.data, o.replay) },
       layers: [...remote.layers, ...overlay],
     };
   }
@@ -301,7 +393,7 @@ export function buildStyle(o: StyleOptions): StyleSpecification {
       sources: {
         satellite: { type: 'raster', tiles: [ESRI_TILES], tileSize: 256, maxzoom: 18, attribution: ESRI_ATTRIBUTION },
         ...(basemap ? { land: { type: 'geojson', data: basemap.land as GeoJSON.GeoJSON, attribution: NE_ATTRIBUTION } } : {}),
-        ...overlaySources(o.data),
+        ...overlaySources(o.data, o.replay),
       },
       layers: [
         { id: 'bg', type: 'background', paint: { 'background-color': theme.space } },
@@ -324,9 +416,9 @@ export function buildStyle(o: StyleOptions): StyleSpecification {
       graticule: { type: 'geojson', data: graticule(15) as GeoJSON.GeoJSON },
       land: { type: 'geojson', data: (basemap?.land ?? EMPTY_FC) as GeoJSON.GeoJSON, attribution: NE_ATTRIBUTION, tolerance: 0.3 },
       admin1: { type: 'geojson', data: (basemap?.lines ?? EMPTY_FC) as GeoJSON.GeoJSON, tolerance: 0.3 },
-      ...overlaySources(o.data),
+      ...overlaySources(o.data, o.replay),
     },
-    layers: [...nightLayers(basemapPaint(theme), o.data.visitedCountries, !!basemap), ...overlay],
+    layers: [...nightLayers(basemapPaint(theme), o.replay ? o.replay.countries : o.data.visitedCountries, !!basemap), ...overlay],
   };
 }
 
