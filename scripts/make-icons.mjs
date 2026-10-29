@@ -9,7 +9,8 @@
  * use a simplified drawing (solid land, fewer and bigger lit dots) so it still reads at 16×16.
  *
  * Outputs (committed):
- *   public/favicon.svg (simplified, also the in-app brand mark), public/icons/icon.svg
+ *   public/favicon.svg (simplified, browser tabs), public/icons/mark.svg (full, in-app brand),
+ *   public/icons/icon.svg
  *   public/icons/icon-192.png, icon-512.png            rounded tile, transparent corners ("any")
  *   public/icons/icon-maskable-512.png                 full-bleed, art in the safe zone ("maskable")
  *   public/icons/icon-monochrome-512.png               white glyph on transparent ("monochrome")
@@ -108,6 +109,8 @@ function shortcutSvg(path, color) {
 
 const favicon = svg({ shape: 'tile', scale: 1.26, detail: 'small' }); // tab icon + in-app brand mark (≤32px)
 const favicon64 = svg({ shape: 'tile', scale: 1.22 });
+/** In-app brand mark (header, welcome): the full dotted map, shown at 40–64px. */
+const mark = svg({ shape: 'tile', scale: 1.22 });
 const tiny = svg({ shape: 'tile', scale: 1.28, detail: 'tiny' });
 const anyIcon = svg({ shape: 'tile', scale: 1.16 });
 const maskable = svg({ shape: 'bleed', scale: 0.82 });
@@ -119,6 +122,7 @@ const shortcutStats = shortcutSvg('M5 19V11M12 19V5M19 19v-6', LIT);
 await mkdir(iconsDir, { recursive: true });
 await writeFile(join(root, 'public', 'favicon.svg'), favicon + '\n');
 await writeFile(join(iconsDir, 'icon.svg'), anyIcon + '\n');
+await writeFile(join(iconsDir, 'mark.svg'), mark + '\n');
 
 /** [file, markup, size, transparent background] */
 const jobs = [

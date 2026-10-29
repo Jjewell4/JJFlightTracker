@@ -247,6 +247,7 @@
     font-weight: 800;
     font-size: var(--text-xl);
     letter-spacing: -0.02em;
+    white-space: nowrap;
   }
 
   .shell__add-wide {

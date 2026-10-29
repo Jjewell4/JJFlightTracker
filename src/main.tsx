@@ -20,5 +20,19 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
+// Launch splash (index.html): fade it out once the app has painted, after a short minimum so the
+// drifting map reads as a moment rather than a flash.
+const splash = document.getElementById('splash');
+if (splash) {
+  const shownFor = performance.now();
+  const MIN_MS = 900;
+  requestAnimationFrame(() =>
+    setTimeout(() => {
+      splash.classList.add('is-done');
+      setTimeout(() => splash.remove(), 320);
+    }, Math.max(0, MIN_MS - shownFor)),
+  );
+}
+
 // Background cloud sync (no-op unless Supabase env vars are configured).
 if (!publicHandleFromPath(window.location.pathname)) startCloudSync();

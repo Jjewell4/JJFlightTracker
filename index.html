@@ -26,8 +26,45 @@
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
     <title>Window Seat</title>
+    <style>
+      /* Launch splash: the window-seat mark with the map drifting under the wing. Removed by
+         main.tsx once the app has rendered (kept up briefly so it doesn't just flash). */
+      #splash { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: #0a0e16; color: #eef2fa; transition: opacity 280ms ease-out; }
+      #splash.is-done { opacity: 0; pointer-events: none; }
+      #splash .ws-splash { display: flex; flex-direction: column; align-items: center; gap: 18px; font: 800 28px/1 system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: -0.02em; }
+      #splash .ws-pan { animation: ws-pan 7s linear infinite; }
+      @keyframes ws-pan { to { transform: translateX(-232px); } }
+      @media (prefers-reduced-motion: reduce) { #splash .ws-pan { animation: none; } }
+      :root[data-theme='light'] #splash { background: #f4f6fb; color: #0e1524; }
+      @media (prefers-color-scheme: light) { :root:not([data-theme='dark']) #splash { background: #f4f6fb; color: #0e1524; } }
+    </style>
   </head>
   <body>
+    <div id="splash" aria-hidden="true">
+      <div class="ws-splash">
+        <svg width="120" height="120" viewBox="0 0 512 512">
+          <defs>
+            <clipPath id="ws-sp-pane"><rect x="156" y="96" width="200" height="320" rx="88" /></clipPath>
+            <pattern id="ws-sp-dots" width="16" height="16" patternUnits="userSpaceOnUse"><circle cx="8" cy="8" r="3.4" fill="#5b8fe6" /></pattern>
+          </defs>
+          <rect width="512" height="512" rx="112" fill="#13285a" />
+          <g transform="translate(256 256) scale(1.22) translate(-256 -256)">
+            <rect x="124" y="64" width="264" height="384" rx="120" fill="#e8f1ff" />
+            <g clip-path="url(#ws-sp-pane)">
+              <rect x="140" y="80" width="232" height="352" fill="#0c1631" />
+              <g class="ws-pan">
+                <path d="M140 140L160 128L184 126L200 120L224 116L244 112L262 106L284 104L300 112L304 128L296 140L290 156L300 166L314 160L316 142L326 128L340 122L352 136L356 154L348 170L336 180L330 192L324 206L318 220L310 232L306 246L310 262L306 272L300 268L296 254L288 248L276 250L264 248L256 254L252 266L254 280L264 290L272 296L278 304L286 312L292 318L286 322L276 316L266 308L256 300L244 292L232 282L222 270L214 256L206 240L200 222L196 204L190 190L180 180L168 172L156 166L148 158L140 156Z" fill="url(#ws-sp-dots)" /><path d="M290 322L304 320L320 326L334 334L350 344L362 356L354 372L342 386L330 400L318 414L308 432L296 432L292 414L288 396L284 378L282 360L280 344L284 332Z" fill="url(#ws-sp-dots)" />
+                <g transform="translate(232 0)"><path d="M140 140L160 128L184 126L200 120L224 116L244 112L262 106L284 104L300 112L304 128L296 140L290 156L300 166L314 160L316 142L326 128L340 122L352 136L356 154L348 170L336 180L330 192L324 206L318 220L310 232L306 246L310 262L306 272L300 268L296 254L288 248L276 250L264 248L256 254L252 266L254 280L264 290L272 296L278 304L286 312L292 318L286 322L276 316L266 308L256 300L244 292L232 282L222 270L214 256L206 240L200 222L196 204L190 190L180 180L168 172L156 166L148 158L140 156Z" fill="url(#ws-sp-dots)" /><path d="M290 322L304 320L320 326L334 334L350 344L362 356L354 372L342 386L330 400L318 414L308 432L296 432L292 414L288 396L284 378L282 360L280 344L284 332Z" fill="url(#ws-sp-dots)" /></g>
+              </g>
+              <path d="M140 340L318 292L330 308L140 392Z" fill="#e8f1ff" />
+              <path d="M140 378L328 304L330 308L140 392Z" fill="#b9cce8" />
+              <path d="M318 292L330 252L342 255L330 308Z" fill="#ffb547" />
+            </g>
+          </g>
+        </svg>
+        <span>Window Seat</span>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
