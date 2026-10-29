@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { asFlights, defaultDistanceUnit, publicFields, publicFlights, validHandle, publicHandleFromPath } from './profile';
+import { asFlights, defaultDistanceUnit, normalizeShare, publicFields, publicFlights, sharedSummary, validHandle, publicHandleFromPath } from './profile';
 import { applyPatch, parseView } from './journal-state';
 import type { Flight } from '@/lib/types';
 const base = {
@@ -45,6 +45,26 @@ describe('public flight projection', () => {
       '2024-01-14',
     );
   });
+  it('adds only the categories the owner switches on, normalized like the database', () => {
+    const rich = { ...base, arrTime: '12:05', arrDayOffset: 0, durationMin: 95.6, cabinClass: 'first', seatType: 'aisle', reason: 'business', airlineName: 'Typed' } as Flight;
+    const keys = (share: Parameters<typeof publicFlights>[3]) => Object.keys(publicFlights([rich], false, '2026-10-28', share)[0]).sort();
+    const basics = ['aircraftType', 'airlineIcao', 'date', 'datePrecision', 'from', 'to'];
+    expect(keys({})).toEqual(basics);
+    expect(keys({ times: true })).toEqual([...basics, 'arrDayOffset', 'arrTime', 'depTime', 'durationMin'].sort());
+    const all = publicFlights([rich], true, '2026-10-28', { times: true, cabin: true, seat: true, reason: true, flightNumber: true, registration: true })[0];
+    expect(all).toMatchObject({ durationMin: 96, cabinClass: 'first', seatNumber: '12A', seatType: 'aisle', reason: 'business', flightNumber: 'UA1', registration: 'N123' });
+    for (const k of ['note', 'airlineName', 'id', 'source', 'createdAt', 'updatedAt']) expect(all).not.toHaveProperty(k);
+    // Malformed values are dropped, never the flight.
+    const odd = publicFlights([{ ...rich, depTime: '9:30', seatNumber: '12AB', cabinClass: 'coach' } as unknown as Flight], false, '2026-10-28', { times: true, seat: true, cabin: true })[0];
+    expect(odd).not.toHaveProperty('depTime');
+    expect(odd).not.toHaveProperty('seatNumber');
+    expect(odd).not.toHaveProperty('cabinClass');
+    expect(odd.seatType).toBe('aisle');
+  });
+  it('keeps only known share switches that are on', () => {
+    expect(normalizeShare({ times: true, seat: false, notes: true, cabin: 'yes' })).toEqual({ times: true });
+    expect(normalizeShare(null)).toEqual({});
+  });
   it('reserves application routes and enforces canonical handles', () => {
     for (const slug of [
       'ab',
@@ -70,6 +90,12 @@ describe('public journal fields and view state', () => {
     expect(month).toEqual({ times: false, cabin: false, seat: false, reason: false, registration: false, flightNumber: false, exactDates: false });
     expect(publicFields(publicFlights([base], true, '2026-10-28')).exactDates).toBe(true);
     expect(publicFields([]).exactDates).toBe(false);
+  });
+  it('reports exactly the categories present in the shared flights', () => {
+    const shared = publicFlights([base], false, '2026-10-28', { times: true, seat: true, flightNumber: true });
+    expect(publicFields(shared)).toEqual({ times: true, cabin: false, seat: true, reason: false, registration: false, flightNumber: true, exactDates: false });
+    expect(sharedSummary(publicFields(shared))).toBe('routes, months, airlines, aircraft types, flight times, seats, flight numbers and saved trips');
+    expect(sharedSummary(publicFields([]))).toBe('routes, months, airlines, aircraft types and saved trips');
   });
   it('picks a customary distance unit for visitors', () => {
     expect(defaultDistanceUnit('en-US')).toBe('mi');

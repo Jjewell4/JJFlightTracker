@@ -68,8 +68,8 @@ export function PublicOverview({ flights, stats, unit, nav }: { flights: Flight[
 
   return (
     <div className="flights pj-overview">
-      {/* Shared journals carry no times: time in the air is the app's distance-based estimate. */}
-      <SummaryHero summary={summary} unit={unit} upcoming={0} link={statsLink} estimatedTime />
+      {/* Unless the owner shares flight times, time in the air is the app's distance-based estimate. */}
+      <SummaryHero summary={summary} unit={unit} upcoming={0} link={statsLink} estimatedTime={!flights.some((f) => f.durationMin)} />
 
       <JournalLink nav={nav} to={{ view: 'map' }} className="overview__map overview__map--solo card" label="Open the route map">
         <span className="overview__heading">

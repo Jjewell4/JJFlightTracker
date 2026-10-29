@@ -26,7 +26,7 @@ export function Footprint({ stats, readOnly = false }: { stats: FlightStats; rea
         <div className="stats-footprint__main">
           <CardHead
             title="Estimated CO₂"
-            subtitle={readOnly ? 'Per-passenger share of each flight, as economy' : 'Your per-passenger share of each flight'}
+            subtitle={readOnly ? `Per-passenger share of each flight${stats.cabin.known ? '' : ', as economy'}` : 'Your per-passenger share of each flight'}
             right={<Icon name="sparkle" size={20} className="stats-footprint__icon" />}
           />
           <p className="stats-footprint__value">

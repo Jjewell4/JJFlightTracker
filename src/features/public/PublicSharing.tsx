@@ -4,6 +4,7 @@ import { todayLocal } from '@/lib/time';
 import { useFlights, useSettings } from '@/lib/db';
 import { useCloudSync, syncBeforeSharing } from '@/services/sync/controller';
 import { ConfirmSheet } from '@/components/Sheet';
+import { Switch } from '@/components/Switch';
 import {
   loadOwnProfile,
   profileError,
@@ -14,11 +15,27 @@ import {
   normalizeHandle,
   profileUrl,
   publicFlights,
+  sharedSummary,
+  SHARE_KEYS,
   validHandle,
   type PublicProfile,
+  type PublicShare,
+  type ShareKey,
 } from './profile';
 import { PublicDashboard } from './PublicDashboard';
 import './public.css';
+
+/** Optional categories, each with what it adds to the public journal. Off by default. */
+const SHARE_OPTIONS: { key: ShareKey | 'exactDates'; title: string; adds: string }[] = [
+  { key: 'exactDates', title: 'Exact dates', adds: 'Adds day-of-week patterns, the travel calendar and your busiest day.' },
+  { key: 'times', title: 'Flight times', adds: 'Adds time in the air from your recorded times, the departure-time clock and records by duration.' },
+  { key: 'cabin', title: 'Cabin class', adds: 'Adds the cabin class chart and cabin-adjusted CO₂.' },
+  { key: 'seat', title: 'Seats', adds: 'Adds window, middle or aisle stats and the seat map.' },
+  { key: 'reason', title: 'Trip purpose', adds: 'Adds the leisure, business and crew breakdown.' },
+  { key: 'flightNumber', title: 'Flight numbers', adds: 'Shows flight numbers in your flight history and travel calendar.' },
+  { key: 'registration', title: 'Aircraft registrations', adds: 'Adds the tail numbers ranking.' },
+];
+
 export function PublicSharing() {
   const sync = useCloudSync();
   const flights = useFlights();
@@ -27,6 +44,7 @@ export function PublicSharing() {
   const [slug, setSlug] = useState('');
   const [name, setName] = useState('');
   const [exact, setExact] = useState(false);
+  const [share, setShare] = useState<PublicShare>({});
   const [preview, setPreview] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -48,6 +66,7 @@ export function PublicSharing() {
             setSlug(p?.slug || '');
             setName(p?.display_name || '');
             setExact(p?.exact_dates || false);
+            setShare(p?.share ?? {});
             setLoaded(true);
           }
         })
@@ -60,9 +79,24 @@ export function PublicSharing() {
   }, [sync.userId, attempt]);
   const today = todayLocal();
   const previewFlights = useMemo(
-    () => publicFlights(flights ?? [], exact, today),
-    [flights, exact, today],
+    () => publicFlights(flights ?? [], exact, today, share),
+    [flights, exact, today, share],
   );
+  const isOn = (key: ShareKey | 'exactDates') => (key === 'exactDates' ? exact : share[key] === true);
+  const setOption = (key: ShareKey | 'exactDates', on: boolean) => {
+    if (key === 'exactDates') setExact(on);
+    else setShare((s) => ({ ...s, [key]: on || undefined }));
+  };
+  const allOn = exact && SHARE_KEYS.every((k) => share[k]);
+  const summary = sharedSummary({
+    exactDates: exact,
+    times: !!share.times,
+    cabin: !!share.cabin,
+    seat: !!share.seat,
+    reason: !!share.reason,
+    flightNumber: !!share.flightNumber,
+    registration: !!share.registration,
+  });
   const handle = normalizeHandle(slug);
   const candidate: PublicProfile = {
     slug: handle,
@@ -81,6 +115,7 @@ export function PublicSharing() {
         slug: handle,
         display_name: name.trim(),
         exact_dates: exact,
+        share,
       });
       setSaved(p);
       setNotice('Your public journal is published.');
@@ -200,26 +235,43 @@ export function PublicSharing() {
                     disabled={busy}
                   />
                 </label>
-                <label className="public-sharing__privacy">
-                  <input
-                    type="checkbox"
-                    checked={exact}
-                    onChange={(e) => {
-                      setExact(e.target.checked);
-                      setPreview(false);
+                <fieldset className="public-share" disabled={busy}>
+                  <legend className="public-share__legend">What visitors can see</legend>
+                  <p className="field__hint">
+                    Always shared: routes, months, airlines, aircraft types and saved trips. Switch on more to make
+                    your public stats match your own.
+                  </p>
+                  <ul className="public-share__list">
+                    {SHARE_OPTIONS.map((o) => (
+                      <li key={o.key} className="public-share__row">
+                        <span className="public-share__text">
+                          <span className="public-share__title">{o.title}</span>
+                          <span className="public-share__sub">{o.adds}</span>
+                        </span>
+                        <Switch checked={isOn(o.key)} onChange={(v) => setOption(o.key, v)} label={`Share ${o.title.toLowerCase()}`} />
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    className="btn btn--ghost public-share__all"
+                    onClick={() => {
+                      setExact(!allOn);
+                      setShare(allOn ? {} : Object.fromEntries(SHARE_KEYS.map((k) => [k, true])));
                     }}
-                    disabled={busy}
-                  />{' '}
-                  Include exact flight dates
-                </label>
+                  >
+                    {allOn ? 'Turn everything off' : 'Share everything (match my stats)'}
+                  </button>
+                </fieldset>
                 <p className="field__hint">
                   Your live journal includes {previewFlights.length} past
                   flights now and automatically includes new past flights after
-                  syncing: routes, {exact ? 'flight dates' : 'months and years'}
-                  , airlines and aircraft types. Notes, seats, flight numbers,
-                  tail numbers, times and account information are excluded.
-                  Today’s and future flights stay private. Anyone with the URL
-                  can view or copy the published information.
+                  syncing: {summary}. Today’s and future flights stay private.
+                  Anyone with the URL can view or copy the published information.
+                </p>
+                <p className="field__hint public-share__never">
+                  Never shared: notes, airline and aircraft names you typed in, flight and account ids, your
+                  email and home country.
                 </p>
                 {saved && saved.slug !== handle && (
                   <p className="field__hint">

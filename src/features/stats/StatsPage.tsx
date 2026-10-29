@@ -143,8 +143,9 @@ function StatsDashboard({ flights, upcoming, unit, clock, homeCountry, readOnly,
           <Icon name="info" size={14} />
           {readOnly ? (
             <p>
-              Distances are great-circle between airports. Shared journals include only routes, {fields.exactDates ? 'dates' : 'months'}, airlines and aircraft, so time in the
-              air is estimated from distance{fields.exactDates ? '' : ' and day-of-week patterns aren’t shown'}.
+              Distances are great-circle between airports.
+              {!fields.times && ' This journal doesn’t share flight times, so time in the air is estimated from distance.'}
+              {!fields.exactDates && ' Only months are shared, so day-of-week patterns aren’t shown.'}
               {q.unknownAirports > 0 && ` ${q.unknownAirports} unrecognized ${plural(q.unknownAirports, 'airport')} ${q.unknownAirports === 1 ? 'is' : 'are'} excluded from distance and places.`}
             </p>
           ) : (

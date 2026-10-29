@@ -5,7 +5,7 @@ import { useReferenceReady } from '@/data/reference';
 import { FlightSourceProvider, type FlightSource } from '@/lib/flight-source';
 import { computeStats } from '@/lib/stats';
 import type { Settings } from '@/lib/types';
-import { asFlights, defaultDistanceUnit, publicFields, type PublicProfile } from './profile';
+import { asFlights, defaultDistanceUnit, publicFields, sharedSummary, type PublicProfile } from './profile';
 import { applyPatch, JOURNAL_VIEWS, LEGACY_TRIPS_VIEW, parseMode, parseView, useJournalParams, type JournalView, type ParamPatch } from './journal-state';
 import { JournalLink, type JournalNav } from './JournalLink';
 import { PublicOverview } from './PublicOverview';
@@ -160,8 +160,7 @@ export function PublicDashboard({
                 </>
               )}
               <footer className="pj-footer">
-                {preview ? 'Visitors see this journal live' : `Updated ${updated} · Live journal`} · Shares routes, {fields.exactDates ? 'dates' : 'months'},
-                airlines, aircraft types and saved trips only.
+                {preview ? 'Visitors see this journal live' : `Updated ${updated} · Live journal`} · Shares {sharedSummary(fields)} only.
               </footer>
             </div>
           )}

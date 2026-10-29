@@ -161,6 +161,29 @@ describe('public journal', () => {
     expect(el.textContent).not.toContain('Departure time');
   });
 
+  it('shows the owner’s extra stats sections when they share every category', async () => {
+    const extra = (i: number): Partial<PublicFlight> => ({
+      date: `${FLIGHTS[i].date.slice(0, 8)}${String(10 + i).padStart(2, '0')}`,
+      datePrecision: 'day',
+      depTime: ['07:05', '13:40', '18:15', '09:30', '22:10', '06:45'][i],
+      durationMin: [150, 155, 640, 655, 330, 320][i],
+      cabinClass: i % 2 ? 'economy' : 'business',
+      seatType: i % 3 ? 'window' : 'aisle',
+      seatNumber: `${10 + i}A`,
+      reason: i < 2 ? 'leisure' : 'business',
+      flightNumber: `AS${100 + i}`,
+      registration: i % 2 ? 'N123AS' : 'N456AS',
+    });
+    const el = await render('/jordan?view=stats', profile(FLIGHTS.map((f, i) => ({ ...f, ...extra(i) }))));
+    const cards = [...el.querySelectorAll('.stats-card__title')].map((h) => h.textContent);
+    const records = [...el.querySelectorAll('.stats-record__label')].map((p) => p.textContent);
+    expect(cards).toEqual(expect.arrayContaining(['Cabin class', 'Seat', 'Reason', 'Departure time', 'Day of the week', 'Tail numbers']));
+    expect(records).toContain('Most time aloft');
+    expect(el.textContent).not.toContain('Est. time in the air');
+    expect(el.querySelector('.pj-footer')?.textContent).toContain('flight times, cabin classes, seats, trip purposes, flight numbers, aircraft registrations');
+    expectNoPrivateLinks(el);
+  });
+
   it('scopes stats to the year in the URL and keeps it in sync', async () => {
     const el = await render('/jordan?view=stats&year=2024');
     expect(el.querySelector('.stats-hero__kicker')?.textContent).toContain('2024');

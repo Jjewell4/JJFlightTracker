@@ -3,6 +3,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { it } from 'vitest';
+import type { Flight } from '@/lib/types';
 it('enforces public-profile ownership, privacy, handles and revocation in PostgreSQL', async () => {
   const db = new PGlite();
   await db.exec(
@@ -152,4 +153,58 @@ it('shares saved trip ids and names, and nothing else new', async () => {
   assert.equal(byFrom.KLAX.tripId, undefined);
   assert.equal(byFrom.KLAX.tripName, undefined);
   await db.close();
+}, 30000);
+
+it('shares optional categories only when the owner switches them on, exactly like the client preview', async () => {
+  const { publicFlights } = await import('./profile');
+  const db = new PGlite();
+  try {
+    await db.exec(
+      `create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; grant usage on schema auth to authenticated,anon; grant execute on function auth.uid() to authenticated,anon; insert into auth.users values ('00000000-0000-0000-0000-000000000001');`,
+    );
+    await db.exec(await readFile(new URL('../../../supabase/schema.sql', import.meta.url), 'utf8'));
+    await db.exec(await readFile(new URL('../../../supabase/public-profiles.sql', import.meta.url), 'utf8'));
+    const full = {
+      date: '2024-01-14', datePrecision: 'day', from: 'KSAN', to: 'KLAX', airlineIcao: 'UAL', airlineIata: 'UA', aircraftType: 'B738',
+      depTime: '07:05', arrTime: '23:59', arrDayOffset: 1, durationMin: 312.4, cabinClass: 'business', seatNumber: '12a', seatType: 'window',
+      reason: 'leisure', flightNumber: 'ua123', registration: 'n123ua', note: 'secret', airlineName: 'Typed airline', aircraftName: 'Typed aircraft',
+      distanceKm: 180, id: 'private-id', source: 'manual', createdAt: 1, updatedAt: 2,
+    };
+    const malformed = {
+      ...full, depTime: '7:05', arrTime: '24:00', arrDayOffset: 5, durationMin: 2000, cabinClass: 'coach', seatNumber: '12AB', seatType: 'floor',
+      reason: 'fun', flightNumber: 'UA 123', registration: 'N12345678901',
+    };
+    const edge = { date: '2024-02-01', datePrecision: 'month', from: 'KLAX', to: 'KSAN', arrDayOffset: 0, durationMin: 0, seatNumber: '1A', flightNumber: 'BA1' };
+    const all = { times: true, cabin: true, seat: true, reason: true, flightNumber: true, registration: true };
+    for (const share of [{}, { times: true }, { seat: true, reason: true }, all])
+      for (const exact of [false, true])
+        for (const data of [full, malformed, edge]) {
+          const sql = (await db.query<{ p: unknown }>('select public.project_public_flight($1::jsonb,$2,$3::jsonb) as p', [JSON.stringify(data), exact, JSON.stringify(share)])).rows[0].p;
+          assert.deepEqual(sql, publicFlights([data as unknown as Flight], exact, '9999-12-31', share)[0], JSON.stringify({ share, exact, data }));
+        }
+
+    await db.exec(
+      `insert into public.public_profiles(user_id,slug,display_name) values ('00000000-0000-0000-0000-000000000001','jordan','Jordan'); insert into public.flights(user_id,id,data,updated_at) values ('00000000-0000-0000-0000-000000000001','a','${JSON.stringify(full)}',1);`,
+    );
+    const shared = async () => (await db.query<{ flights: Record<string, unknown>[] }>("select flights from public.get_public_profile('jordan')")).rows[0].flights[0];
+    // Off by default: nothing beyond the basics leaves the database.
+    assert.deepEqual(Object.keys(await shared()).sort(), ['aircraftType', 'airlineIata', 'airlineIcao', 'date', 'datePrecision', 'from', 'to']);
+    await db.exec(`update public.public_profiles set share='{"times":true,"seat":true}'`);
+    const some = await shared();
+    assert.deepEqual([some.depTime, some.arrTime, some.arrDayOffset, some.durationMin, some.seatNumber, some.seatType], ['07:05', '23:59', 1, 312, '12A', 'window']);
+    for (const k of ['cabinClass', 'reason', 'flightNumber', 'registration', 'note', 'airlineName', 'aircraftName', 'id', 'distanceKm']) assert.equal(some[k], undefined, k);
+    await db.exec(`update public.public_profiles set share='${JSON.stringify(all)}'`);
+    const everything = await shared();
+    assert.deepEqual([everything.cabinClass, everything.reason, everything.flightNumber, everything.registration], ['business', 'leisure', 'UA123', 'N123UA']);
+    for (const k of ['note', 'airlineName', 'aircraftName', 'id', 'source', 'createdAt']) assert.equal(everything[k], undefined, k);
+    // Only known categories, as booleans.
+    await assert.rejects(() => db.exec(`update public.public_profiles set share='{"notes":true}'`));
+    await assert.rejects(() => db.exec(`update public.public_profiles set share='{"times":"yes"}'`));
+    await assert.rejects(() => db.exec(`update public.public_profiles set share='[]'`));
+    // A snapshot can never carry notes or malformed optional values either.
+    await assert.rejects(() => db.exec(`update public.public_profiles set flights='[{"date":"2024-01-01","datePrecision":"day","from":"KSAN","to":"KLAX","seatNumber":"12a"}]'`));
+    await assert.rejects(() => db.exec(`update public.public_profiles set flights='[{"date":"2024-01-01","datePrecision":"day","from":"KSAN","to":"KLAX","durationMin":"90"}]'`));
+  } finally {
+    await db.close();
+  }
 }, 30000);

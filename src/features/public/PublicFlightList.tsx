@@ -57,7 +57,7 @@ function matches(f: Flight, q: string): boolean {
   if (!q) return true;
   const from = getAirport(f.from);
   const to = getAirport(f.to);
-  return `${airportCode(f.from)} ${airportCode(f.to)} ${from?.city || ''} ${to?.city || ''} ${from?.name || ''} ${to?.name || ''} ${getAirline(f.airlineIcao || f.airlineIata)?.name || ''} ${f.aircraftType || ''} ${f.date} ${formatFlightDate(f.date, f.datePrecision)}`
+  return `${airportCode(f.from)} ${airportCode(f.to)} ${from?.city || ''} ${to?.city || ''} ${from?.name || ''} ${to?.name || ''} ${getAirline(f.airlineIcao || f.airlineIata)?.name || ''} ${f.aircraftType || ''} ${f.flightNumber || ''} ${f.date} ${formatFlightDate(f.date, f.datePrecision)}`
     .toLowerCase()
     .includes(q);
 }
