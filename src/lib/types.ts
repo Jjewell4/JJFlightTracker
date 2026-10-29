@@ -161,7 +161,7 @@ export interface DraftLeg {
  */
 export interface ImportDraft {
   id: string;
-  source: 'screenshot';
+  source: 'screenshot' | 'email';
   status: 'reading' | 'ready' | 'failed';
   createdAt: number;
   updatedAt: number;
@@ -173,5 +173,9 @@ export interface ImportDraft {
   error?: { code: string; message: string };
   /** Indexes of `result.flights` already saved or skipped. */
   handled?: number[];
+  /** Forwarded emails: the email_inbox row in Supabase, its subject and sender. */
+  remoteId?: string;
+  subject?: string;
+  sender?: string;
 }
 

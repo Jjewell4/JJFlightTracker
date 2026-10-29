@@ -8,6 +8,7 @@ import { useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, newId } from '@/lib/db';
 import type { ImportDraft } from '@/lib/types';
+import { ackEmail } from '@/services/email/client';
 import { prepareScreenshot, readScreenshot, ScreenshotError } from './client';
 
 /** Client-side ceiling; the server gives Gemini ~50 s inside a 60 s function. */
@@ -102,18 +103,26 @@ export async function cancelDraft(id: string): Promise<void> {
 
 export async function dismissDraft(id: string): Promise<void> {
   running.get(id)?.abort('cancel');
+  const draft = await db.drafts.get(id);
   await db.drafts.delete(id);
+  if (draft?.remoteId) void ackEmail(draft.remoteId, 'dismissed');
 }
 
 /** Marks legs as saved/skipped; the draft disappears once every leg is handled. */
 export async function markLegsHandled(id: string, indexes: number[]): Promise<void> {
-  await db.transaction('rw', db.drafts, async () => {
+  const finished = await db.transaction('rw', db.drafts, async () => {
     const draft = await db.drafts.get(id);
-    if (!draft) return;
+    if (!draft) return undefined;
     const handled = [...new Set([...(draft.handled ?? []), ...indexes])].sort((a, b) => a - b);
-    if (handled.length >= (draft.result?.flights.length ?? 0)) await db.drafts.delete(id);
-    else await db.drafts.update(id, { handled, updatedAt: Date.now() });
+    if (handled.length < (draft.result?.flights.length ?? 0)) {
+      await db.drafts.update(id, { handled, updatedAt: Date.now() });
+      return undefined;
+    }
+    await db.drafts.delete(id);
+    return draft;
   });
+  // A forwarded email leaves To review on every device once it's done.
+  if (finished?.remoteId) void ackEmail(finished.remoteId, 'done');
 }
 
 /**

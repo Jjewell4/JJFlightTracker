@@ -99,12 +99,12 @@ export default function ReviewPage() {
   return (
     <div className="review">
       {header}
-      <p className="review__lead">Screenshots being read or waiting for you to save their flights. They stay on this device until you’re done.</p>
+      <p className="review__lead">Screenshots and forwarded emails waiting for you to save their flights.</p>
       {drafts.length === 0 ? (
         <div className="empty">
           <Icon name="scan" size={32} />
           <p className="empty__title">Nothing to review</p>
-          <p>Scan a booking or boarding pass screenshot from Log a flight.</p>
+          <p>Scan a screenshot from Log a flight, or forward a booking email to your address in Settings → Email import.</p>
           <Link to="/flights/new" className="btn btn--primary">
             Log a flight
           </Link>
@@ -129,7 +129,7 @@ function DraftCard({ draft }: { draft: ImportDraft }) {
         <img className="review__thumb" src={draft.thumb} alt="" />
       ) : (
         <span className="review__thumb review__thumb--icon" aria-hidden="true">
-          <Icon name="scan" size={22} />
+          <Icon name={draft.source === 'email' ? 'mail' : 'scan'} size={22} />
         </span>
       )}
       <span className="review__text">

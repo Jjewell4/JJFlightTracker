@@ -20,6 +20,7 @@
     "dexie-react-hooks": "^4.4.0",
     "maplibre-gl": "^5.24.0",
     "papaparse": "^5.7.0",
+    "postal-mime": "^2.4.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router-dom": "^7.18.4",

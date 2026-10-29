@@ -36,12 +36,12 @@
 .topbar__brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  min-height: 44px;
+  gap: var(--space-3);
+  min-height: 48px;
   min-width: 0;
   color: var(--text);
-  font-weight: 750;
-  font-size: var(--text-lg);
+  font-weight: 800;
+  font-size: var(--text-xl);
   letter-spacing: -0.02em;
   white-space: nowrap;
   -webkit-tap-highlight-color: transparent;

@@ -194,3 +194,42 @@ button.srow:disabled {
 .sabout__list a {
   font-weight: 600;
 }
+
+/* ---------- email import ---------- */
+.email-import__address {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+.email-import__senders {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.email-import__senders li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-1) 0 var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.email-import__tag {
+  flex: none;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--text-xs);
+  font-weight: 650;
+}
+.email-import__remove {
+  flex: none;
+  min-width: 44px;
+}

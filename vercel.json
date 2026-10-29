@@ -45,7 +45,8 @@
   ],
   "trailingSlash": false,
   "functions": {
-    "api/extract-flight.ts": { "maxDuration": 60 }
+    "api/extract-flight.ts": { "maxDuration": 60 },
+    "api/inbound-email.ts": { "maxDuration": 60 }
   },
   "rewrites": [
     {

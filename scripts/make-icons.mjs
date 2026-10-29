@@ -106,12 +106,12 @@ function shortcutSvg(path, color) {
   <g transform="translate(96 96) scale(4.4) translate(-12 -12)"><path d="${path}" fill="none" stroke="${color}" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
 }
 
-const favicon = svg({ shape: 'tile', scale: 1.08, detail: 'small' }); // tab icon + in-app brand mark (≤32px)
-const favicon64 = svg({ shape: 'tile', scale: 1.04 });
-const tiny = svg({ shape: 'tile', scale: 1.12, detail: 'tiny' });
-const anyIcon = svg({ shape: 'tile', scale: 1 });
+const favicon = svg({ shape: 'tile', scale: 1.26, detail: 'small' }); // tab icon + in-app brand mark (≤32px)
+const favicon64 = svg({ shape: 'tile', scale: 1.22 });
+const tiny = svg({ shape: 'tile', scale: 1.28, detail: 'tiny' });
+const anyIcon = svg({ shape: 'tile', scale: 1.16 });
 const maskable = svg({ shape: 'bleed', scale: 0.82 });
-const apple = svg({ shape: 'bleed', scale: 0.9 });
+const apple = svg({ shape: 'bleed', scale: 1.04 });
 const mono = svg({ shape: 'none', scale: 0.82, mono: true });
 const shortcutAdd = shortcutSvg('M12 5v14M5 12h14', AMBER);
 const shortcutStats = shortcutSvg('M5 19V11M12 19V5M19 19v-6', LIT);

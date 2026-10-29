@@ -177,6 +177,11 @@ export function DraftReview({
         <h3 id={`${id}-title`} className="ss-results__title">
           {total === 0 ? 'No flights found' : total === 1 ? 'Found 1 flight' : `Found ${total} flights`}
         </h3>
+        {draft.source === 'email' && draft.subject && (
+          <p className="ss-note">
+            <Icon name="mail" size={14} /> {draft.subject}
+          </p>
+        )}
         <p className="ss-note">{open.length ? 'AI can misread details. Check each flight, then save — or edit one first.' : 'Every flight from this screenshot is saved.'}</p>
       </div>
       {!!draft.result?.warnings.length && (

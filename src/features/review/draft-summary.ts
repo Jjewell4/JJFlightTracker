@@ -28,10 +28,11 @@ export function routeSummary(legs: readonly DraftLeg[]): string {
 
 /** What the draft is: its route once read, else what's happening to it. */
 export function draftHeadline(d: ImportDraft): string {
-  if (d.status === 'reading') return 'Reading screenshot…';
-  if (d.status === 'failed') return 'Couldn’t read screenshot';
+  const kind = d.source === 'email' ? 'email' : 'screenshot';
+  if (d.status === 'reading') return `Reading ${kind}…`;
+  if (d.status === 'failed') return d.subject || `Couldn’t read ${kind}`;
   const legs = openLegs(d);
-  return routeSummary(legs) || 'Screenshot';
+  return routeSummary(legs) || d.subject || 'Screenshot';
 }
 
 export function draftDetail(d: ImportDraft, now = Date.now()): string {
@@ -39,7 +40,7 @@ export function draftDetail(d: ImportDraft, now = Date.now()): string {
   if (d.status === 'reading') return `Started ${when}`;
   if (d.status === 'failed') return d.error?.message ?? 'Tap to try again';
   const n = openLegs(d).length;
-  return `${n} ${n === 1 ? 'flight' : 'flights'} to save · ${when}`;
+  return `${d.source === 'email' ? 'Email · ' : ''}${n} ${n === 1 ? 'flight' : 'flights'} to save · ${when}`;
 }
 
 /** "just now", "12 min ago", "3:41 PM", "yesterday", "Oct 21". */
@@ -65,7 +66,7 @@ export function reviewBanner(drafts: readonly ImportDraft[]): { title: string; s
   const legs = ready.reduce((n, d) => n + openLegs(d).length, 0);
   const href = drafts.length === 1 ? `/review/${drafts[0].id}` : '/review';
   const sub = [
-    ready.length && (ready.length === 1 ? routeSummary(openLegs(ready[0])) : `${legs} flights from ${ready.length} screenshots`),
+    ready.length && (ready.length === 1 ? routeSummary(openLegs(ready[0])) : `${legs} flights from ${ready.length} imports`),
     reading.length && `Reading ${reading.length === 1 ? 'a screenshot' : `${reading.length} screenshots`}…`,
     failed.length && `${failed.length} couldn’t be read`,
   ]

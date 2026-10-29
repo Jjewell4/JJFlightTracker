@@ -25,6 +25,7 @@ import { CloudSyncSection } from './CloudSyncSection';
 import { useCloudSync } from '@/services/sync/controller';
 import './settings.css';
 import { PublicSharing } from '@/features/public/PublicSharing';
+import { EmailImport } from './EmailImport';
 import { exportSpreadsheetCsv } from '@/services/import/export-csv';
 
 function Group({ title, footer, children }: { title?: string; footer?: ReactNode; children: ReactNode }) {
@@ -161,6 +162,7 @@ export default function SettingsPage() {
 
       <CloudSyncSection Group={Group} />
       <PublicSharing />
+      <EmailImport />
 
       {/* ---------------------------------------------------------------- */}
       <Group title="Import & export">

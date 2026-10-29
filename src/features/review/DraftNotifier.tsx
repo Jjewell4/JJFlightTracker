@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
 import type { ImportDraft } from '@/lib/types';
+import { pullEmailDrafts } from '@/services/email/client';
 import { isWatched, resumeDrafts, useDrafts } from '@/services/screenshot/drafts';
 import { useCloudSync } from '@/services/sync/controller';
 import { openLegs, routeSummary } from './draft-summary';
@@ -25,12 +26,24 @@ export function DraftNotifier() {
   const [toast, setToast] = useState<Toast | null>(null);
 
   // Interrupted reads resume once signed in, and again when the connection comes back.
+  // Forwarded emails are fetched then too, when the app comes back to the foreground, and
+  // every couple of minutes while it's open.
   useEffect(() => {
     if (sync.phase !== 'signed-in') return;
-    void resumeDrafts();
-    const online = () => void resumeDrafts();
-    window.addEventListener('online', online);
-    return () => window.removeEventListener('online', online);
+    const refresh = () => {
+      void resumeDrafts();
+      void pullEmailDrafts();
+    };
+    refresh();
+    const visible = () => document.visibilityState === 'visible' && refresh();
+    const timer = setInterval(() => document.visibilityState === 'visible' && void pullEmailDrafts(), 120_000);
+    window.addEventListener('online', refresh);
+    document.addEventListener('visibilitychange', visible);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('online', refresh);
+      document.removeEventListener('visibilitychange', visible);
+    };
   }, [sync.phase]);
 
   useEffect(() => {
@@ -38,6 +51,11 @@ export function DraftNotifier() {
     const before = previous.current;
     previous.current = new Map(drafts.map((d) => [d.id, d.status]));
     if (!before) return; // first load: nothing just finished
+    const emails = drafts.filter((d) => d.source === 'email' && !before.has(d.id));
+    if (emails.length) {
+      const n = emails.reduce((sum, d) => sum + openLegs(d).length, 0);
+      setToast({ id: emails.length === 1 ? emails[0].id : '', ok: n > 0, text: n ? `Email read · ${n === 1 ? routeSummary(openLegs(emails[0])) : `${n} flights`} ready to save` : 'Couldn’t read a forwarded email' });
+    }
     for (const d of drafts) {
       if (before.get(d.id) !== 'reading' || d.status === 'reading' || isWatched(d.id)) continue;
       if (d.status === 'ready') {
@@ -65,7 +83,7 @@ export function DraftNotifier() {
         className="rtoast__btn"
         onClick={() => {
           setToast(null);
-          navigate(`/review/${toast.id}`);
+          navigate(toast.id ? `/review/${toast.id}` : '/review');
         }}
       >
         {toast.ok ? 'Review' : 'View'}
