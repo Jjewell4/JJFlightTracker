@@ -32,6 +32,10 @@ export interface ScreenshotConfig {
   supabaseKey: string;
   /** Names of misnamed variables found in the environment, for diagnostics only (never values). */
   misnamed?: string[];
+  /** Names of variables that look like a Gemini key but couldn't be used (typos, empty values). */
+  keyHints?: string[];
+  /** Which deployment is answering (Vercel system variables), shown when the key is missing. */
+  deployment?: { env?: string; branch?: string; commit?: string };
 }
 
 function fail(status: number, message: string, code?: ImportErrorCode): never {
@@ -235,35 +239,53 @@ export interface SetupCheck { id: string; label: string; ok: boolean | null; det
 export interface SetupStatus { ready: boolean; checks: SetupCheck[]; model?: string }
 
 /**
+ * Why the key is missing, as specifically as the environment allows. Deployment details and
+ * look-alike variable names are only shown to a signed-in user.
+ */
+function missingKeyDetail(config: ScreenshotConfig, signedIn: boolean): string {
+  if (config.misnamed?.length) return `GEMINI_API_KEY isn’t set, but ${config.misnamed.join(', ')} is. Rename it to GEMINI_API_KEY (no VITE_ prefix) and redeploy.`;
+  const generic = 'GEMINI_API_KEY isn’t set for this deployment. Add it in Vercel → Settings → Environment Variables (tick Production), then redeploy.';
+  if (!signedIn) return generic;
+  const d = config.deployment ?? {};
+  const where = [d.env && d.env[0].toUpperCase() + d.env.slice(1), d.branch, d.commit].filter(Boolean).join(' · ');
+  const intro = `GEMINI_API_KEY isn’t in this deployment${where ? ` (${where})` : ''}.`;
+  const hints = config.keyHints ?? [];
+  if (hints.length) {
+    const empty = hints.filter((h) => h.endsWith(' (empty)'));
+    return empty.length === hints.length
+      ? `${intro} ${hints.map((h) => h.replace(' (empty)', '')).join(', ')} exists but is empty. Paste the key again in Vercel, then redeploy.`
+      : `${intro} Found ${hints.join(', ')}. Rename it to exactly GEMINI_API_KEY in Vercel, then redeploy.`;
+  }
+  if (d.env === 'preview') return `${intro} This is a Preview deployment, so a key ticked only for Production doesn’t reach it. Tick Preview for the key too, or make main the Production branch in Vercel, then redeploy.`;
+  if (d.env === 'development') return `${intro} Add it to your local .env file (server-only, no VITE_ prefix) and restart.`;
+  return `${intro} If you’ve already added it: check it’s in this Vercel project with Production ticked, then Redeploy. Saved variables only reach deployments made after the change.`;
+}
+
+/**
  * Diagnostics for the in-app "Check setup" button. Reports which settings are present (never
  * their values). Network checks (key validity, model availability, quota SQL) run only for a
  * signed-in user, so anonymous visitors can't make the server call Google.
  */
 export async function screenshotStatus(authorization: string | undefined, config: ScreenshotConfig, fetcher: typeof fetch = fetch): Promise<SetupStatus> {
-  const checks: SetupCheck[] = [];
-  const keySet = !!config.geminiKey.trim();
-  checks.push({
-    id: 'gemini_key', label: 'Gemini API key on the server', ok: keySet,
-    detail: keySet
-      ? 'GEMINI_API_KEY is set.'
-      : config.misnamed?.length
-        ? `GEMINI_API_KEY isn’t set, but ${config.misnamed.join(', ')} is. Rename it to GEMINI_API_KEY (no VITE_ prefix) and redeploy.`
-        : 'GEMINI_API_KEY isn’t set for this deployment. Add it in Vercel → Settings → Environment Variables (tick Production), then redeploy.',
-  });
   const supabaseOk = !!config.supabaseUrl.trim() && !!config.supabaseKey.trim();
-  checks.push({ id: 'supabase', label: 'Supabase settings on the server', ok: supabaseOk, detail: supabaseOk ? 'SUPABASE_URL and the anon key are set.' : 'SUPABASE_URL or SUPABASE_ANON_KEY is missing for server functions.' });
-
   let headers: Record<string, string> | null = null;
+  let session: SetupCheck | undefined;
   if (!authorization) {
-    checks.push({ id: 'session', label: 'Signed in', ok: null, detail: 'Sign in to run the full check.' });
+    session = { id: 'session', label: 'Signed in', ok: null, detail: 'Sign in to run the full check.' };
   } else if (supabaseOk) {
     try {
       headers = await verifyUser(authorization, config, fetcher);
-      checks.push({ id: 'session', label: 'Signed in', ok: true, detail: 'Your session is valid.' });
+      session = { id: 'session', label: 'Signed in', ok: true, detail: 'Your session is valid.' };
     } catch (e) {
-      checks.push({ id: 'session', label: 'Signed in', ok: false, detail: e instanceof Error ? e.message : 'Could not verify your session.' });
+      session = { id: 'session', label: 'Signed in', ok: false, detail: e instanceof Error ? e.message : 'Could not verify your session.' };
     }
   }
+
+  const checks: SetupCheck[] = [];
+  const keySet = !!config.geminiKey.trim();
+  checks.push({ id: 'gemini_key', label: 'Gemini API key on the server', ok: keySet, detail: keySet ? 'GEMINI_API_KEY is set.' : missingKeyDetail(config, !!headers) });
+  checks.push({ id: 'supabase', label: 'Supabase settings on the server', ok: supabaseOk, detail: supabaseOk ? 'SUPABASE_URL and the anon key are set.' : 'SUPABASE_URL or SUPABASE_ANON_KEY is missing for server functions.' });
+  if (session) checks.push(session);
 
   let model: string | undefined;
   if (keySet && headers) {

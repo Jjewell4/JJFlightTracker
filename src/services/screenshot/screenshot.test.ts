@@ -155,6 +155,29 @@ describe('screenshot setup status', () => {
     expect(JSON.stringify(status)).not.toContain(config.geminiKey);
   });
 
+  it('explains a missing key with the deployment and look-alike names, only when signed in', async () => {
+    const missing = { ...config, geminiKey: '', keyHints: ['Gemini_Api_Key_2'], deployment: { env: 'production', branch: 'main', commit: 'abc1234' } };
+    const anon = await screenshotStatus(undefined, missing, vi.fn<typeof fetch>());
+    expect(anon.checks[0].detail).not.toContain('abc1234');
+    expect(anon.checks[0].detail).not.toContain('Gemini_Api_Key_2');
+
+    const f = vi.fn<typeof fetch>().mockResolvedValueOnce(json({ id: 'user-1' })).mockResolvedValueOnce(json([{ day_remaining: 10, month_remaining: 100 }]));
+    const signedIn = await screenshotStatus(auth, missing, f);
+    expect(signedIn.checks.map((c) => c.id)).toEqual(['gemini_key', 'supabase', 'session', 'quota']);
+    expect(signedIn.checks[0].detail).toContain('(Production · main · abc1234)');
+    expect(signedIn.checks[0].detail).toContain('Found Gemini_Api_Key_2');
+  });
+
+  it('points out a Preview deployment and empty values', async () => {
+    const f = () => vi.fn<typeof fetch>().mockResolvedValueOnce(json({ id: 'user-1' })).mockResolvedValueOnce(json([{}]));
+    const preview = await screenshotStatus(auth, { ...config, geminiKey: '', deployment: { env: 'preview', branch: 'main' } }, f());
+    expect(preview.checks[0].detail).toContain('Preview deployment');
+    const empty = await screenshotStatus(auth, { ...config, geminiKey: '', keyHints: ['GEMINI_API_KEY (empty)'] }, f());
+    expect(empty.checks[0].detail).toContain('GEMINI_API_KEY exists but is empty');
+    const stale = await screenshotStatus(auth, { ...config, geminiKey: '', deployment: { env: 'production' } }, f());
+    expect(stale.checks[0].detail).toContain('Redeploy');
+  });
+
   it('flags an install that lacks the quota functions', async () => {
     const f = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(json({ id: 'user-1' }))
@@ -171,5 +194,16 @@ describe('server environment', () => {
     const { configFromEnv } = await import('../../../api/extract-flight');
     const c = configFromEnv({ GOOGLE_API_KEY: ' "abc123"\n', SUPABASE_URL: 'https://x.supabase.co/', SUPABASE_ANON_KEY: 'anon', VITE_GEMINI_API_KEY: 'leaked' });
     expect(c).toMatchObject({ geminiKey: 'abc123', supabaseUrl: 'https://x.supabase.co', supabaseKey: 'anon', misnamed: ['VITE_GEMINI_API_KEY'] });
+  });
+
+  it('tolerates case/space typos in the key name and reports unusable look-alikes by name only', async () => {
+    const { configFromEnv } = await import('../../../api/extract-flight');
+    expect(configFromEnv({ 'gemini_api_key ': 'k1' }).geminiKey).toBe('k1');
+    expect(configFromEnv({ 'Gemini-API-Key': 'k2' }).geminiKey).toBe('k2');
+    const c = configFromEnv({ GEMINI_API_KEY: '  ', GEMINI_APIKEY: 'secret', GEMINI_MODEL: 'x', VERCEL_ENV: 'preview', VERCEL_GIT_COMMIT_REF: 'main', VERCEL_GIT_COMMIT_SHA: 'abcdef1234567' });
+    expect(c.geminiKey).toBe('');
+    expect(c.keyHints).toEqual(['GEMINI_API_KEY (empty)', 'GEMINI_APIKEY']);
+    expect(c.deployment).toEqual({ env: 'preview', branch: 'main', commit: 'abcdef1' });
+    expect(JSON.stringify(c)).not.toContain('secret');
   });
 });

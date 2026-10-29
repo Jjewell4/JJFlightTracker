@@ -6,23 +6,50 @@ function clean(value: string | undefined): string {
   return (value ?? '').trim().replace(/^(['"])(.*)\1$/, '$2').trim();
 }
 
+const norm = (name: string) => name.trim().toUpperCase().replace(/[\s-]+/g, '_');
+
+/** First non-empty value among `names`; also matches names that differ only in case, spaces or dashes. */
 function first(env: NodeJS.ProcessEnv, names: string[]): string {
   for (const n of names) {
     const v = clean(env[n]);
     if (v) return v;
   }
+  const wanted = new Set(names);
+  for (const [n, raw] of Object.entries(env)) {
+    const v = clean(raw);
+    if (v && wanted.has(norm(n))) return v;
+  }
   return '';
 }
 
+// GEMINI_API_KEY is documented; the others are common names for the same Google AI Studio key.
+const KEY_NAMES = ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'GEMINI_KEY'];
+const BROWSER_KEY_NAMES = ['VITE_GEMINI_API_KEY', 'NEXT_PUBLIC_GEMINI_API_KEY'];
+
 export function configFromEnv(env: NodeJS.ProcessEnv): ScreenshotConfig {
+  const geminiKey = first(env, KEY_NAMES);
+  const misnamed = BROWSER_KEY_NAMES.filter((n) => clean(env[n]));
+  // Variables that look like a Gemini key but weren't usable (typos, empty values). Names only.
+  const keyHints = geminiKey
+    ? []
+    : Object.keys(env)
+        .filter((n) => /GEMINI|GENAI|GENERATIVE/.test(norm(n)) && norm(n) !== 'GEMINI_MODEL' && !misnamed.includes(n))
+        .map((n) => (clean(env[n]) ? n : `${n} (empty)`))
+        .slice(0, 5);
   return {
-    // GEMINI_API_KEY is documented; the others are common names for the same Google AI Studio key.
-    geminiKey: first(env, ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'GEMINI_KEY']),
+    geminiKey,
     model: clean(env.GEMINI_MODEL),
     supabaseUrl: first(env, ['SUPABASE_URL', 'VITE_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL']).replace(/\/$/, ''),
     supabaseKey: first(env, ['SUPABASE_ANON_KEY', 'SUPABASE_PUBLISHABLE_KEY', 'VITE_SUPABASE_ANON_KEY', 'VITE_SUPABASE_PUBLISHABLE_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY']),
     // Never used — reported by name so a browser-exposed key can be renamed.
-    misnamed: ['VITE_GEMINI_API_KEY', 'NEXT_PUBLIC_GEMINI_API_KEY'].filter((n) => clean(env[n])),
+    misnamed,
+    keyHints,
+    // Vercel system variables: which deployment answered, so a stale or Preview build is obvious.
+    deployment: {
+      env: clean(env.VERCEL_ENV) || undefined,
+      branch: clean(env.VERCEL_GIT_COMMIT_REF) || undefined,
+      commit: clean(env.VERCEL_GIT_COMMIT_SHA).slice(0, 7) || undefined,
+    },
   };
 }
 
