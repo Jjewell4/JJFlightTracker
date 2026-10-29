@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { defaultDistanceUnit, publicFields, publicFlights, validHandle, publicHandleFromPath } from './profile';
+import { asFlights, defaultDistanceUnit, publicFields, publicFlights, validHandle, publicHandleFromPath } from './profile';
 import { applyPatch, parseView } from './journal-state';
 import type { Flight } from '@/lib/types';
 const base = {
@@ -84,5 +84,16 @@ describe('public journal fields and view state', () => {
     expect(applyPatch('', { view: 'stats', year: '2019' })).toBe('?view=stats&year=2019');
     expect(applyPatch('?view=stats&year=2019', { year: null })).toBe('?view=stats');
     expect(applyPatch('?view=map', { view: null })).toBe('');
+  });
+});
+
+describe('public flight order', () => {
+  it('keeps legs of a saved trip in sequence when only months are shared', async () => {
+    const { savedTrips } = await import('./PublicTripList');
+    const leg = (from: string, to: string) => ({ date: '2026-06-01', datePrecision: 'month' as const, from, to, tripId: 't1', tripName: 'Europe' });
+    // Newest first, as the server sends them.
+    const flights = asFlights([leg('CDG', 'LAX'), leg('LHR', 'CDG'), leg('LAX', 'LHR')]).sort((a, b) => b.date.localeCompare(a.date));
+    const [trip] = savedTrips(flights);
+    expect(trip.flights.map((f) => `${f.from}-${f.to}`)).toEqual(['LAX-LHR', 'LHR-CDG', 'CDG-LAX']);
   });
 });

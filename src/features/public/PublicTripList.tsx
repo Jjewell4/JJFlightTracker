@@ -41,13 +41,14 @@ export function PublicTripList({ flights, unit }: { flights: Flight[]; unit: Set
     );
   }
   return (
-    <div className="pj-trips">
+    <div className="flights trips pj-trips">
       {years.map((y) => (
-        <section key={y.year} className="pj-trips__year" aria-labelledby={`pj-trips-${y.year}`}>
-          <h2 id={`pj-trips-${y.year}`} className="section-title">
-            {y.year} <span className="pj-trips__count">{y.trips.length === 1 ? '1 trip' : `${y.trips.length} trips`}</span>
+        <section key={y.year} className="tyear" aria-labelledby={`pj-trips-${y.year}`}>
+          <h2 id={`pj-trips-${y.year}`} className="tyear__head">
+            <span className="tyear__year">{y.year}</span>
+            <span className="tyear__meta tabular">{plural(y.trips.length, 'trip')}</span>
           </h2>
-          <ul className="pj-trips__list">
+          <ul className="tyear__list pj-trips__list">
             {y.trips.map((t) => {
               const expanded = open === t.id;
               return (
@@ -58,12 +59,17 @@ export function PublicTripList({ flights, unit }: { flights: Flight[]; unit: Set
                     </span>
                     <span className="tcard__body">
                       <span className="tcard__top">
+                        <Icon name="bookmark" size={14} className="tcard__saved-icon" strokeWidth={2.2} />
                         <span className="tcard__title">{tripTitle(t)}</span>
                       </span>
-                      <span className="tcard__dates">{exact(t) ? tripDates(t) : t.start.slice(0, 7) === t.end.slice(0, 7) ? monthFmt(t.start) : `${monthFmt(t.start)} – ${monthFmt(t.end)}`}</span>
+                      <span className="tcard__dates">
+                        {exact(t) ? tripDates(t) : t.start.slice(0, 7) === t.end.slice(0, 7) ? monthFmt(t.start) : `${monthFmt(t.start)} – ${monthFmt(t.end)}`}
+                      </span>
                       <TripRouteLine trip={t} compact className="tcard__route" />
                       <span className="tcard__stats tabular">
-                        {exact(t) ? tripStatsLine(t, unit) : [plural(t.flights.length, 'flight'), t.distanceKm > 0 ? formatDistance(t.distanceKm, unit) : ''].filter(Boolean).join(' · ')}
+                        {exact(t)
+                          ? tripStatsLine(t, unit)
+                          : [plural(t.flights.length, 'flight'), t.distanceKm > 0 ? formatDistance(t.distanceKm, unit) : ''].filter(Boolean).join(' · ')}
                       </span>
                     </span>
                     <Icon name="chevron" size={16} className={`tcard__chev pj-trip__chev${expanded ? ' is-open' : ''}`} />

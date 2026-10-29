@@ -1,6 +1,7 @@
 /**
  * View state of a public journal, deep-linkable through the page's own query string:
- * `/<handle>?view=map`, `/<handle>?view=stats&year=2019`, `/<handle>?view=flights&airport=KSAN`.
+ * `/<handle>?view=map`, `/<handle>?view=stats&year=2019`, `/<handle>?view=flights&airport=KSAN`,
+ * `/<handle>?view=flights&mode=trips` (the Flights | Trips switch, like the app's Log tab).
  *
  * Public journals live outside the app's HashRouter (the Vercel `/:slug` rewrite serves
  * index.html), so the query string never clashes with `#/…` app routes. The owner's
@@ -9,11 +10,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ViewParams } from '@/lib/flight-source';
 
-export const JOURNAL_VIEWS = ['overview', 'map', 'stats', 'trips', 'flights'] as const;
+export const JOURNAL_VIEWS = ['overview', 'map', 'stats', 'flights'] as const;
 export type JournalView = (typeof JOURNAL_VIEWS)[number];
 
+/** Trips used to be their own section (`?view=trips`); they now live inside Flights. */
+export const LEGACY_TRIPS_VIEW = 'trips';
+
 export function parseView(raw: string | null): JournalView {
+  if (raw === LEGACY_TRIPS_VIEW) return 'flights';
   return (JOURNAL_VIEWS as readonly string[]).includes(raw ?? '') ? (raw as JournalView) : 'overview';
+}
+
+export type FlightsMode = 'flights' | 'trips';
+
+/** The Flights view's Flights | Trips switch (`mode=trips`; old `view=trips` links too). */
+export function parseMode(params: { get(key: string): string | null }): FlightsMode {
+  return params.get('mode') === 'trips' || params.get('view') === LEGACY_TRIPS_VIEW ? 'trips' : 'flights';
 }
 
 export type ParamPatch = Record<string, string | null>;

@@ -3,23 +3,10 @@
 .public-page {
   min-height: 100dvh;
 }
-.public-page--state {
+.public-page--state .public-page__body {
   max-width: 720px;
   margin: 0 auto;
   padding: 0 var(--space-4) var(--space-12);
-}
-
-.public-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 44px;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.pj-bar {
-  padding-top: calc(var(--safe-top) + var(--space-2));
 }
 
 .public-empty {
@@ -53,9 +40,63 @@
 .pj-top {
   display: contents;
 }
+/* Brand bar: the same full-bleed bar, mark and name as the app's phone top bar. */
 .pj-brand {
   order: 0;
-  padding: calc(var(--safe-top) + var(--space-2)) var(--pj-gutter) 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: calc(var(--safe-top) + var(--space-3)) var(--space-4) var(--space-3);
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+}
+.pj-brand__home {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  min-width: 0;
+  color: var(--text);
+  font-weight: 800;
+  font-size: var(--text-2xl);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+.pj-brand__mark {
+  display: block;
+  flex: none;
+}
+.pj-brand__start {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  margin-right: calc(var(--space-1) * -1);
+  border-radius: var(--radius-pill);
+  color: var(--accent);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--dur-fast);
+}
+.pj-brand__start:active {
+  background: var(--accent-soft);
+}
+@media (hover: hover) {
+  .pj-brand__start:hover {
+    background: var(--accent-soft);
+  }
+}
+/* Very narrow phones: the brand comes first. */
+@media (max-width: 359px) {
+  .pj-brand__start {
+    display: none;
+  }
 }
 .pj-eyebrow {
   order: 0;
@@ -247,8 +288,24 @@
     backdrop-filter: saturate(160%) blur(18px);
     border-bottom: 1px solid var(--border);
   }
+  /* One bar: brand · sections · start link. */
   .pj-brand {
-    padding: 0;
+    display: contents;
+  }
+  .pj-brand__home {
+    order: 0;
+    font-size: var(--text-xl);
+  }
+  .pj-brand__mark {
+    width: 40px;
+    height: 40px;
+  }
+  .pj-nav {
+    order: 1;
+  }
+  .pj-brand__start {
+    order: 2;
+    margin-right: 0;
   }
   .pj-nav {
     position: static;
@@ -279,122 +336,58 @@
   }
 }
 
-/* ---------- overview ---------- */
-.pj-overview {
-  display: grid;
-  gap: var(--space-4);
+/* ---------- overview (the app's Home components) ---------- */
+.pj .flights {
+  --fsearch-h: var(--pj-sticky);
 }
-.pj-hero {
-  position: relative;
-  overflow: hidden;
-  padding: var(--space-5) var(--space-5) var(--space-3);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--border);
-  background:
-    radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 62%),
-    radial-gradient(90% 80% at 0% 110%, color-mix(in srgb, var(--accent-2) 12%, transparent), transparent 60%),
-    var(--surface);
+.pj--preview .fyear__head,
+.pj--preview .tyear__head {
+  position: static;
 }
-.pj-hero__kicker {
-  font-size: var(--text-xs);
-  font-weight: 650;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-2);
+.pj .tyear__head {
+  top: var(--pj-sticky);
 }
-.pj-hero__main {
+/* In the owner's preview journal links are buttons: keep them looking like the app's cards. */
+.pj button.hero,
+.pj button.overview__map {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+}
+.pj .overview__map {
+  display: block;
+}
+.pj .overview__heading,
+.pj .overview__caption {
   display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  margin-top: var(--space-2);
 }
-.pj-hero__big {
-  font-size: clamp(3.5rem, 17vw, 5rem);
-  font-weight: 760;
-  letter-spacing: -0.05em;
-  line-height: 0.95;
-}
-.pj-hero__unit {
-  font-size: var(--text-xl);
-  font-weight: 600;
-  color: var(--text-2);
-}
-.pj-totals {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3) var(--space-4);
-  margin: var(--space-5) 0 0;
-}
-.pj-totals dt {
-  font-size: var(--text-xs);
-  color: var(--text-2);
-}
-.pj-totals dd {
-  margin: 2px 0 0;
-  font-size: var(--text-xl);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-.pj-totals small {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--text-2);
-}
-.pj-hero__trend {
-  margin-top: var(--space-5);
-}
-.pj-cta {
+.pj-more {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-1);
-  width: 100%;
   min-height: 44px;
-  margin-top: var(--space-1);
   padding: 0;
   border: 0;
   background: none;
   color: var(--accent);
   font-size: var(--text-sm);
-  font-weight: 600;
 }
-
-.pj-card-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-bottom: var(--space-3);
+/* Rows without a flight page: no pressed state. */
+.frow.frow--static {
+  -webkit-user-select: text;
+  user-select: text;
 }
-.pj-card-head h2 {
-  font-size: var(--text-lg);
-}
-.pj-card-head span {
-  font-size: var(--text-xs);
-  color: var(--text-3);
-  text-align: right;
-}
-
-.pj-mapcard {
-  display: grid;
-  gap: var(--space-3);
-}
-.pj-mapcard__preview {
-  display: block;
-  width: 100%;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-md);
+.frow.frow--static:active,
+.frow.frow--static:hover {
   background: none;
-  overflow: hidden;
 }
-.pj-mapcard .journey-map {
-  height: auto;
-  aspect-ratio: 640 / 360;
+.frow.frow--static:active .frow__plane {
+  background: var(--surface);
+  box-shadow: 0 0 0 3px var(--surface);
 }
 
 .pj-highlights {
   display: grid;
+  margin-top: var(--space-4);
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
 }
@@ -434,43 +427,9 @@
   color: var(--text-3);
 }
 
-.pj-recent .pj-flight-list {
-  margin-bottom: var(--space-3);
-}
-
-@media (min-width: 600px) {
-  .pj-totals {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
 @media (min-width: 720px) {
   .pj-highlights {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-@media (min-width: 960px) {
-  .pj-overview {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas:
-      'hero map'
-      'high high'
-      'recent recent';
-    align-items: stretch;
-    gap: var(--space-4);
-  }
-  .pj-hero {
-    grid-area: hero;
-    padding: var(--space-6) var(--space-6) var(--space-4);
-  }
-  .pj-mapcard {
-    grid-area: map;
-    align-content: space-between;
-  }
-  .pj-highlights {
-    grid-area: high;
-  }
-  .pj-recent {
-    grid-area: recent;
   }
 }
 
@@ -539,78 +498,6 @@
   border-color: transparent;
   color: var(--accent);
   font-weight: 600;
-}
-.pj-year {
-  margin-top: var(--space-5);
-}
-.pj-year__title {
-  position: sticky;
-  top: var(--pj-sticky);
-  z-index: 2;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: var(--space-2) 0;
-  background: var(--bg);
-  border-bottom: 1px solid var(--border-strong);
-  font-size: var(--text-md);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-.pj--preview .pj-year__title {
-  position: static;
-  background: none;
-}
-.pj-year__title span {
-  font-size: var(--text-xs);
-  font-weight: 500;
-  color: var(--text-3);
-}
-.pj-flight-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.pj-flight {
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--border);
-}
-.pj-flight:last-child {
-  border-bottom: 0;
-}
-.pj-flight__main {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-.pj-flight__route {
-  font-size: var(--text-md);
-}
-.pj-flight__cities,
-.pj-flight__meta {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--text-xs);
-}
-.pj-flight__cities {
-  color: var(--text-2);
-}
-.pj-flight__meta {
-  color: var(--text-3);
-}
-.pj-flight__date {
-  align-self: start;
-  padding-top: 2px;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--text-2);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
 }
 .pj-flights > .btn {
   margin-top: var(--space-4);
@@ -709,44 +596,9 @@
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
-@media (min-width: 720px) {
-  /* Wide screens: one line per flight, like a logbook. */
-  .pj-flight__main {
-    grid-template-columns: 8.5rem minmax(0, 1fr) minmax(0, 1fr);
-    align-items: baseline;
-    column-gap: var(--space-4);
-  }
-  .pj-flight__cities {
-    font-size: var(--text-sm);
-  }
-  .pj-flight__meta {
-    font-size: var(--text-sm);
-  }
-  .pj-flight__date {
-    align-self: center;
-    padding-top: 0;
-    min-width: 5.5rem;
-    text-align: right;
-  }
-}
-
 /* ---------- trips ---------- */
-.pj-trips {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-.pj-trips__count {
-  margin-left: var(--space-2);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--text-2);
-}
 .pj-trips__list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  margin: var(--space-3) 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -785,4 +637,11 @@
 }
 .pj-trip__meta {
   color: var(--text-2);
+}
+
+/* Wide screens: keep the route map card from towering over the page. */
+@media (min-width: 960px) {
+  .pj .overview__map .journey-map {
+    max-height: 380px;
+  }
 }

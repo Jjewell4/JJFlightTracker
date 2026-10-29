@@ -1,18 +1,21 @@
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { Icon, type IconName } from '@/components/Icon';
+import { useReferenceReady } from '@/data/reference';
 import { JourneyMap } from '@/features/flights/JourneyMap';
-import { TrendBars } from '@/features/stats/charts/TrendBars';
-import { trendData } from '@/features/stats/trend';
-import { fmtCompact, fmtDistance, fmtInt, plural, toUnit } from '@/features/stats/format';
+import { SummaryHero, type HeroLink } from '@/features/flights/SummaryHero';
+import { computeSummary } from '@/features/flights/flight-logic';
+import { fmtDistance, fmtInt, plural } from '@/features/stats/format';
 import { orientRoute } from '@/features/stats/TopLists';
 import { airportCode } from '@/lib/flight-utils';
 import type { FlightStats } from '@/lib/stats';
-import { formatFlightDate } from '@/lib/time';
+import { formatFlightDate, todayLocal } from '@/lib/time';
 import type { Flight, Settings } from '@/lib/types';
 import { JournalLink, type JournalNav } from './JournalLink';
-import { PublicFlightRow } from './PublicFlightList';
-import '@/features/stats/charts/charts.css';
+import { PublicFlightGroups } from './PublicFlightList';
+import '@/features/flights/FlightsPage.css';
 import '@/features/flights/Overview.css';
+
+const RECENT = 5;
 
 function Highlight({ icon, label, value, detail, tone }: { icon: IconName; label: string; value: ReactNode; detail?: ReactNode; tone?: 'amber' }) {
   return (
@@ -27,18 +30,24 @@ function Highlight({ icon, label, value, detail, tone }: { icon: IconName; label
   );
 }
 
-/** Landing view: totals, flights per year, a route preview, highlights and recent flights. */
+/**
+ * Landing view, laid out like the owner's Home: the same summary hero, route map card and
+ * recent journeys (same components, same numbers), plus a few highlights for visitors.
+ */
 export function PublicOverview({ flights, stats, unit, nav }: { flights: Flight[]; stats: FlightStats; unit: Settings['distanceUnit']; nav: JournalNav }) {
-  const t = stats.totals;
-  const trend = trendData(stats, 'all');
-  const first = stats.byYear[0]?.year;
-  const last = stats.byYear[stats.byYear.length - 1]?.year;
-  const visits = new Map(stats.airports.map((a) => [a.key, a.count]));
-  const topRoute = stats.routes[0] && orientRoute(visits)(stats.routes[0]);
-  const home = stats.airports[0];
-  const longest = stats.records.longestDistance;
-  const airline = stats.airlines[0];
-  const recent = flights.slice(0, 5);
+  const ready = useReferenceReady();
+  // Shared flights are all in the past, so they're the app's "past" list as-is.
+  // `ready` is a dependency because airport lookups only resolve once reference data loads.
+  const summary = useMemo(() => computeSummary(flights, todayLocal()), [flights, ready]);
+  const statsLink = useMemo<HeroLink>(
+    () =>
+      ({ className, label, children }) => (
+        <JournalLink nav={nav} to={{ view: 'stats' }} className={className} label={label}>
+          {children}
+        </JournalLink>
+      ),
+    [nav],
+  );
 
   if (!flights.length)
     return (
@@ -51,67 +60,28 @@ export function PublicOverview({ flights, stats, unit, nav }: { flights: Flight[
       </section>
     );
 
-  return (
-    <div className="pj-overview">
-      <section className="pj-hero" aria-label="Summary">
-        <p className="pj-hero__kicker">{first ? `Flying since ${first}` : 'Flight journal'}</p>
-        <p className="pj-hero__main">
-          <span className="pj-hero__big">{fmtInt(t.flights)}</span>
-          <span className="pj-hero__unit">{plural(t.flights, 'flight')}</span>
-        </p>
-        <dl className="pj-totals">
-          <div>
-            <dt>Distance</dt>
-            <dd>
-              {fmtCompact(toUnit(t.distanceKm, unit))} <small>{unit}</small>
-            </dd>
-          </div>
-          <div>
-            <dt>Airports</dt>
-            <dd>{fmtInt(stats.unique.airports)}</dd>
-          </div>
-          <div>
-            <dt>Countries</dt>
-            <dd>{fmtInt(stats.unique.countries)}</dd>
-          </div>
-          <div>
-            <dt>Airlines</dt>
-            <dd>{fmtInt(stats.unique.airlines)}</dd>
-          </div>
-        </dl>
-        {trend.data.length > 1 && (
-          <div className="pj-hero__trend">
-            <TrendBars
-              data={trend.data}
-              highlightKey={trend.highlightKey}
-              partialKey={trend.highlightKey}
-              formatValue={(v) => `${fmtInt(v)} ${plural(v, 'flight')}`}
-              label={`Flights per year, ${first}–${last}`}
-              caption="flights per year"
-              height={56}
-            />
-          </div>
-        )}
-        <JournalLink nav={nav} to={{ view: 'stats' }} className="pj-cta">
-          All stats
-          <Icon name="chevron" size={16} />
-        </JournalLink>
-      </section>
+  const visits = new Map(stats.airports.map((a) => [a.key, a.count]));
+  const topRoute = stats.routes[0] && orientRoute(visits)(stats.routes[0]);
+  const home = stats.airports[0];
+  const longest = stats.records.longestDistance;
+  const airline = stats.airlines[0];
 
-      <section className="card pj-mapcard" aria-labelledby="pj-routes-title">
-        <div className="pj-card-head">
-          <h2 id="pj-routes-title">Routes</h2>
-          <span>
-            {fmtInt(stats.unique.routes)} {plural(stats.unique.routes, 'route')} · {fmtInt(stats.unique.countries)} {plural(stats.unique.countries, 'country', 'countries')}
-          </span>
-        </div>
-        <JournalLink nav={nav} to={{ view: 'map' }} className="pj-mapcard__preview" label="Open the interactive map">
-          <JourneyMap flights={flights} />
-        </JournalLink>
-        <JournalLink nav={nav} to={{ view: 'map' }} className="btn btn--block">
-          <Icon name="globe" size={18} /> Explore the map
-        </JournalLink>
-      </section>
+  return (
+    <div className="flights pj-overview">
+      {/* Shared journals carry no times: time in the air is the app's distance-based estimate. */}
+      <SummaryHero summary={summary} unit={unit} upcoming={0} link={statsLink} estimatedTime />
+
+      <JournalLink nav={nav} to={{ view: 'map' }} className="overview__map overview__map--solo card" label="Open the route map">
+        <span className="overview__heading">
+          <Icon name="globe" size={20} />
+          <span>Route map</span>
+          <Icon name="chevron" size={16} />
+        </span>
+        <JourneyMap flights={flights} />
+        <span className="overview__caption">
+          {summary.airports} airports · {summary.countries} countries<span>Open map</span>
+        </span>
+      </JournalLink>
 
       <section className="pj-highlights" aria-label="Highlights">
         {topRoute && (
@@ -153,20 +123,13 @@ export function PublicOverview({ flights, stats, unit, nav }: { flights: Flight[
         {airline && <Highlight icon="plane" label="Favorite airline" value={airline.name} detail={`${fmtInt(airline.count)} ${plural(airline.count, 'flight')}`} />}
       </section>
 
-      <section className="card pj-recent" aria-labelledby="pj-recent-title">
-        <div className="pj-card-head">
-          <h2 id="pj-recent-title">Recent flights</h2>
-        </div>
-        <ul className="pj-flight-list">
-          {recent.map((f) => (
-            <PublicFlightRow key={f.id} f={f} />
-          ))}
-        </ul>
-        <JournalLink nav={nav} to={{ view: 'flights' }} className="btn btn--block">
-          All {fmtInt(flights.length)} flights
-          <Icon name="chevron" size={16} />
+      <div className="overview__section-head">
+        <h2 className="section-title">Recent journeys</h2>
+        <JournalLink nav={nav} to={{ view: 'flights' }} className="pj-more">
+          View full log <Icon name="chevron" size={14} />
         </JournalLink>
-      </section>
+      </div>
+      <PublicFlightGroups flights={flights} unit={unit} limit={RECENT} />
     </div>
   );
 }

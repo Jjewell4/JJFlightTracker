@@ -41,10 +41,15 @@ interface Props {
   flight: Flight;
   unit: Settings['distanceUnit'];
   clock: Settings['clock'];
+  /**
+   * A row with no flight page to open (public journals): renders as plain content and,
+   * since shared flights carry no times, names the airline where the times would be.
+   */
+  linkless?: boolean;
 }
 
 /** One flight in the list: airline mark, big route codes, cities, times and key facts. */
-export const FlightRow = memo(function FlightRow({ flight: f, unit, clock }: Props) {
+export const FlightRow = memo(function FlightRow({ flight: f, unit, clock, linkless = false }: Props) {
   const from = airportCode(f.from);
   const to = airportCode(f.to);
   const airline = flightAirlineName(f);
@@ -55,10 +60,11 @@ export const FlightRow = memo(function FlightRow({ flight: f, unit, clock }: Pro
   const arr = formatTime(f.arrTime, clock);
   const km = flightDistanceKm(f);
   const offset = f.arrDayOffset ?? 0;
+  const airlineInTimes = linkless && !dep;
   const label = `${airline ? `${airline} ` : ''}${fn ?? ''} from ${shortCity(f.from)} to ${shortCity(f.to)}, ${date.main}${date.sub && f.datePrecision === 'month' ? ` ${date.sub}` : ''}`;
 
-  return (
-    <Link to={`/flights/${f.id}`} className="frow" aria-label={label}>
+  const body = (
+    <>
       <span className="frow__logo">
         <AirlineLogo iata={f.airlineIata} icao={f.airlineIcao} name={airline} size={36} />
       </span>
@@ -80,7 +86,7 @@ export const FlightRow = memo(function FlightRow({ flight: f, unit, clock }: Pro
         <span className="frow__dur">{f.durationMin ? formatDuration(f.durationMin) : date.sub}</span>
       </span>
       <span className="frow__foot">
-        <span className="frow__times">
+        {(!airlineInTimes || airline) && <span className="frow__times">
           {dep ? (
             <>
               {dep}
@@ -92,10 +98,12 @@ export const FlightRow = memo(function FlightRow({ flight: f, unit, clock }: Pro
                 </>
               )}
             </>
+          ) : airlineInTimes ? (
+            airline
           ) : (
             <span className="subtle">No times</span>
           )}
-        </span>
+        </span>}
         <span className="frow__info">
           {fn && <span className="frow__fn">{fn}</span>}
           {aircraft && (
@@ -104,10 +112,21 @@ export const FlightRow = memo(function FlightRow({ flight: f, unit, clock }: Pro
               {f.aircraftType && <span className="frow__ac-code">{f.aircraftType}</span>}
             </span>
           )}
-          {!fn && !aircraft && airline && <span className="frow__ac">{airline}</span>}
+          {!fn && !aircraft && airline && !airlineInTimes && <span className="frow__ac">{airline}</span>}
         </span>
       </span>
       <span className="frow__dist">{formatDistance(km, unit)}</span>
+    </>
+  );
+  if (linkless)
+    return (
+      <div className="frow frow--static" role="group" aria-label={label}>
+        {body}
+      </div>
+    );
+  return (
+    <Link to={`/flights/${f.id}`} className="frow" aria-label={label}>
+      {body}
     </Link>
   );
 });

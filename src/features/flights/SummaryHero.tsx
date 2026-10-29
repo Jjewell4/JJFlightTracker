@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
 import type { Settings } from '@/lib/types';
@@ -15,7 +16,14 @@ function YearSparkline({ perYear, year }: { perYear: FlightSummary['perYear']; y
   const r = Math.min(2, bw / 2);
   return (
     <figure className="hero__spark">
-      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} preserveAspectRatio="none" role="img" aria-label={`Flights per year, ${perYear[0].year}–${perYear[perYear.length - 1].year}`}>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        width={W}
+        height={H}
+        preserveAspectRatio="none"
+        role="img"
+        aria-label={`Flights per year, ${perYear[0].year}–${perYear[perYear.length - 1].year}`}
+      >
         {perYear.map((p, i) => {
           const h = p.count ? Math.max(3, (p.count / max) * H) : 1.5;
           const x = i * (bw + gap);
@@ -37,56 +45,92 @@ function YearSparkline({ perYear, year }: { perYear: FlightSummary['perYear']; y
   );
 }
 
-export function SummaryHero({ summary, unit, upcoming }: { summary: FlightSummary; unit: Settings['distanceUnit']; upcoming: number }) {
+/** Renders the hero's link; defaults to the app's Stats screen. */
+export type HeroLink = (props: { className: string; label: string; children: ReactNode }) => ReactNode;
+
+const statsLink: HeroLink = ({ className, label, children }) => (
+  <Link to="/stats" className={className} aria-label={label}>
+    {children}
+  </Link>
+);
+
+export function SummaryHero({
+  summary,
+  unit,
+  upcoming,
+  link = statsLink,
+  estimatedTime = false,
+}: {
+  summary: FlightSummary;
+  unit: Settings['distanceUnit'];
+  upcoming: number;
+  /** Where the hero leads (public journals have no app routes). */
+  link?: HeroLink;
+  /** Every duration is a distance-based estimate (shared journals carry no times). */
+  estimatedTime?: boolean;
+}) {
   const dist = unit === 'mi' ? kmToMiles(summary.distanceKm) : summary.distanceKm;
   const laps = summary.distanceKm / 40075;
-  return (
-    <Link to="/stats" className="hero animate-in" aria-label="Open statistics">
-      <div className="hero__glow" aria-hidden />
-      <div className="hero__top">
-        <div>
-          <div className="hero__eyebrow">{summary.firstYear ? `Since ${summary.firstYear}` : 'Lifetime'}</div>
-          <div className="hero__big tabular">
-            {summary.flights.toLocaleString('en-US')}
-            <span className="hero__big-unit">{summary.flights === 1 ? 'flight' : 'flights'}</span>
+  return link({
+    className: 'hero animate-in',
+    label: 'Open statistics',
+    children: (
+      <>
+        <div className="hero__glow" aria-hidden />
+        <div className="hero__top">
+          <div>
+            <div className="hero__eyebrow">{summary.firstYear ? `Since ${summary.firstYear}` : 'Lifetime'}</div>
+            <div className="hero__big tabular">
+              {summary.flights.toLocaleString('en-US')}
+              <span className="hero__big-unit">{summary.flights === 1 ? 'flight' : 'flights'}</span>
+            </div>
           </div>
+          <YearSparkline perYear={summary.perYear} year={summary.year} />
         </div>
-        <YearSparkline perYear={summary.perYear} year={summary.year} />
-      </div>
 
-      <dl className="hero__stats">
-        <div className="hero__stat">
-          <dt>Distance</dt>
-          <dd className="tabular">
-            {formatCompact(Math.round(dist))}
-            <small> {unit}</small>
-          </dd>
-        </div>
-        <div className="hero__stat">
-          <dt>In the air</dt>
-          <dd className="tabular">{formatLongDuration(summary.minutes)}</dd>
-        </div>
-        <div className="hero__stat">
-          <dt>Airports</dt>
-          <dd className="tabular">{summary.airports}</dd>
-        </div>
-        <div className="hero__stat">
-          <dt>Countries</dt>
-          <dd className="tabular">{summary.countries}</dd>
-        </div>
-      </dl>
+        <dl className="hero__stats">
+          <div className="hero__stat">
+            <dt>Distance</dt>
+            <dd className="tabular">
+              {formatCompact(Math.round(dist))}
+              <small> {unit}</small>
+            </dd>
+          </div>
+          <div className="hero__stat">
+            <dt>In the air</dt>
+            <dd className="tabular" title={estimatedTime ? 'Estimated from distance' : undefined}>
+              {estimatedTime && (
+                <>
+                  <span aria-hidden>~</span>
+                  <span className="visually-hidden">about </span>
+                </>
+              )}
+              {formatLongDuration(summary.minutes)}
+            </dd>
+          </div>
+          <div className="hero__stat">
+            <dt>Airports</dt>
+            <dd className="tabular">{summary.airports}</dd>
+          </div>
+          <div className="hero__stat">
+            <dt>Countries</dt>
+            <dd className="tabular">{summary.countries}</dd>
+          </div>
+        </dl>
 
-      <div className="hero__foot">
-        <span className="hero__year">
-          <span className="hero__dot" aria-hidden />
-          <strong>{summary.thisYear}</strong>&nbsp;{summary.thisYear === 1 ? 'flight' : 'flights'} in {summary.year}
-          {upcoming > 0 && <span className="subtle">&nbsp;· {upcoming} upcoming</span>}
-        </span>
-        {laps >= 0.5 && <span className="hero__laps">{laps.toFixed(1)}× around Earth</span>}
-        <Icon name="chevron" size={16} className="hero__chev" />
-      </div>
-    </Link>
-  );
+        <div className="hero__foot">
+          <span className="hero__year">
+            <span className="hero__dot" aria-hidden />
+            <strong>{summary.thisYear}</strong>&nbsp;
+            {summary.thisYear === 1 ? 'flight' : 'flights'} in {summary.year}
+            {upcoming > 0 && <span className="subtle">&nbsp;· {upcoming} upcoming</span>}
+          </span>
+          {laps >= 0.5 && <span className="hero__laps">{laps.toFixed(1)}× around Earth</span>}
+          <Icon name="chevron" size={16} className="hero__chev" />
+        </div>
+      </>
+    ),
+  });
 }
 
 export function SummaryHeroSkeleton() {

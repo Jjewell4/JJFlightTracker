@@ -52,17 +52,22 @@ export default function PublicProfilePage({ slug }: { slug: string }) {
   }, [slug, attempt]);
   useEffect(() => {
     const old = document.title;
-    document.title = profile
-      ? `${profile.display_name} · Window Seat`
-      : 'Shared flight journal';
+    document.title = profile ? `${profile.display_name} · Window Seat` : 'Shared flight journal';
     return () => {
       document.title = old;
     };
   }, [profile]);
+  // Same brand bar as the app's phone top bar; visitors get a quiet way to start their own.
   const brand = (
-    <a className="public-brand" href="/">
-      <img src="/favicon.svg" width="28" height="28" alt="" /> Window Seat
-    </a>
+    <>
+      <a className="pj-brand__home" href={import.meta.env.BASE_URL} aria-label="Window Seat — home">
+        <img className="pj-brand__mark" src={`${import.meta.env.BASE_URL}icons/mark.svg`} width="48" height="48" alt="" />
+        Window Seat
+      </a>
+      <a className="pj-brand__start" href={import.meta.env.BASE_URL} aria-label="Start your own flight journal">
+        Start yours
+      </a>
+    </>
   );
   if (profile)
     return (
@@ -73,8 +78,7 @@ export default function PublicProfilePage({ slug }: { slug: string }) {
           notice={
             error && (
               <p role="status" className="pj-notice">
-                Connection interrupted. Showing the last loaded flights; updates
-                will resume automatically.
+                Connection interrupted. Showing the last loaded flights; updates will resume automatically.
               </p>
             )
           }
@@ -83,25 +87,27 @@ export default function PublicProfilePage({ slug }: { slug: string }) {
     );
   return (
     <main className="public-page public-page--state">
-      <div className="pj-bar">{brand}</div>
-      {error ? (
-        <section className="public-empty">
-          <h1>Couldn’t load this journal</h1>
-          <p>Check your connection and try again.</p>
-          <button className="btn" onClick={() => setAttempt((n) => n + 1)}>
-            Try again
-          </button>
-        </section>
-      ) : profile === undefined ? (
-        <p role="status" className="public-empty">
-          Loading flight journal…
-        </p>
-      ) : (
-        <section className="public-empty">
-          <h1>This journal isn’t public</h1>
-          <p>The URL may have changed, or the owner has stopped sharing.</p>
-        </section>
-      )}
+      <div className="pj-brand">{brand}</div>
+      <div className="public-page__body">
+        {error ? (
+          <section className="public-empty">
+            <h1>Couldn’t load this journal</h1>
+            <p>Check your connection and try again.</p>
+            <button className="btn" onClick={() => setAttempt((n) => n + 1)}>
+              Try again
+            </button>
+          </section>
+        ) : profile === undefined ? (
+          <p role="status" className="public-empty">
+            Loading flight journal…
+          </p>
+        ) : (
+          <section className="public-empty">
+            <h1>This journal isn’t public</h1>
+            <p>The URL may have changed, or the owner has stopped sharing.</p>
+          </section>
+        )}
+      </div>
     </main>
   );
 }

@@ -73,8 +73,23 @@ describe('public journal', () => {
   it('opens on an overview with deep-linkable section tabs', async () => {
     const el = await render('/jordan');
     expect(el.querySelector('h1')?.textContent).toBe('Jordan');
-    expect(el.textContent).toContain('Flying since 2023');
+    // The owner's Home summary, with the same numbers.
+    const hero = el.querySelector<HTMLAnchorElement>('a.hero')!;
+    expect(hero.getAttribute('href')).toBe('/jordan?view=stats');
+    expect(hero.querySelector('.hero__eyebrow')?.textContent).toBe('Since 2023');
+    expect(hero.querySelector('.hero__big')?.textContent).toBe('6flights');
+    const stats = Object.fromEntries([...hero.querySelectorAll('.hero__stat')].map((s) => [s.querySelector('dt')!.textContent, s.querySelector('dd')!.textContent]));
+    expect(Object.keys(stats)).toEqual(['Distance', 'In the air', 'Airports', 'Countries']);
+    expect(stats.Airports).toBe('5');
+    expect(stats.Countries).toBe('2');
+    // No times are shared: time in the air is the app's distance-based estimate, marked as such.
+    expect(stats['In the air']).toMatch(/^~about \d/);
     expect(el.textContent).toContain('Top route');
+    // Recent journeys use the app's rows, without links to flight pages.
+    expect(el.querySelectorAll('.frow')).toHaveLength(5);
+    expect(el.querySelector('a.frow')).toBeNull();
+    expect(el.querySelector('.frow')?.textContent).toContain('Alaska Airlines');
+    expect(el.textContent).not.toContain('No times');
     const tabs = [...el.querySelectorAll<HTMLAnchorElement>('.pj-tab')];
     expect(tabs.map((t) => t.textContent)).toEqual(['Overview', 'Map', 'Stats', 'Flights']);
     expect(tabs.map((t) => t.getAttribute('href'))).toEqual(['/jordan', '/jordan?view=map', '/jordan?view=stats', '/jordan?view=flights']);
@@ -86,16 +101,38 @@ describe('public journal', () => {
     expect(el.querySelector('.pj-tab[aria-current="page"]')?.textContent).toBe('Flights');
   });
 
-  it('shows saved trips (never suggestions) in a Trips tab, without leaving the page', async () => {
+  it('shows saved trips (never suggestions) behind a Flights | Trips switch, like the app’s log', async () => {
     const trip = { tripId: 'trip-1', tripName: 'Weekend in Seattle' };
-    const el = await render('/jordan?view=trips', profile([month('2025-06', 'KSAN', 'KSEA', trip), month('2025-06', 'KSEA', 'KSAN', trip), ...FLIGHTS.slice(2)]));
-    expect([...el.querySelectorAll('.pj-tab')].map((t) => t.textContent)).toEqual(['Overview', 'Map', 'Stats', 'Trips', 'Flights']);
+    const withTrips = profile([month('2025-06', 'KSAN', 'KSEA', trip), month('2025-06', 'KSEA', 'KSAN', trip), ...FLIGHTS.slice(2)]);
+    // Old Trips-tab links land on the switch's Trips side.
+    const el = await render('/jordan?view=trips', withTrips);
+    expect(window.location.search).toBe('?view=flights&mode=trips');
+    expect([...el.querySelectorAll('.pj-tab')].map((t) => t.textContent)).toEqual(['Overview', 'Map', 'Stats', 'Flights']);
+    expect(el.querySelector('.pj-tab[aria-current="page"]')?.textContent).toBe('Flights');
+    const options = [...el.querySelectorAll<HTMLButtonElement>('.logswitch [role="radio"]')];
+    expect(options.map((o) => [o.textContent, o.getAttribute('aria-checked')])).toEqual([
+      ['Flights', 'false'],
+      ['Trips', 'true'],
+    ]);
     const cards = [...el.querySelectorAll<HTMLButtonElement>('.pj-trip')];
     expect(cards).toHaveLength(1); // the London and New York round trips are only suggestions
     expect(cards[0].textContent).toContain('Weekend in Seattle');
     await act(async () => cards[0].click());
     expect(el.querySelector('.pj-trip__legs')?.textContent).toContain('SAN → SEA');
     expectNoPrivateLinks(el);
+
+    await act(async () => options[0].click());
+    expect(window.location.search).toBe('?view=flights');
+    expect(el.querySelectorAll('.frow')).toHaveLength(6);
+    await act(async () => options[1].click());
+    expect(window.location.search).toBe('?view=flights&mode=trips');
+    expect(el.querySelector('.pj-trip')).not.toBeNull();
+  });
+
+  it('has no Flights | Trips switch when no trips are saved', async () => {
+    const el = await render('/jordan?view=flights&mode=trips');
+    expect(el.querySelector('.logswitch')).toBeNull();
+    expect(el.querySelectorAll('.frow')).toHaveLength(6);
   });
 
   it('shows stats that public data supports and hides the rest', async () => {
@@ -134,12 +171,12 @@ describe('public journal', () => {
 
   it('filters the flight list by airport from the URL', async () => {
     const el = await render('/jordan?view=flights&airport=EGLL');
-    expect(el.querySelectorAll('.pj-flight')).toHaveLength(2);
+    expect(el.querySelectorAll('.frow')).toHaveLength(2);
     expect(el.querySelector('.pj-section-head span')?.textContent).toBe('2 of 6');
     const chip = el.querySelector<HTMLButtonElement>('.pj-filter')!;
     expect(chip.textContent).toContain('LHR');
     await act(async () => chip.click());
-    expect(el.querySelectorAll('.pj-flight')).toHaveLength(6);
+    expect(el.querySelectorAll('.frow')).toHaveLength(6);
     expect(window.location.search).toBe('?view=flights');
   });
 

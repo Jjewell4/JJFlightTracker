@@ -86,12 +86,16 @@ export function publicFlights(
       ...(f.tripId && f.tripName?.trim() ? { tripName: f.tripName.trim().slice(0, 80) } : {}),
     }));
 }
+/**
+ * Public flights arrive newest first in the owner's real order (the server sorts by date and the
+ * private times). Keeping that order in createdAt keeps same-day/-month legs in sequence.
+ */
 export function asFlights(flights: PublicFlight[]): Flight[] {
   return flights.map((f, i) => ({
     ...f,
     id: `public-${i}`,
     source: 'manual',
-    createdAt: 0,
+    createdAt: flights.length - i,
     updatedAt: 0,
   }));
 }

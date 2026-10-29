@@ -1,43 +1,55 @@
-import { useMemo, useState } from 'react';
-import { AirlineLogo } from '@/components/AirlineLogo';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { Icon } from '@/components/Icon';
 import { getAirline, getAirport } from '@/data/reference';
+import { FlightRow } from '@/features/flights/FlightRow';
+import { formatDistance, groupFlights, limitGroups } from '@/features/flights/flight-logic';
 import { airportCode } from '@/lib/flight-utils';
 import type { ViewParams } from '@/lib/flight-source';
 import { formatFlightDate } from '@/lib/time';
-import type { Flight } from '@/lib/types';
+import type { Flight, Settings } from '@/lib/types';
+import '@/features/flights/FlightsPage.css';
 
 const PAGE = 40;
 
-const dateTime = (f: Flight) => (f.datePrecision === 'year' ? f.date.slice(0, 4) : f.datePrecision === 'month' ? f.date.slice(0, 7) : f.date);
-
-/** One shared flight. Public journals have no flight pages, so rows are never links. */
-export function PublicFlightRow({ f }: { f: Flight }) {
-  const from = getAirport(f.from);
-  const to = getAirport(f.to);
-  const airline = getAirline(f.airlineIcao || f.airlineIata);
+/**
+ * Flights grouped by year and month exactly like the app's log, with the same rows.
+ * Public journals have no flight pages, so rows are never links.
+ */
+export function PublicFlightGroups({ flights, unit, limit = Infinity }: { flights: Flight[]; unit: Settings['distanceUnit']; limit?: number }) {
+  const groups = useMemo(() => {
+    const all = groupFlights(flights);
+    return limit >= flights.length ? all : limitGroups(all, limit);
+  }, [flights, limit]);
   return (
-    <li className="pj-flight">
-      <AirlineLogo iata={airline?.iata || f.airlineIata} icao={airline?.icao || f.airlineIcao} name={airline?.name} size={36} />
-      <div className="pj-flight__main">
-        <strong
-          className="pj-flight__route code"
-          aria-label={`From ${from?.city || airportCode(f.from)} (${airportCode(f.from)}) to ${to?.city || airportCode(f.to)} (${airportCode(f.to)})`}
-        >
-          {airportCode(f.from)} <span aria-hidden="true">→</span> {airportCode(f.to)}
-        </strong>
-        <span className="pj-flight__cities">
-          {from?.city || f.from} → {to?.city || f.to}
-        </span>
-        <span className="pj-flight__meta">
-          {airline?.name || 'Airline not recorded'}
-          {f.aircraftType ? ` · ${f.aircraftType}` : ''}
-        </span>
-      </div>
-      <time className="pj-flight__date" dateTime={dateTime(f)}>
-        {formatFlightDate(f.date, f.datePrecision)}
-      </time>
-    </li>
+    <>
+      {groups.map((y) => (
+        <section key={y.year} className="fyear" aria-label={`${y.year}: ${y.count} ${y.count === 1 ? 'flight' : 'flights'}`}>
+          <h3 className="fyear__head">
+            <span className="fyear__year">{y.year}</span>
+            <span className="fyear__meta tabular">
+              {y.count} {y.count === 1 ? 'flight' : 'flights'}
+              <span className="fyear__sep" aria-hidden>
+                ·
+              </span>
+              {formatDistance(y.distanceKm, unit)}
+            </span>
+          </h3>
+          {y.months.map((m) => (
+            <div key={m.key} className="fmonth" style={{ '--n': m.flights.length } as CSSProperties}>
+              <h4 className="fmonth__label">
+                {m.label}
+                <span className="fmonth__count">{m.flights.length}</span>
+              </h4>
+              <div className="flist">
+                {m.flights.map((f) => (
+                  <FlightRow key={f.id} flight={f} unit={unit} clock="12h" linkless />
+                ))}
+              </div>
+            </div>
+          ))}
+        </section>
+      ))}
+    </>
   );
 }
 
@@ -51,7 +63,7 @@ function matches(f: Flight, q: string): boolean {
 }
 
 /** Searchable flight history, grouped by year, with filters from the map or stats. */
-export function PublicFlightList({ flights, params }: { flights: Flight[]; params: ViewParams }) {
+export function PublicFlightList({ flights, params, unit }: { flights: Flight[]; params: ViewParams; unit: Settings['distanceUnit'] }) {
   const [query, setQuery] = useState('');
   const [limit, setLimit] = useState(PAGE);
   const airport = params.get('airport');
@@ -63,31 +75,17 @@ export function PublicFlightList({ flights, params }: { flights: Flight[]; param
     const q = query.trim().toLowerCase();
     const key = airportInfo?.ident ?? airport?.toUpperCase();
     return flights.filter(
-      (f) =>
-        (!year || f.date.startsWith(year)) &&
-        (!key || [f.from, f.to].some((id) => (getAirport(id)?.ident ?? id.toUpperCase()) === key)) &&
-        matches(f, q),
+      (f) => (!year || f.date.startsWith(year)) && (!key || [f.from, f.to].some((id) => (getAirport(id)?.ident ?? id.toUpperCase()) === key)) && matches(f, q),
     );
   }, [flights, query, year, airport, airportInfo]);
 
-  const groups = useMemo(() => {
-    const out: { year: string; total: number; flights: Flight[] }[] = [];
-    const totals = new Map<string, number>();
-    for (const f of filtered) totals.set(f.date.slice(0, 4), (totals.get(f.date.slice(0, 4)) ?? 0) + 1);
-    for (const f of filtered.slice(0, limit)) {
-      const y = f.date.slice(0, 4);
-      if (out[out.length - 1]?.year !== y) out.push({ year: y, total: totals.get(y) ?? 0, flights: [] });
-      out[out.length - 1].flights.push(f);
-    }
-    return out;
-  }, [filtered, limit]);
-
   const filters: { key: string; label: string }[] = [];
-  if (airport) filters.push({ key: 'airport', label: airportInfo ? `${airportInfo.iata || airportInfo.ident} · ${airportInfo.city || airportInfo.name}` : airport });
+  if (airport)
+    filters.push({ key: 'airport', label: airportInfo ? `${airportInfo.iata || airportInfo.ident} · ${airportInfo.city || airportInfo.name}` : airport });
   if (year) filters.push({ key: 'year', label: year });
 
   return (
-    <section className="pj-flights" aria-labelledby="pj-flights-title">
+    <section className="flights pj-flights" aria-labelledby="pj-flights-title">
       <div className="pj-section-head">
         <h2 id="pj-flights-title">Flight history</h2>
         <span>
@@ -131,21 +129,7 @@ export function PublicFlightList({ flights, params }: { flights: Flight[]; param
           ))}
         </div>
       )}
-      {groups.map((g) => (
-        <div key={g.year} className="pj-year">
-          <h3 className="pj-year__title">
-            {g.year}
-            <span>
-              {g.total} {g.total === 1 ? 'flight' : 'flights'}
-            </span>
-          </h3>
-          <ul className="pj-flight-list">
-            {g.flights.map((f) => (
-              <PublicFlightRow key={f.id} f={f} />
-            ))}
-          </ul>
-        </div>
-      ))}
+      <PublicFlightGroups flights={filtered} unit={unit} limit={limit} />
       {!filtered.length && <p className="pj-empty">{query || filters.length ? 'No flights match your search.' : 'No flights have been shared yet.'}</p>}
       {filtered.length > limit && (
         <button className="btn btn--block" onClick={() => setLimit((n) => n + PAGE)}>

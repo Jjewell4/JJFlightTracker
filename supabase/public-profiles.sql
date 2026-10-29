@@ -67,7 +67,7 @@ language sql stable security definer set search_path=public as $$
  select p.slug,p.display_name,coalesce(live.flights,'[]'::jsonb),greatest(p.published_at,live.changed_at),p.exact_dates
  from public.public_profiles p
  left join lateral (
-  select jsonb_agg(public.project_public_flight(f.data,p.exact_dates) order by f.data->>'date' desc,f.id) filter (where not f.deleted and public.project_public_flight(f.data,p.exact_dates) is not null and
+  select jsonb_agg(public.project_public_flight(f.data,p.exact_dates) order by f.data->>'date' desc,coalesce(f.data->>'depTime','') desc,case when jsonb_typeof(f.data->'createdAt')='number' then (f.data->>'createdAt')::numeric end desc nulls last,f.id) filter (where not f.deleted and public.project_public_flight(f.data,p.exact_dates) is not null and
    case coalesce(f.data->>'datePrecision','day')
     when 'year' then left(f.data->>'date',4)<to_char(current_date,'YYYY')
     when 'month' then left(f.data->>'date',7)<to_char(current_date,'YYYY-MM')

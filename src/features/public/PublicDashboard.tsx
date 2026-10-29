@@ -6,11 +6,12 @@ import { FlightSourceProvider, type FlightSource } from '@/lib/flight-source';
 import { computeStats } from '@/lib/stats';
 import type { Settings } from '@/lib/types';
 import { asFlights, defaultDistanceUnit, publicFields, type PublicProfile } from './profile';
-import { applyPatch, JOURNAL_VIEWS, parseView, useJournalParams, type JournalView, type ParamPatch } from './journal-state';
+import { applyPatch, JOURNAL_VIEWS, LEGACY_TRIPS_VIEW, parseMode, parseView, useJournalParams, type JournalView, type ParamPatch } from './journal-state';
 import { JournalLink, type JournalNav } from './JournalLink';
 import { PublicOverview } from './PublicOverview';
 import { PublicFlightList } from './PublicFlightList';
 import { PublicTripList } from './PublicTripList';
+import { LogViewSwitch } from '@/features/trips/TripsList';
 import './public.css';
 
 // The full map and stats screens are shared with the owner's app and loaded on demand.
@@ -21,7 +22,6 @@ const VIEW_META: Record<JournalView, { label: string; icon: IconName }> = {
   overview: { label: 'Overview', icon: 'home' },
   map: { label: 'Map', icon: 'globe' },
   stats: { label: 'Stats', icon: 'chart' },
-  trips: { label: 'Trips', icon: 'suitcase' },
   flights: { label: 'Flights', icon: 'list' },
 };
 
@@ -54,9 +54,14 @@ export function PublicDashboard({
   const unit = unitProp ?? defaultDistanceUnit();
   const flights = useMemo(() => asFlights(profile.flights).sort((a, b) => b.date.localeCompare(a.date)), [profile.flights]);
   const fields = useMemo(() => publicFields(profile.flights), [profile.flights]);
-  // The Trips tab only appears when the owner has saved trips.
+  // Like the app's Log tab, Flights has a Flights | Trips switch — only when the owner saved trips.
   const hasTrips = useMemo(() => flights.some((f) => f.tripId), [flights]);
-  const views = JOURNAL_VIEWS.filter((v) => v !== 'trips' || hasTrips);
+  const mode = hasTrips ? parseMode(params) : 'flights';
+  // Old `?view=trips` links land on the switch's Trips side.
+  const legacyTrips = params.get('view') === LEGACY_TRIPS_VIEW;
+  useEffect(() => {
+    if (legacyTrips) params.update({ view: 'flights', mode: 'trips' }, 'replace');
+  }, [legacyTrips, params]);
   // `ready` is a dependency because airport lookups only resolve once reference data loads.
   const stats = useMemo(() => (ready ? computeStats(flights, { distanceUnit: unit, audience: 'visitor' }) : undefined), [flights, unit, ready]);
 
@@ -77,7 +82,8 @@ export function PublicDashboard({
       homeCountry: '',
       fields,
       params,
-      showFlights: ({ airport, year }) => params.update({ view: 'flights', airport: airport ?? null, year: year == null ? null : String(year) }, 'push'),
+      showFlights: ({ airport, year }) =>
+        params.update({ view: 'flights', mode: null, airport: airport ?? null, year: year == null ? null : String(year) }, 'push'),
     }),
     [flights, unit, fields, params],
   );
@@ -105,7 +111,7 @@ export function PublicDashboard({
           {preview && <p className="pj-eyebrow">Public journal preview</p>}
           <nav className="pj-nav" aria-label="Journal sections">
             <div className="pj-nav__track">
-              {views.map((v) => (
+              {JOURNAL_VIEWS.map((v) => (
                 <JournalLink key={v} nav={nav} to={viewPatch(v)} current={view === v} className="pj-tab">
                   <Icon name={VIEW_META[v].icon} size={16} />
                   <span>{VIEW_META[v].label}</span>
@@ -147,11 +153,15 @@ export function PublicDashboard({
                   <StatsPage embedded />
                 </Suspense>
               )}
-              {view === 'trips' && <PublicTripList flights={flights} unit={unit} />}
-              {view === 'flights' && <PublicFlightList flights={flights} params={params} />}
+              {view === 'flights' && (
+                <>
+                  {hasTrips && <LogViewSwitch value={mode} onChange={(m) => params.update({ mode: m === 'trips' ? 'trips' : null }, 'replace')} />}
+                  {mode === 'trips' ? <PublicTripList flights={flights} unit={unit} /> : <PublicFlightList flights={flights} params={params} unit={unit} />}
+                </>
+              )}
               <footer className="pj-footer">
-                {preview ? 'Visitors see this journal live' : `Updated ${updated} · Live journal`} · Shares routes, {fields.exactDates ? 'dates' : 'months'}, airlines,
-                aircraft types and saved trips only.
+                {preview ? 'Visitors see this journal live' : `Updated ${updated} · Live journal`} · Shares routes, {fields.exactDates ? 'dates' : 'months'},
+                airlines, aircraft types and saved trips only.
               </footer>
             </div>
           )}
