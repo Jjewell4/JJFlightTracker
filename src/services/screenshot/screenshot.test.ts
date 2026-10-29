@@ -131,6 +131,44 @@ describe('screenshot server diagnostics and resilience', () => {
     const request = JSON.parse(f.mock.calls[2][1]!.body as string);
     expect(request.generationConfig.thinkingConfig).toEqual({ thinkingBudget: 0 });
     expect(request.generationConfig.maxOutputTokens).toBeGreaterThanOrEqual(8192);
+    expect(request.generationConfig.temperature).toBe(0);
+  });
+
+  it('keeps Gemini 3 and -latest aliases on low thinking and their default temperature', async () => {
+    for (const model of ['gemini-flash-latest', 'gemini-3-flash-preview']) {
+      const f = mockFetch();
+      await extractScreenshot(body, auth, { ...config, model }, f);
+      const request = JSON.parse(f.mock.calls[2][1]!.body as string);
+      expect(request.generationConfig.thinkingConfig).toEqual({ thinkingLevel: 'low' });
+      expect(request.generationConfig).not.toHaveProperty('temperature');
+    }
+  });
+
+  it('gives the rest of the time to a lighter model when the first one times out', async () => {
+    const timeout = () => Promise.reject(Object.assign(new Error('timed out'), { name: 'TimeoutError' }));
+    const f = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(authOk()).mockResolvedValueOnce(json(true))
+      .mockImplementationOnce(timeout)
+      .mockResolvedValueOnce(json(provider()));
+    const out = await extractScreenshot(body, auth, { ...config, model: 'gemini-slow-model' }, f);
+    expect(out.flights[0].to).toBe('LAX');
+    const models = f.mock.calls.filter((c) => String(c[0]).includes('generateContent')).map((c) => String(c[0]));
+    expect(models[0]).toContain('gemini-slow-model');
+    expect(models[1]).toContain('lite');
+    // A timeout doesn't demote the preferred model for later requests.
+    const next = mockFetch();
+    await extractScreenshot(body, auth, { ...config, model: 'gemini-slow-model' }, next);
+    expect(String(next.mock.calls[2][0])).toContain('gemini-slow-model');
+  });
+
+  it('reports a timeout as busy and refunds the attempt when every model runs long', async () => {
+    const timeout = () => Promise.reject(Object.assign(new Error('timed out'), { name: 'TimeoutError' }));
+    const f = vi.fn<typeof fetch>((input) => (String(input).includes('generateContent') ? timeout() : Promise.resolve(json(String(input).includes('/auth/') ? { id: 'u' } : true))));
+    await expect(extractScreenshot(body, auth, { ...config, model: 'gemini-timeout-model' }, f)).rejects.toMatchObject({ status: 504, code: 'busy', message: expect.stringContaining('took too long') });
+    expect(f.mock.calls.some((c) => String(c[0]).includes('refund_screenshot_import'))).toBe(true);
+    // Only the preferred model and the lite fallbacks were tried, not every model.
+    const tried = f.mock.calls.filter((c) => String(c[0]).includes('generateContent')).map((c) => String(c[0]));
+    expect(tried.slice(1).every((u) => u.includes('lite'))).toBe(true);
   });
 });
 

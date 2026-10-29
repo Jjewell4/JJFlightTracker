@@ -42,8 +42,16 @@ function fail(status: number, message: string, code?: ImportErrorCode): never {
   throw new ImportError(status, message, code);
 }
 
-/** Models tried in order when the configured one is unavailable to the key's project. */
-export const FALLBACK_MODELS = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+/**
+ * Models tried in order when the configured one is unavailable to the key's project. The lite
+ * models double as the quick retry when a bigger model runs out of time.
+ */
+export const FALLBACK_MODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+
+/** Time all Gemini attempts may take together; keeps the function under Vercel's 60 s limit. */
+export const GEMINI_BUDGET_MS = 48_000;
+/** First attempt's share, leaving time for a lighter model if it runs long. */
+export const FIRST_ATTEMPT_MS = 26_000;
 
 export function modelCandidates(preferred: string): string[] {
   return [...new Set([preferred.trim(), ...FALLBACK_MODELS].filter(Boolean))];
@@ -63,15 +71,27 @@ const schema = {
   },
 };
 
+/** Gemini 3 generation models, including the moving `-latest` aliases that now point at them. */
+const isGemini3 = (model: string) => /gemini-3|-latest$/.test(model);
+
 /**
- * Keeps "thinking" from eating the output budget (a truncated answer fails as unreadable).
- * Extraction is a reading task, so minimal thinking is enough.
+ * Keeps "thinking" short: extraction is a reading task, and long thinking both delays the
+ * answer (the cause of timeouts) and eats the output budget (a truncated answer is unreadable).
+ * Gemini 3 takes a level ("minimal" isn't accepted by every Flash model, "low" is); 2.5 a budget.
  */
 export function thinkingConfig(model: string): Record<string, unknown> | undefined {
-  if (/gemini-3/.test(model)) return { thinkingLevel: 'low' };
+  if (isGemini3(model)) return { thinkingLevel: 'low' };
   if (/2\.5-flash/.test(model)) return { thinkingBudget: 0 };
   if (/2\.5-pro/.test(model)) return { thinkingBudget: 128 };
-  return undefined; // aliases such as gemini-flash-latest: rely on the generous token limit
+  return undefined;
+}
+
+/**
+ * Sampling settings. Gemini 3 is tuned for its default temperature (1.0); lower values can make
+ * it loop until the output limit, so only older models get a deterministic temperature of 0.
+ */
+export function samplingConfig(model: string): Record<string, unknown> {
+  return isGemini3(model) ? {} : { temperature: 0 };
 }
 
 interface GoogleError { error?: { code?: number; status?: string; message?: string; details?: { reason?: string }[] } }
@@ -131,44 +151,66 @@ async function verifyUser(authorization: string | undefined, config: ScreenshotC
   return headers;
 }
 
-function callGemini(model: string, key: string, mimeType: string, image: string, fetcher: typeof fetch, withThinking = true) {
+function callGemini(model: string, key: string, mimeType: string, image: string, fetcher: typeof fetch, timeoutMs: number, withThinking = true) {
   const thinking = withThinking ? thinkingConfig(model) : undefined;
   return fetcher(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, signal: AbortSignal.timeout(45_000),
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, signal: AbortSignal.timeout(timeoutMs),
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: prompt }] },
       contents: [{ role: 'user', parts: [{ inlineData: { mimeType, data: image } }] }],
       generationConfig: {
-        temperature: 0, maxOutputTokens: 16384, responseMimeType: 'application/json', responseSchema: schema,
+        ...samplingConfig(model), maxOutputTokens: 8192, responseMimeType: 'application/json', responseSchema: schema,
         ...(thinking ? { thinkingConfig: thinking } : {}),
       },
     }),
   });
 }
 
-/** Tries the preferred model, then fallbacks when a model isn't available to the key. */
-async function generate(config: ScreenshotConfig, mimeType: string, image: string, fetcher: typeof fetch): Promise<Response> {
+const isTimeout = (e: unknown) => e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError');
+
+/**
+ * Tries the preferred model, then fallbacks when a model isn't available to the key. If an
+ * attempt runs out of time, the rest of the budget goes to a lighter (faster) model instead of
+ * failing outright. Only models that answered normally are remembered for the next request.
+ */
+async function generate(config: ScreenshotConfig, mimeType: string, image: string, fetcher: typeof fetch, now: () => number = Date.now): Promise<Response> {
+  const deadline = now() + GEMINI_BUDGET_MS;
   const candidates = modelCandidates(config.model);
   const known = workingModel.get(config.model);
   const models = known ? [known, ...candidates.filter((m) => m !== known)] : candidates;
   let last: GeminiFailure | null = null;
+  let timedOut = false;
   for (const model of models) {
-    let r = await callGemini(model, config.geminiKey, mimeType, image, fetcher);
-    if (!r.ok) {
-      let failure = describeGeminiFailure(r.status, await googleError(r));
-      if (failure.thinkingRejected) {
-        r = await callGemini(model, config.geminiKey, mimeType, image, fetcher, false);
-        if (!r.ok) failure = describeGeminiFailure(r.status, await googleError(r));
-      }
+    // After a timeout only a lighter model is worth the remaining time.
+    if (timedOut && !/lite/.test(model)) continue;
+    const remaining = deadline - now();
+    if (remaining < 5_000) break;
+    const timeoutMs = timedOut ? remaining : Math.min(FIRST_ATTEMPT_MS, remaining);
+    let r: Response;
+    try {
+      r = await callGemini(model, config.geminiKey, mimeType, image, fetcher, timeoutMs);
       if (!r.ok) {
-        last = failure;
-        if (failure.tryNextModel) continue;
-        break;
+        let failure = describeGeminiFailure(r.status, await googleError(r));
+        if (failure.thinkingRejected) {
+          r = await callGemini(model, config.geminiKey, mimeType, image, fetcher, Math.max(3_000, deadline - now()), false);
+          if (!r.ok) failure = describeGeminiFailure(r.status, await googleError(r));
+        }
+        if (!r.ok) {
+          last = failure;
+          if (failure.tryNextModel) continue;
+          break;
+        }
       }
+    } catch (e) {
+      if (!isTimeout(e)) throw e;
+      timedOut = true;
+      last = { code: 'busy', tryNextModel: true, message: 'Gemini took too long to read this screenshot. Please retry, or crop it to just the flight details.' };
+      continue;
     }
-    workingModel.set(config.model, model);
+    if (!timedOut) workingModel.set(config.model, model);
     return r;
   }
+  if (timedOut) fail(504, last!.message, 'busy');
   if (last?.tryNextModel) {
     fail(503, `No Gemini model worked with this API key (tried ${models.join(', ')}). Set GEMINI_MODEL in Vercel to a model listed in Google AI Studio, then redeploy.`, 'setup');
   }
@@ -231,7 +273,7 @@ export async function extractScreenshot(body: unknown, authorization: string | u
       }
     }
     if (error instanceof ImportError) throw error;
-    return fail(504, 'Gemini took too long or couldn’t be reached. Please retry.', 'busy');
+    return fail(504, isTimeout(error) ? 'Gemini took too long to answer. Please retry.' : 'Couldn’t reach Gemini from the server. Please retry.', 'busy');
   }
 }
 
