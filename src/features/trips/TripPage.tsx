@@ -273,7 +273,13 @@ function TripView({ trip, settings, onBack, onUngrouped }: { trip: Trip; setting
               <span className="titin__icon" aria-hidden>
                 <Icon name={trip.roundTrip ? 'home' : 'landing'} size={14} strokeWidth={2} />
               </span>
-              <span className="titin__text">{trip.roundTrip ? `Home again in ${placeName(trip.finish)}` : `Trip ends in ${placeName(trip.finish)}`}</span>
+              <span className="titin__text">
+                {trip.roundTrip
+                  ? `Home again in ${placeName(trip.finish)}`
+                  : trip.returnLogged === false
+                    ? `Last logged in ${placeName(trip.finish)} · the way home isn’t in your log`
+                    : `Trip ends in ${placeName(trip.finish)}`}
+              </span>
             </li>
           </ol>
 

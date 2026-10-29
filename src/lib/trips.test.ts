@@ -47,16 +47,16 @@ describe('detectTrips', () => {
     expect(homeAirport(flights)).toBe('KSAN');
   });
 
-  it('breaks chains on long gaps and airport mismatches, but treats same-city airports as connected', () => {
+  it('keeps long trips together and treats same-city airports as connected', () => {
     const trips = detectTrips([
       leg('2026-06-01', 'KSAN', 'KJFK', '07:00', '15:30'),
       leg('2026-06-04', 'KLGA', 'KORD'), // JFK → LGA same city
       leg('2026-06-05', 'KORD', 'KSAN'),
       leg('2026-08-01', 'KSAN', 'KLAS'),
-      leg('2026-09-30', 'KLAS', 'KSAN'), // 60 days later: separate
+      leg('2026-09-30', 'KLAS', 'KSAN'), // two months in Las Vegas is still one trip
     ]);
-    expect(trips).toHaveLength(1);
-    expect(trips[0].flights).toHaveLength(3);
+    expect(trips.map((t) => t.flights.length).sort()).toEqual([2, 3]);
+    expect(trips.find((t) => t.main === 'KLAS')?.nights).toBe(60);
   });
 
   it('keeps saved trips intact and excludes their legs from suggestions', () => {
@@ -188,5 +188,89 @@ describe('home region', () => {
     expect(byMain.KDEN.flights).toHaveLength(2); // not chained with the Boston trip a week later
     expect(byMain.KBOS.flights).toHaveLength(2);
     expect(byMain.KJFK.roundTrip).toBe(true); // SAN → JFK → LAX is back home
+  });
+});
+
+describe('time away (location over time)', () => {
+  const homeBase = () => [
+    // Enough SAN departures to make SAN home.
+    leg('2025-01-05', 'KSAN', 'KSEA'), leg('2025-01-07', 'KSEA', 'KSAN'),
+    leg('2025-02-05', 'KSAN', 'KPHX'), leg('2025-02-07', 'KPHX', 'KSAN'),
+    leg('2025-03-05', 'KSAN', 'KDEN'), leg('2025-03-07', 'KDEN', 'KSAN'),
+  ];
+
+  it('keeps an open-jaw trip with ground legs together until you fly home', () => {
+    const trips = detectTrips([
+      ...homeBase(),
+      leg('2025-06-01', 'KSAN', 'KJFK', '07:00', '15:30'),
+      leg('2025-06-06', 'KBOS', 'KORD', '09:00', '11:00'), // train New York → Boston
+      leg('2025-06-09', 'KORD', 'KSAN', '09:00', '11:30'),
+    ]);
+    const t = trips.find((x) => x.flights.some((f) => f.to === 'KJFK'))!;
+    expect(t.flights.map((f) => f.to)).toEqual(['KJFK', 'KORD', 'KSAN']);
+    expect(t).toMatchObject({ nights: 8, roundTrip: true, returnLogged: true, startLogged: true });
+  });
+
+  it('keeps a months-long multi-city trip as one', () => {
+    const trips = detectTrips([
+      ...homeBase(),
+      leg('2025-07-05', 'KSAN', 'EGLL'), leg('2025-08-01', 'EGLL', 'LFPG'), leg('2025-09-20', 'LFPG', 'LIRF'), leg('2025-10-02', 'LIRF', 'KSAN'),
+    ]);
+    const t = trips.find((x) => x.flights.length === 4)!;
+    expect(t.start).toBe('2025-07-05');
+    expect(t.roundTrip).toBe(true);
+    expect(t.nights).toBeGreaterThan(80);
+  });
+
+  it('ends a trip when your next flight leaves from home (return not logged)', () => {
+    const trips = detectTrips([
+      ...homeBase(),
+      leg('2025-04-01', 'KSAN', 'KDEN', '07:00', '10:00'), leg('2025-04-03', 'KDEN', 'KBOS', '09:00', '15:00'),
+      // drove/flew home without logging it
+      leg('2025-05-01', 'KSAN', 'KSFO'), leg('2025-05-03', 'KSFO', 'KSAN'),
+    ]);
+    const boston = trips.find((x) => x.flights.some((f) => f.to === 'KBOS'))!;
+    expect(boston.flights).toHaveLength(2);
+    expect(boston).toMatchObject({ returnLogged: false, roundTrip: false, end: '2025-04-03' });
+    expect(trips.find((x) => x.main === 'KSFO')?.flights).toHaveLength(2);
+  });
+
+  it('does not mistake a long stint abroad with weekend trips for a move', () => {
+    const before: Flight[] = [];
+    for (let m = 1; m <= 6; m++) before.push(leg(`2025-0${m}-02`, 'KSAN', 'KSEA'), leg(`2025-0${m}-04`, 'KSEA', 'KSAN'));
+    const london = [
+      leg('2025-07-01', 'KSAN', 'EGLL'),
+      leg('2025-07-12', 'EGLL', 'LFPG'), leg('2025-07-14', 'LFPG', 'EGLL'),
+      leg('2025-08-09', 'EGLL', 'EHAM'), leg('2025-08-11', 'EHAM', 'EGLL'),
+      leg('2025-09-06', 'EGLL', 'EIDW'), leg('2025-09-08', 'EIDW', 'EGLL'),
+      leg('2025-09-30', 'EGLL', 'KSAN'),
+    ];
+    const after: Flight[] = [];
+    for (let m = 10; m <= 12; m++) after.push(leg(`2025-${m}-02`, 'KSAN', 'KDEN'), leg(`2025-${m}-04`, 'KDEN', 'KSAN'));
+    const trips = detectTrips([...before, ...london, ...after]);
+    const stint = trips.find((t) => t.start === '2025-07-01')!;
+    expect(stint.flights).toHaveLength(8);
+    expect(stint).toMatchObject({ roundTrip: true, main: 'EGLL' });
+  });
+
+  it('follows a move: trips end at the new home once you live there', () => {
+    const nyc: Flight[] = [];
+    for (let m = 1; m <= 10; m++) {
+      const mm = String(m).padStart(2, '0');
+      nyc.push(leg(`2016-${mm}-05`, 'KJFK', m % 2 ? 'KORD' : 'KMIA'), leg(`2016-${mm}-08`, m % 2 ? 'KORD' : 'KMIA', 'KJFK'));
+    }
+    const move = leg('2017-01-15', 'KJFK', 'KSAN');
+    const sd: Flight[] = [];
+    for (let m = 3; m <= 12; m++) {
+      const mm = String(m).padStart(2, '0');
+      sd.push(leg(`2017-${mm}-05`, 'KSAN', m % 2 ? 'KSEA' : 'KDEN'), leg(`2017-${mm}-08`, m % 2 ? 'KSEA' : 'KDEN', 'KSAN'));
+    }
+    const trips = detectTrips([...nyc, move, ...sd]);
+    // No trip swallows months of San Diego life after the move.
+    expect(Math.max(...trips.map((t) => t.nights))).toBeLessThan(40);
+    const late = trips.filter((t) => t.start >= '2017-03-01');
+    expect(late).toHaveLength(10);
+    expect(late.every((t) => t.roundTrip && t.flights.length === 2)).toBe(true);
+    expect(trips.filter((t) => t.start < '2017-01-01').every((t) => t.roundTrip)).toBe(true);
   });
 });

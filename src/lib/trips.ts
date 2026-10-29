@@ -1,10 +1,14 @@
 /**
  * Trips: groups of flights that belong to one journey (out, connections, back).
  *
- * Trips are suggested automatically from the log — consecutive legs that chain airport to
- * airport within a few weeks, ending when you're back home. Saving a suggestion stamps every
- * leg with the same `tripId` (and `tripName`), so saved trips sync with the flights and survive
- * re-detection. Only day-precision flights take part.
+ * Detection follows where you are between flights. A trip starts when a flight lands outside
+ * your home area and lasts — however long, through however many cities, including ground legs
+ * between airports — until a flight lands back home. If your next flight leaves from home
+ * instead, you got back some other way: the trip ends there with `returnLogged: false`.
+ * "Home" is inferred from the flights around each date (so a move to a new city is understood)
+ * and covers nearby airports you use regularly (e.g. SAN and LAX). Saving a suggestion stamps
+ * every leg with the same `tripId` (and `tripName`), so saved trips sync with the flights and
+ * always win over detection. Only day-precision flights take part.
  */
 import { getAirport } from '@/data/reference';
 import { airlineKey, departureInstant, flightDistanceKm } from './flight-utils';
@@ -38,19 +42,21 @@ export interface Trip {
   stops: TripStop[];
   /** Primary destination: the longest stay, else the farthest airport from the origin. */
   main: string;
-  /** Ends where it started. */
+  /** Ends back in the home area. */
   roundTrip: boolean;
   nights: number;
   distanceKm: number;
+  /** False when the log has no flight out of home for this trip (it starts mid-journey). */
+  startLogged: boolean;
+  /** False when the trip ended without a logged flight home (you returned another way). */
+  returnLogged: boolean;
 }
 
 export interface TripOptions {
-  /** Home airport ident; defaults to the most frequent departure airport. */
+  /** Fixed home airport ident; by default home is inferred from the flights around each date. */
   home?: string;
-  /** Longest gap between legs of one trip. */
-  maxGapDays?: number;
-  /** Longest trip. */
-  maxTripDays?: number;
+  /** Silence after which an open trip is assumed to have ended (missing data). Default 270 days. */
+  maxSilenceDays?: number;
 }
 
 const DAY_MIN = 24 * 60;
@@ -140,7 +146,14 @@ function chronological(flights: Flight[]): Flight[] {
     .map(([, f]) => f);
 }
 
-function buildTrip(id: string, saved: boolean, legs: Flight[], name?: string, isHome: (ident: string) => boolean = () => false): Trip {
+function buildTrip(
+  id: string,
+  saved: boolean,
+  legs: Flight[],
+  name?: string,
+  isHome: (ident: string) => boolean = () => false,
+  flags: { startLogged?: boolean; returnLogged?: boolean } = {},
+): Trip {
   const flights = chronological(legs);
   const first = flights[0];
   const last = flights[flights.length - 1];
@@ -181,54 +194,219 @@ function buildTrip(id: string, saved: boolean, legs: Flight[], name?: string, is
     finish,
     stops,
     main,
-    roundTrip: sameCity(origin, finish) || (isHome(origin) && isHome(finish)),
+    roundTrip: sameCity(origin, finish) || isHome(finish),
     nights,
     distanceKm: Math.round(flights.reduce((s, f) => s + (flightDistanceKm(f) ?? 0), 0)),
+    startLogged: flags.startLogged ?? true,
+    returnLogged: flags.returnLogged ?? (sameCity(origin, finish) || isHome(finish)),
   };
 }
 
+// ---------- areas & home over time ----------
+
+/** Airports within this distance of an area's busiest airport belong to the same metro area. */
+const METRO_KM = 120;
+/** Regularly used airports within this distance of the main home also count as home. */
+const HOME_REGION_KM = 250;
+
 /**
- * Saved trips plus suggestions, newest first. Suggestions chain legs whose departure airport
- * (or city) matches the previous arrival within `maxGapDays`, stop when the traveller is back
- * home, and never exceed `maxTripDays`. Single flights aren't returned as trips.
+ * Groups the log's airports into metro areas (JFK/LGA/EWR, SFO/OAK/SJC…), seeded by the busiest
+ * airports first. Returns airport ident → area id (the seed airport's ident).
+ */
+function metroAreas(flights: Flight[]): Map<string, string> {
+  const use = new Map<string, number>();
+  for (const f of flights) for (const a of [f.from, f.to]) use.set(a, (use.get(a) ?? 0) + 1);
+  const seeds: { ident: string; lat: number; lon: number; city: string; country: string }[] = [];
+  const area = new Map<string, string>();
+  for (const [ident] of [...use].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))) {
+    const ap = getAirport(ident);
+    if (!ap) {
+      area.set(ident, ident);
+      continue;
+    }
+    const seed = seeds.find((s) => (s.country === ap.country && s.city && s.city === baseCity(ap.city)) || distanceKm(s, ap) <= METRO_KM);
+    if (seed) area.set(ident, seed.ident);
+    else {
+      seeds.push({ ident, lat: ap.lat, lon: ap.lon, city: baseCity(ap.city), country: ap.country });
+      area.set(ident, ident);
+    }
+  }
+  return area;
+}
+
+/**
+ * Home areas in effect for each flight (by index into `flights`, chronological): the area you
+ * fly out of most within a year either side, plus nearby areas you also use regularly.
+ * Because it's local in time, moving to a new city moves "home" with you.
+ */
+function homesOverTime(flights: Flight[], areaOf: (ident: string) => string): Set<string>[] {
+  const YEAR = 365 * DAY_MIN * 60_000;
+  const t = flights.map(depInstant);
+  const out: Set<string>[] = [];
+  let lo = 0;
+  let hi = 0;
+  const counts = new Map<string, number>();
+  const add = (i: number, d: number) => {
+    const a = areaOf(flights[i].from);
+    counts.set(a, (counts.get(a) ?? 0) + d);
+  };
+  const global = new Map<string, number>();
+  // Ties go to the area flown out of first — where a short log most likely starts: home.
+  const firstOut = new Map<string, number>();
+  flights.forEach((f, i) => {
+    const a = areaOf(f.from);
+    global.set(a, (global.get(a) ?? 0) + 1);
+    if (!firstOut.has(a)) firstOut.set(a, i);
+  });
+  let current: string | undefined;
+  for (let i = 0; i < flights.length; i++) {
+    while (hi < flights.length && t[hi] <= t[i] + YEAR) add(hi++, 1);
+    while (t[lo] < t[i] - YEAR) add(lo++, -1);
+    // Sparse stretches don't say much about where home is: fall back to the whole log.
+    const source = hi - lo >= 8 ? counts : global;
+    const candidate = busiest(source, firstOut);
+    // Hysteresis: home only moves when another area clearly dominates (a real move), so
+    // near-even stretches between two cities don't flip it back and forth.
+    if (!current) current = busiest(global, firstOut);
+    else if (candidate && candidate !== current && (source.get(candidate) ?? 0) >= 1.25 * (source.get(current) ?? 0) + 2) current = candidate;
+    out.push(homeSet(current, source));
+  }
+  return out;
+}
+
+function busiest(counts: Map<string, number>, firstOut: Map<string, number>): string | undefined {
+  let top: string | undefined;
+  let n = 0;
+  const order = (a: string) => firstOut.get(a) ?? Number.MAX_SAFE_INTEGER;
+  for (const [a, c] of counts) if (c > n || (c === n && c > 0 && top !== undefined && order(a) < order(top))) [top, n] = [a, c];
+  return top;
+}
+
+function homeSet(top: string | undefined, counts: Map<string, number>): Set<string> {
+  const set = new Set<string>();
+  if (!top) return set;
+  const n = counts.get(top) ?? 0;
+  set.add(top);
+  const t = getAirport(top);
+  if (!t) return set;
+  for (const [a, c] of counts) {
+    if (a === top || c < Math.max(2, n * 0.2)) continue;
+    const ap = getAirport(a);
+    if (ap && distanceKm(ap, t) <= HOME_REGION_KM) set.add(a);
+  }
+  return set;
+}
+
+/**
+ * Saved trips plus suggestions, newest first. See the module comment for the rules. Suggestions
+ * need at least two flights; saved trips are kept whatever their size.
  */
 export function detectTrips(all: Flight[], opts: TripOptions = {}): Trip[] {
-  const maxGap = (opts.maxGapDays ?? 21) * DAY_MIN * 60_000;
-  const maxSpan = (opts.maxTripDays ?? 60) * DAY_MIN * 60_000;
-  const dated = all.filter((f) => f.datePrecision === 'day');
-  const home = opts.home ?? homeAirport(dated);
-  const region = homeRegion(dated, home);
-  const isHome = (ident: string) => [...region].some((h) => sameCity(ident, h));
+  const silence = (opts.maxSilenceDays ?? 270) * DAY_MIN * 60_000;
+  const timeline = chronological(all.filter((f) => f.datePrecision === 'day'));
+  const areas = metroAreas(timeline);
+  const areaOf = (ident: string) => areas.get(ident) ?? ident;
+  const fixedHome = opts.home ? new Set([areaOf(opts.home)]) : undefined;
+  const homes = fixedHome ? timeline.map(() => fixedHome) : homesOverTime(timeline, areaOf);
   const trips: Trip[] = [];
 
-  // Saved trips win: their legs are grouped by id and excluded from suggestions.
+  // Saved trips win: their legs are grouped by id.
   const savedGroups = new Map<string, Flight[]>();
-  for (const f of dated) {
+  for (const f of timeline) {
     if (!f.tripId) continue;
     const group = savedGroups.get(f.tripId);
     if (group) group.push(f);
     else savedGroups.set(f.tripId, [f]);
   }
-  for (const [id, legs] of savedGroups) trips.push(buildTrip(id, true, legs, legs.find((l) => l.tripName)?.tripName, isHome));
-
-  let current: Flight[] = [];
-  const flush = () => {
-    if (current.length >= 2) trips.push(buildTrip(`auto-${current[0].id}`, false, current, undefined, isHome));
-    current = [];
-  };
-  for (const f of chronological(dated.filter((x) => !x.tripId))) {
-    const prev = current[current.length - 1];
-    if (prev) {
-      const gap = depInstant(f) - arrivalInstant(prev);
-      const span = depInstant(f) - depInstant(current[0]);
-      const chained = sameCity(prev.to, f.from) && gap >= -60 * 60_000 && gap <= maxGap && span <= maxSpan;
-      // Landing at home ends the trip, unless it's just a connection through home (< 6h).
-      const backHome = isHome(prev.to) && gap > 6 * 60 * 60_000;
-      if (!chained || backHome) flush();
-    }
-    current.push(f);
+  const homeAtFlight = new Map<Flight, Set<string>>(timeline.map((f, i) => [f, homes[i]]));
+  for (const [id, legs] of savedGroups) {
+    const home = homeAtFlight.get(legs[legs.length - 1]) ?? new Set<string>();
+    trips.push(buildTrip(id, true, legs, legs.find((l) => l.tripName)?.tripName, (a) => home.has(areaOf(a))));
   }
-  flush();
+
+  // Moves: once you start flying out of a new area that dominates your next six months of
+  // departures while your old home barely appears, you live there now.
+  const AHEAD = 180 * DAY_MIN * 60_000;
+  const depAt = timeline.map(depInstant);
+  const movedTo = (i: number, area: string, base: Set<string>): Set<string> | undefined => {
+    if (fixedHome || base.has(area)) return undefined;
+    const counts = new Map<string, number>();
+    let old = 0;
+    for (let j = i; j < timeline.length && depAt[j] <= depAt[i] + AHEAD; j++) {
+      const a = areaOf(timeline[j].from);
+      counts.set(a, (counts.get(a) ?? 0) + 1);
+      if (base.has(a)) old++;
+    }
+    const n = counts.get(area) ?? 0;
+    const others = [...counts].filter(([a]) => a !== area).map(([, c]) => c);
+    if (n >= 3 && old <= 1 && n >= 1.5 * Math.max(1, ...others)) return homeSet(area, counts);
+    return undefined;
+  };
+  let base = homes[0] ?? new Set<string>();
+
+  let legs: Flight[] = [];
+  let startLogged = true;
+  let tripHome = new Set<string>();
+  const close = (returnLogged: boolean) => {
+    if (legs.length >= 2) {
+      const home = tripHome;
+      trips.push(buildTrip(`auto-${legs[0].id}`, false, legs, undefined, (a) => home.has(areaOf(a)), { startLogged, returnLogged }));
+    }
+    legs = [];
+  };
+
+  for (let i = 0; i < timeline.length; i++) {
+    const f = timeline[i];
+    if (f.tripId) {
+      // A saved trip interrupts whatever was in progress.
+      if (legs.length) close(false);
+      continue;
+    }
+    // Home follows the inferred base; a detected move ends any trip in progress there.
+    const moved = movedTo(i, areaOf(f.from), base);
+    if (moved) {
+      if (legs.length) close(false);
+      base = moved;
+    } else if (!fixedHome && !legs.length && homes[i] !== base && [...homes[i]].some((a) => !base.has(a))) {
+      // Gradual shifts (no single move) still follow the rolling home between trips.
+      const top = [...homes[i]][0];
+      if (top && homes[i].has(areaOf(f.from))) base = homes[i];
+    }
+    const home = base;
+    const fromHome = home.has(areaOf(f.from));
+    const toHome = home.has(areaOf(f.to));
+
+    if (legs.length) {
+      const last = legs[legs.length - 1];
+      const stillAway = !home.has(areaOf(last.to));
+      // Flying out of home while the log still has you away: you came back another way.
+      if (fromHome && stillAway && areaOf(last.to) !== areaOf(f.from)) close(false);
+      // A long silence mid-trip means missing flights, not a months-long trip.
+      else if (depInstant(f) - arrivalInstant(last) > silence) close(false);
+    }
+
+    if (legs.length) {
+      legs.push(f);
+      if (toHome) {
+        // Landing at home ends the trip — unless you fly straight out again (a connection).
+        const next = timeline[i + 1];
+        const connecting = next && !next.tripId && areaOf(next.from) === areaOf(f.to) && depInstant(next) - arrivalInstant(f) < 6 * 60 * 60_000 && !home.has(areaOf(next.to));
+        if (!connecting) close(true);
+      }
+      continue;
+    }
+
+    if (!toHome) {
+      // Leaving home (or the first flight we know of while away).
+      legs = [f];
+      startLogged = fromHome;
+      tripHome = home;
+    }
+    // Hops between home airports (SAN → LAX) aren't trips; a lone flight home from somewhere
+    // we never saw you fly to has no known start, so it isn't suggested either.
+  }
+  if (legs.length) close(false);
+
   return trips.sort((a, b) => b.start.localeCompare(a.start) || b.flights.length - a.flights.length);
 }
 
