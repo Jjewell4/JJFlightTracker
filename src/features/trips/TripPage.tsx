@@ -4,7 +4,7 @@ import { Icon, type IconName } from '@/components/Icon';
 import { ConfirmSheet, Sheet } from '@/components/Sheet';
 import { useReferenceReady } from '@/data/reference';
 import { renameTrip, saveTrip, setOccasion, unsaveTrip, useFlights, useSettings } from '@/lib/db';
-import { FLIGHT_OCCASIONS, OCCASION_EMOJI, OCCASION_LABELS } from '@/lib/occasions';
+import { FLIGHT_OCCASIONS, OCCASION_ICON, OCCASION_LABELS } from '@/lib/occasions';
 import { todayLocal } from '@/lib/time';
 import { resolveTrip, suggestTripName, tripCounts, tripDates, tripMinutes, tripTitle, type Trip } from '@/lib/trips';
 import type { FlightOccasion, Settings } from '@/lib/types';
@@ -246,7 +246,8 @@ function TripView({ trip, settings, onBack, onUngrouped }: { trip: Trip; setting
           <button type="button" className="toccasion animate-in" onClick={() => setPicking(true)} aria-haspopup="dialog">
             <span className="toccasion__label">Occasion</span>
             <span className={`toccasion__value${occasion ? '' : ' is-placeholder'}`}>
-              {occasion ? `${OCCASION_EMOJI[occasion]} ${OCCASION_LABELS[occasion]}` : mixed ? 'Mixed' : 'Vacation, wedding, conference…'}
+              {occasion && <Icon name={OCCASION_ICON[occasion]} size={16} className="toccasion__icon" />}
+              <span className="toccasion__text">{occasion ? OCCASION_LABELS[occasion] : mixed ? 'Mixed' : 'Vacation, wedding, conference…'}</span>
             </span>
             <Icon name="chevron" size={16} className="toccasion__chev" />
           </button>
@@ -349,7 +350,7 @@ function TripView({ trip, settings, onBack, onUngrouped }: { trip: Trip; setting
         <div className="chip-group toccasion__chips" role="group" aria-label="Occasion">
           {FLIGHT_OCCASIONS.map((o) => (
             <button key={o} type="button" className="chip toccasion__chip" aria-pressed={o === occasion} onClick={() => void pickOccasion(o === occasion ? undefined : o)}>
-              <span aria-hidden>{OCCASION_EMOJI[o]}</span> {OCCASION_LABELS[o]}
+              <Icon name={OCCASION_ICON[o]} size={16} /> {OCCASION_LABELS[o]}
             </button>
           ))}
         </div>

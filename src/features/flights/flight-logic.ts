@@ -8,7 +8,7 @@ import { getAirline, getAirport, getCountry, normalize } from '@/data/reference'
 import { airlineKey, airportCode, flightAircraftName, flightAirlineName, flightDistanceKm, parseFlightNumber } from '@/lib/flight-utils';
 import { estimateDurationMin, kmToMiles } from '@/lib/geo';
 import { zonedToUtc } from '@/lib/time';
-import { OCCASION_EMOJI, OCCASION_LABELS } from '@/lib/occasions';
+import { OCCASION_LABELS } from '@/lib/occasions';
 import type { CabinClass, Flight, FlightOccasion, FlightReason, Settings } from '@/lib/types';
 
 // ---------- formatting ----------
@@ -199,7 +199,7 @@ export function filterOptions(flights: Flight[]): FilterOptions {
   const reasons = [...tally(flights.map((f) => f.reason))].map(([value, count]) => ({ value, label: REASON_LABEL[value], count })).sort(byCount);
 
   const occasions = [...tally(flights.map((f) => f.occasion))]
-    .map(([value, count]) => ({ value, label: `${OCCASION_EMOJI[value]} ${OCCASION_LABELS[value]}`, count }))
+    .map(([value, count]) => ({ value, label: OCCASION_LABELS[value], count }))
     .sort(byCount);
 
   return { years, airlines, airports, cabins, reasons, occasions };

@@ -1,4 +1,5 @@
 /** Occasion tags: the optional "what was the trip for" category (vacation, wedding, …). */
+import type { IconName } from '@/components/Icon';
 import type { FlightOccasion, FlightReason } from './types';
 
 export const FLIGHT_OCCASIONS: readonly FlightOccasion[] = [
@@ -29,18 +30,19 @@ export const OCCASION_LABELS: Record<FlightOccasion, string> = {
   other: 'Other',
 };
 
-export const OCCASION_EMOJI: Record<FlightOccasion, string> = {
-  vacation: '🏖️',
-  family: '🏡',
-  friends: '🫶',
-  wedding: '💍',
-  holiday: '🎄',
-  event: '🎟️',
-  conference: '🎤',
-  work: '💼',
-  school: '🎓',
-  moving: '📦',
-  other: '🏷️',
+/** Line icon for each occasion (same set as the rest of the app). */
+export const OCCASION_ICON: Record<FlightOccasion, IconName> = {
+  vacation: 'palm',
+  family: 'home',
+  friends: 'users',
+  wedding: 'ring',
+  holiday: 'gift',
+  event: 'ticket',
+  conference: 'mic',
+  work: 'briefcase',
+  school: 'graduation',
+  moving: 'box',
+  other: 'tag',
 };
 
 /** The reason an occasion implies, used to fill an empty reason. */

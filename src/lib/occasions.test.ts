@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { sanitizeFlight } from '@/services/import/backup';
 import { addFlights, deleteAllFlights, getAllFlights, setOccasion } from './db';
-import { FLIGHT_OCCASIONS, OCCASION_EMOJI, OCCASION_LABELS, parseOccasion } from './occasions';
+import { FLIGHT_OCCASIONS, OCCASION_ICON, OCCASION_LABELS, parseOccasion } from './occasions';
 import { computeStats } from './stats';
 
 afterEach(deleteAllFlights);
@@ -10,7 +10,7 @@ describe('occasions', () => {
   it('has a label and emoji for every occasion', () => {
     for (const o of FLIGHT_OCCASIONS) {
       expect(OCCASION_LABELS[o]).toBeTruthy();
-      expect(OCCASION_EMOJI[o]).toBeTruthy();
+      expect(OCCASION_ICON[o]).toBeTruthy();
     }
   });
 

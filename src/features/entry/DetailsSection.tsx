@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import { Icon, type IconName } from '@/components/Icon';
-import { FLIGHT_OCCASIONS, OCCASION_EMOJI, OCCASION_LABELS, OCCASION_REASON } from '@/lib/occasions';
+import { FLIGHT_OCCASIONS, OCCASION_ICON, OCCASION_LABELS, OCCASION_REASON } from '@/lib/occasions';
 import type { CabinClass, DatePrecision, FlightReason, SeatType } from '@/lib/types';
 import { inferSeatType, type FormValues } from './form-model';
 
@@ -17,7 +17,14 @@ const REASONS: { value: FlightReason; label: string }[] = [
   { value: 'crew', label: 'Crew' },
   { value: 'other', label: 'Other' },
 ];
-const OCCASIONS = FLIGHT_OCCASIONS.map((value) => ({ value, label: `${OCCASION_EMOJI[value]} ${OCCASION_LABELS[value]}` }));
+const OCCASIONS = FLIGHT_OCCASIONS.map((value) => ({
+  value,
+  label: (
+    <>
+      <Icon name={OCCASION_ICON[value]} size={16} /> {OCCASION_LABELS[value]}
+    </>
+  ),
+}));
 const SEATS: { value: SeatType; label: string }[] = [
   { value: 'window', label: 'Window' },
   { value: 'middle', label: 'Middle' },
@@ -39,7 +46,7 @@ function Choice<T extends string>({
   clearable = true,
 }: {
   label: string;
-  options: { value: T; label: string }[];
+  options: { value: T; label: React.ReactNode }[];
   value: T | undefined;
   onChange: (v: T | undefined) => void;
   variant?: 'seg' | 'chips';

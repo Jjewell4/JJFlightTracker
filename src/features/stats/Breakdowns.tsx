@@ -2,7 +2,8 @@ import type { Breakdown, FlightStats } from '@/lib/stats';
 import { Donut, SegmentBar, type PartItem } from './charts/PartToWhole';
 import { CardHead, Section } from './parts';
 import { RankList } from './TopLists';
-import { OCCASION_EMOJI } from '@/lib/occasions';
+import { Icon } from '@/components/Icon';
+import { OCCASION_ICON } from '@/lib/occasions';
 import { fmtDistance, fmtInt, fmtPct, type DistanceUnit } from './format';
 import type { StatsSections } from './sections';
 
@@ -71,7 +72,7 @@ export function Breakdowns({ stats, unit, sections, readOnly = false }: { stats:
               .sort((a, b) => b.count - a.count)
               .map((it) => ({
                 key: it.key,
-                lead: <span aria-hidden>{OCCASION_EMOJI[it.key]}</span>,
+                lead: <Icon name={OCCASION_ICON[it.key]} size={20} className="stats-occasion__icon" />,
                 primary: it.label,
                 secondary: fmtPct(it.share),
                 count: it.count,

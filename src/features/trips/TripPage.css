@@ -534,12 +534,22 @@
   color: var(--text-3);
 }
 .toccasion__value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+.toccasion__text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 600;
+}
+.toccasion__icon {
+  flex: none;
+  color: var(--accent);
 }
 .toccasion__value.is-placeholder {
   font-weight: 500;

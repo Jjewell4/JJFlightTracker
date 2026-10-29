@@ -1073,3 +1073,7 @@
 @media (min-width: 960px) { .stats-jump { margin-inline:0; padding:0; flex-wrap:wrap; } }
 .stats-jump button:hover { color:var(--accent); border-color:var(--accent); }
 [id^="stats-"] { scroll-margin-top:var(--stats-scroll-margin, var(--space-6)); }
+
+.stats-occasion__icon {
+  color: var(--accent);
+}
