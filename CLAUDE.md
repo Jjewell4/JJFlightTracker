@@ -48,3 +48,10 @@ at once, optionally as a trip). Interrupted reads resume on the next launch.
   Touch targets ≥44px, respect safe-area insets, no hover-only affordances.
 - Keep lookups graceful offline: network features must degrade silently.
 - SQL files in `supabase/` must stay safe to re-run; the user pastes them into the SQL editor.
+
+## Git workflow
+- Work on a branch, never directly on `main`. Commit and verify there (`npx tsc -b`,
+  `npx vitest run`, `npm run build`).
+- Ship by pushing the branch and fast-forwarding `main` to it in one command, so Vercel builds
+  one finished state: `git push origin <branch> <branch>:main` (rebase on `origin/main` first if it moved).
+- Commit as `Jordan Jewell <jjewell444@gmail.com>`.
