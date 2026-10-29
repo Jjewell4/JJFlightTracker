@@ -167,12 +167,12 @@ it('shares optional categories only when the owner switches them on, exactly lik
     const full = {
       date: '2024-01-14', datePrecision: 'day', from: 'KSAN', to: 'KLAX', airlineIcao: 'UAL', airlineIata: 'UA', aircraftType: 'B738',
       depTime: '07:05', arrTime: '23:59', arrDayOffset: 1, durationMin: 312.4, cabinClass: 'business', seatNumber: '12a', seatType: 'window',
-      reason: 'leisure', flightNumber: 'ua123', registration: 'n123ua', note: 'secret', airlineName: 'Typed airline', aircraftName: 'Typed aircraft',
+      reason: 'leisure', occasion: 'wedding', flightNumber: 'ua123', registration: 'n123ua', note: 'secret', airlineName: 'Typed airline', aircraftName: 'Typed aircraft',
       distanceKm: 180, id: 'private-id', source: 'manual', createdAt: 1, updatedAt: 2,
     };
     const malformed = {
       ...full, depTime: '7:05', arrTime: '24:00', arrDayOffset: 5, durationMin: 2000, cabinClass: 'coach', seatNumber: '12AB', seatType: 'floor',
-      reason: 'fun', flightNumber: 'UA 123', registration: 'N12345678901',
+      reason: 'fun', occasion: 'party', flightNumber: 'UA 123', registration: 'N12345678901',
     };
     const edge = { date: '2024-02-01', datePrecision: 'month', from: 'KLAX', to: 'KSAN', arrDayOffset: 0, durationMin: 0, seatNumber: '1A', flightNumber: 'BA1' };
     const all = { times: true, cabin: true, seat: true, reason: true, flightNumber: true, registration: true };
@@ -192,10 +192,10 @@ it('shares optional categories only when the owner switches them on, exactly lik
     await db.exec(`update public.public_profiles set share='{"times":true,"seat":true}'`);
     const some = await shared();
     assert.deepEqual([some.depTime, some.arrTime, some.arrDayOffset, some.durationMin, some.seatNumber, some.seatType], ['07:05', '23:59', 1, 312, '12A', 'window']);
-    for (const k of ['cabinClass', 'reason', 'flightNumber', 'registration', 'note', 'airlineName', 'aircraftName', 'id', 'distanceKm']) assert.equal(some[k], undefined, k);
+    for (const k of ['cabinClass', 'reason', 'occasion', 'flightNumber', 'registration', 'note', 'airlineName', 'aircraftName', 'id', 'distanceKm']) assert.equal(some[k], undefined, k);
     await db.exec(`update public.public_profiles set share='${JSON.stringify(all)}'`);
     const everything = await shared();
-    assert.deepEqual([everything.cabinClass, everything.reason, everything.flightNumber, everything.registration], ['business', 'leisure', 'UA123', 'N123UA']);
+    assert.deepEqual([everything.cabinClass, everything.reason, everything.occasion, everything.flightNumber, everything.registration], ['business', 'leisure', 'wedding', 'UA123', 'N123UA']);
     for (const k of ['note', 'airlineName', 'aircraftName', 'id', 'source', 'createdAt']) assert.equal(everything[k], undefined, k);
     // Only known categories, as booleans.
     await assert.rejects(() => db.exec(`update public.public_profiles set share='{"notes":true}'`));

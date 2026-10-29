@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { BrandMark } from '@/components/BrandMark';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
 import { useFlights } from '@/lib/db';
@@ -30,7 +31,7 @@ export default function WelcomePage() {
     <div className="welcome">
       <div className="welcome__inner animate-in">
         <div className="welcome__brand">
-          <img className="brand-mark brand-mark--hero" src={`${import.meta.env.BASE_URL}favicon.svg`} width="64" height="64" alt="" />
+          <BrandMark size={64} variant="detailed" className="brand-mark brand-mark--hero" />
           <h1 className="welcome__title">Window Seat</h1>
           <p className="welcome__tagline">Every flight, route and mile — beautifully kept.</p>
         </div>

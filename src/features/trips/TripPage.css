@@ -508,3 +508,58 @@
     bottom: var(--space-8);
   }
 }
+
+/* ---------- occasion ---------- */
+.toccasion {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 48px;
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+.toccasion:active {
+  background: var(--surface-2);
+}
+.toccasion__label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-3);
+}
+.toccasion__value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.toccasion__value.is-placeholder {
+  font-weight: 500;
+  color: var(--text-3);
+}
+.toccasion__chev {
+  color: var(--text-3);
+}
+.toccasion__lead {
+  margin: 0 0 var(--space-3);
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+.toccasion__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+.toccasion__chip {
+  min-height: 44px;
+  padding: 0 var(--space-4);
+}

@@ -19,6 +19,8 @@ export interface StatsSections {
   /** Seat heatmap — needs seat numbers (it also hides itself with too few of them). */
   seatMap: boolean;
   reason: boolean;
+  /** Occasion tags (shared with trip purpose). */
+  occasion: boolean;
   /** Tail-number ranking. */
   registrations: boolean;
   /** "Most time aloft" / "Quickest hop" records — need recorded times. */
@@ -41,6 +43,7 @@ export function statsSections(fields: FlightFields, stats: Pick<FlightStats, 'we
     seat: fields.seat,
     seatMap: fields.seat,
     reason: fields.reason,
+    occasion: fields.reason,
     registrations: fields.registration && stats.registrations.length > 0,
     durationRecords: fields.durations,
     busiestDay: fields.exactDates,

@@ -1,6 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { DEFAULT_SETTINGS, type Flight, type FlightInput, type ImportDraft, type Settings } from './types';
+import { OCCASION_REASON } from './occasions';
+import { DEFAULT_SETTINGS, type Flight, type FlightInput, type FlightOccasion, type ImportDraft, type Settings } from './types';
 
 interface KV {
   key: string;
@@ -132,6 +133,19 @@ async function updateTripLegs(tripId: string, patch: Pick<Flight, 'tripId' | 'tr
 /** Renames a saved trip (an empty name falls back to the automatic title). */
 export async function renameTrip(tripId: string, name: string): Promise<void> {
   await updateTripLegs(tripId, { tripId, tripName: name.trim() });
+}
+
+/**
+ * Tags flights (a trip's legs) with an occasion, or clears it. An occasion implies a reason, which
+ * fills legs that have none (a wedding is leisure, a conference business).
+ */
+export async function setOccasion(flightIds: string[], occasion: FlightOccasion | undefined): Promise<void> {
+  await db.transaction('rw', db.flights, async () => {
+    const legs = (await db.flights.bulkGet(flightIds)).filter((f): f is Flight => !!f);
+    const now = Date.now();
+    const reason = occasion && OCCASION_REASON[occasion];
+    await db.flights.bulkPut(legs.map((f) => compact({ ...f, occasion, reason: f.reason ?? reason, updatedAt: now })));
+  });
 }
 
 /** Removes the trip grouping: clears tripId/tripName on its legs; the flights stay. */

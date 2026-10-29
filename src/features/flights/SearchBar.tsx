@@ -85,6 +85,9 @@ export const SearchBar = forwardRef<HTMLDivElement, Props>(function SearchBar({ 
         />
         <ChipSelect label="Class" anyLabel="Any class" value={filters.cabin} options={options.cabins} onChange={(cabin) => set({ cabin: cabin as FlightFilters['cabin'] })} />
         <ChipSelect label="Reason" anyLabel="Any reason" value={filters.reason} options={options.reasons} onChange={(reason) => set({ reason: reason as FlightFilters['reason'] })} />
+        {options.occasions.length > 0 && (
+          <ChipSelect label="Occasion" anyLabel="Any occasion" value={filters.occasion} options={options.occasions} onChange={(occasion) => set({ occasion: occasion as FlightFilters['occasion'] })} />
+        )}
         {any && (
           <button type="button" className="chip fchip fchip--clear" onClick={() => onFilters({})}>
             <Icon name="close" size={12} strokeWidth={2.25} />

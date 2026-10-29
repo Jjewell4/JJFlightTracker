@@ -1,3 +1,4 @@
+import { isOccasion } from '@/lib/occasions';
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
@@ -54,6 +55,8 @@ export function FlightsPage() {
       const v = searchParams.get(key);
       if (v) linked[key] = v;
     }
+    const occasion = searchParams.get('occasion');
+    if (isOccasion(occasion)) linked.occasion = occasion;
     if (Object.keys(linked).length) {
       setQuery('');
       setFilters(linked);

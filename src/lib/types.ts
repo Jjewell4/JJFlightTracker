@@ -7,6 +7,19 @@ export type DatePrecision = 'day' | 'month' | 'year';
 export type SeatType = 'window' | 'middle' | 'aisle';
 export type CabinClass = 'economy' | 'premium' | 'business' | 'first' | 'private';
 export type FlightReason = 'leisure' | 'business' | 'crew' | 'other';
+/** Optional "what the trip was for" tag (see src/lib/occasions.ts). */
+export type FlightOccasion =
+  | 'vacation'
+  | 'family'
+  | 'friends'
+  | 'wedding'
+  | 'holiday'
+  | 'event'
+  | 'conference'
+  | 'work'
+  | 'school'
+  | 'moving'
+  | 'other';
 export type FlightSource = 'manual' | 'lookup' | 'screenshot' | 'fr24' | 'csv' | 'backup';
 
 export interface Flight {
@@ -52,6 +65,8 @@ export interface Flight {
   seatType?: SeatType;
   cabinClass?: CabinClass;
   reason?: FlightReason;
+  /** Optional occasion tag: vacation, wedding, conference, … */
+  occasion?: FlightOccasion;
   note?: string;
 
   /** Set when the user saves a (suggested) trip: every leg of the trip shares the id. */

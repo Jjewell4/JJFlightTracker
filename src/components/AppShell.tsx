@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, type ReactNode } from 'react';
+import { BrandMark } from './BrandMark';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { isOnboarded } from '@/features/account/onboarding';
 import { clearNotice, useCloudSync } from '@/services/sync/controller';
@@ -27,10 +28,6 @@ const TABS_RIGHT = [MAP, STATS];
 /** Wide-screen sidebar. */
 const SIDE_NAV = [HOME, LOG, MAP, STATS, SETTINGS, IMPORT];
 
-/** The app mark (same artwork as the favicon and launcher icons). */
-function BrandMark({ size }: { size: number }) {
-  return <img className="brand-mark" src={`${import.meta.env.BASE_URL}favicon.svg`} width={size} height={size} alt="" />;
-}
 
 /**
  * Responsive app frame. Phones: slim top bar (brand, settings, account) on the main tabs and a
@@ -87,7 +84,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className={`shell${isMap ? ' shell--fullbleed' : ''}${isBare ? ' shell--bare' : ''}`}>
       <aside className="shell__sidebar" aria-label="Primary">
         <Link to="/" className="shell__brand" aria-label="Window Seat — home">
-          <BrandMark size={40} />
+          <BrandMark size={40} variant="simple" />
           Window Seat
         </Link>
         <Link to="/flights/new" className="shell__add-wide">
@@ -108,7 +105,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {hasTopbar && (
           <header className="topbar">
             <Link to="/" className="topbar__brand" aria-label="Window Seat — home">
-              <BrandMark size={48} />
+              <BrandMark size={48} variant="detailed" />
               Window Seat
             </Link>
             <div className="topbar__actions">

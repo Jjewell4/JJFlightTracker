@@ -30,7 +30,8 @@
 import { getAircraftType, getAirline, getAirport, getCountry, normalize } from '@/data/reference';
 import { airlineKey } from './flight-utils';
 import { EARTH_CIRCUMFERENCE_KM, distanceKm as greatCircleKm, estimateDurationMin, kmToMiles } from './geo';
-import type { Airport, CabinClass, Continent, Flight, FlightReason, SeatType } from './types';
+import { FLIGHT_OCCASIONS, OCCASION_LABELS } from './occasions';
+import type { Airport, CabinClass, Continent, Flight, FlightOccasion, FlightReason, SeatType } from './types';
 
 export const MOON_DISTANCE_KM = 384_400;
 export { EARTH_CIRCUMFERENCE_KM };
@@ -355,6 +356,7 @@ function breakdown<K extends string>(values: (K | undefined)[], order: readonly 
 export const cabinBreakdown = (flights: Flight[]) => breakdown(flights.map((f) => f.cabinClass), CABIN_CLASSES, CABIN_LABELS);
 export const seatBreakdown = (flights: Flight[]) => breakdown(flights.map((f) => f.seatType), SEAT_TYPES, SEAT_LABELS);
 export const reasonBreakdown = (flights: Flight[]) => breakdown(flights.map((f) => f.reason), FLIGHT_REASONS, REASON_LABELS);
+export const occasionBreakdown = (flights: Flight[]) => breakdown(flights.map((f) => f.occasion), FLIGHT_OCCASIONS, OCCASION_LABELS);
 
 export function scopeBreakdown(rs: ResolvedFlight[]): Breakdown<'domestic' | 'international'> {
   return breakdown(
@@ -887,6 +889,7 @@ export interface FlightStats {
   cabin: Breakdown<CabinClass>;
   seat: Breakdown<SeatType>;
   reason: Breakdown<FlightReason>;
+  occasion: Breakdown<FlightOccasion>;
   haul: Breakdown<'short' | 'medium' | 'long'>;
   manufacturer: Breakdown<Manufacturer>;
   countries: CountryVisit[];
@@ -927,6 +930,7 @@ export function computeStats(flights: Flight[], opts: StatsOptions = {}): Flight
     seat: seatBreakdown(flights),
     cabin: cabinBreakdown(flights),
     reason: reasonBreakdown(flights),
+    occasion: occasionBreakdown(flights),
     haul: haulBreakdown(rs),
     weekday: flightsByWeekday(rs),
     hour: flightsByHour(rs),

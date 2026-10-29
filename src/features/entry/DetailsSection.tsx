@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import { Icon, type IconName } from '@/components/Icon';
+import { FLIGHT_OCCASIONS, OCCASION_EMOJI, OCCASION_LABELS, OCCASION_REASON } from '@/lib/occasions';
 import type { CabinClass, DatePrecision, FlightReason, SeatType } from '@/lib/types';
 import { inferSeatType, type FormValues } from './form-model';
 
@@ -16,6 +17,7 @@ const REASONS: { value: FlightReason; label: string }[] = [
   { value: 'crew', label: 'Crew' },
   { value: 'other', label: 'Other' },
 ];
+const OCCASIONS = FLIGHT_OCCASIONS.map((value) => ({ value, label: `${OCCASION_EMOJI[value]} ${OCCASION_LABELS[value]}` }));
 const SEATS: { value: SeatType; label: string }[] = [
   { value: 'window', label: 'Window' },
   { value: 'middle', label: 'Middle' },
@@ -125,6 +127,7 @@ export function DetailsSection({
     v.seatNumber && `Seat ${v.seatNumber.toUpperCase()}`,
     CABINS.find((c) => c.value === v.cabinClass)?.label,
     REASONS.find((r) => r.value === v.reason)?.label,
+    v.occasion && OCCASION_LABELS[v.occasion],
   ].filter(Boolean);
 
   return (
@@ -192,6 +195,14 @@ export function DetailsSection({
 
           <Choice label="Cabin class" options={CABINS} value={v.cabinClass} onChange={(c) => onPatch({ cabinClass: c })} variant="chips" />
           <Choice label="Reason" options={REASONS} value={v.reason} onChange={(r) => onPatch({ reason: r })} />
+          <Choice
+            label="Occasion"
+            options={OCCASIONS}
+            value={v.occasion}
+            // An occasion implies a reason when none was picked (a wedding is leisure, a conference business).
+            onChange={(o) => onPatch({ occasion: o, ...(!v.reason && o && OCCASION_REASON[o] ? { reason: OCCASION_REASON[o] } : {}) })}
+            variant="chips"
+          />
 
           <div className="entry-field">
             <label className="field__label" htmlFor="entry-note">

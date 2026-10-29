@@ -31,7 +31,7 @@ const SHARE_OPTIONS: { key: ShareKey | 'exactDates'; title: string; adds: string
   { key: 'times', title: 'Flight times', adds: 'Adds departure and arrival times to each flight and the departure-time clock.' },
   { key: 'cabin', title: 'Cabin class', adds: 'Adds the cabin class chart and cabin-adjusted CO₂.' },
   { key: 'seat', title: 'Seats', adds: 'Adds window, middle or aisle stats and the seat map.' },
-  { key: 'reason', title: 'Trip purpose', adds: 'Adds the leisure, business and crew breakdown.' },
+  { key: 'reason', title: 'Trip purpose', adds: 'Adds the leisure, business and crew breakdown and your occasions (vacation, wedding, …).' },
   { key: 'flightNumber', title: 'Flight numbers', adds: 'Shows flight numbers in your flight history and travel calendar.' },
   { key: 'registration', title: 'Aircraft registrations', adds: 'Adds the tail numbers ranking.' },
 ];

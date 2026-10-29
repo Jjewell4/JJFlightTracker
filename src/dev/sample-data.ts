@@ -7,7 +7,7 @@ import { addFlights, db, deleteAllFlights } from '@/lib/db';
 import { enrichFlight } from '@/lib/flight-utils';
 import { getAirport, loadReference } from '@/data/reference';
 import { tzOffsetMinutes, zonedToUtc } from '@/lib/time';
-import type { CabinClass, FlightInput, FlightReason, SeatType } from '@/lib/types';
+import type { CabinClass, FlightInput, FlightOccasion, FlightReason, SeatType } from '@/lib/types';
 
 // Tiny seeded PRNG (mulberry32) so the sample is stable across runs.
 function rng(seed: number) {
@@ -87,7 +87,10 @@ export async function generateSampleFlights(): Promise<FlightInput[]> {
       const seatLetter = seatType === 'window' ? pick(['A', 'F']) : seatType === 'aisle' ? pick(['C', 'D']) : pick(['B', 'E']);
       const dep = 6 * 60 + Math.floor(r() * 14 * 60);
       const t = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-      const common = { datePrecision: 'day' as const, source: 'manual' as const, reason, cabinClass: cabin, seatType };
+      // Derived from the day (not r()) so the rest of the sample log stays the same.
+      const occasion: FlightOccasion | undefined =
+        day % 3 === 0 ? undefined : reason === 'business' ? (day % 2 ? 'work' : 'conference') : (['vacation', 'family', 'wedding', 'friends', 'holiday'] as const)[day % 5];
+      const common = { datePrecision: 'day' as const, source: 'manual' as const, reason, occasion, cabinClass: cabin, seatType };
       const mk = (from: string, to: string, d: string, depMin: number, num: number): FlightInput => {
         const base = enrichFlight({ ...common, date: d, from, to, flightNumber: `${airline}${num}`, aircraftType: pick(aircraft), seatNumber: `${seatRow}${seatLetter}` });
         const km = base.distanceKm ?? 800;

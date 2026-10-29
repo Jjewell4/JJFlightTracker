@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { OCCASION_EMOJI, OCCASION_LABELS } from '@/lib/occasions';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AirlineLogo } from '@/components/AirlineLogo';
 import { Icon, type IconName } from '@/components/Icon';
@@ -228,6 +229,7 @@ function FlightDetail({ flight: f, all, settings, onBack }: { flight: Flight; al
                 extra={f.airlineIata || f.airlineIcao ? <span className="pass__type">{[f.airlineIata, f.airlineIcao].filter(Boolean).join(' / ')}</span> : undefined}
               />
               <Field label="Reason" value={reasonLabel(f.reason)} />
+              <Field label="Occasion" value={f.occasion && `${OCCASION_EMOJI[f.occasion]} ${OCCASION_LABELS[f.occasion]}`} />
               <Field label="Source" value={SOURCE_LABEL[f.source] ?? f.source} small wide />
             </dl>
 

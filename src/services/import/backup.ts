@@ -1,4 +1,5 @@
 /** JSON backup: versioned export of all flights + settings, and a validating parser. */
+import { FLIGHT_OCCASIONS } from '@/lib/occasions';
 import { getAirport } from '@/data/reference';
 import { isValidTime } from '@/lib/time';
 import type { Flight, Settings } from '@/lib/types';
@@ -87,6 +88,7 @@ export function sanitizeFlight(raw: unknown): ImportFlight | undefined {
     ['seatType', ['window', 'middle', 'aisle']],
     ['cabinClass', ['economy', 'premium', 'business', 'first', 'private']],
     ['reason', ['leisure', 'business', 'crew', 'other']],
+    ['occasion', [...FLIGHT_OCCASIONS]],
     ['source', ['manual', 'lookup', 'screenshot', 'fr24', 'csv', 'backup']],
   ];
   for (const [k, allowed] of enums) if (f[k] !== undefined && !allowed.includes(f[k] as string)) delete f[k];

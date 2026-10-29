@@ -86,7 +86,7 @@ export function csvFileName(now: Date = new Date()): string {
 /** Portable, readable columns; JSON remains the lossless backup format. */
 export function exportSpreadsheetCsv(flights: Flight[]): string {
   const sorted = [...flights].sort((a, b) => a.date.localeCompare(b.date) || (a.depTime ?? '').localeCompare(b.depTime ?? ''));
-  if (!sorted.length) return 'Date,From,To,Flight number,Airline,Departure time,Arrival time,Duration,Aircraft,Registration,Seat,Seat type,Cabin class,Reason,Notes';
+  if (!sorted.length) return 'Date,From,To,Flight number,Airline,Departure time,Arrival time,Duration,Aircraft,Registration,Seat,Seat type,Cabin class,Reason,Occasion,Notes';
   return Papa.unparse(sorted.map((f) => ({
     Date: f.datePrecision === 'year' ? f.date.slice(0, 4) : f.datePrecision === 'month' ? f.date.slice(0, 7) : f.date,
     From: f.from, To: f.to, 'Flight number': f.flightNumber ?? '',
@@ -95,6 +95,6 @@ export function exportSpreadsheetCsv(flights: Flight[]): string {
     Duration: f.durationMin ? `${pad(f.durationMin / 60)}:${pad(f.durationMin % 60)}` : '',
     Aircraft: f.aircraftType || f.aircraftName || '', Registration: f.registration ?? '',
     Seat: f.seatNumber ?? '', 'Seat type': f.seatType ?? '',
-    'Cabin class': f.cabinClass ?? '', Reason: f.reason ?? '', Notes: f.note ?? '',
-  })), { newline: '\r\n', escapeFormulae: true, columns: ['Date','From','To','Flight number','Airline','Departure time','Arrival time','Duration','Aircraft','Registration','Seat','Seat type','Cabin class','Reason','Notes'] });
+    'Cabin class': f.cabinClass ?? '', Reason: f.reason ?? '', Occasion: f.occasion ?? '', Notes: f.note ?? '',
+  })), { newline: '\r\n', escapeFormulae: true, columns: ['Date','From','To','Flight number','Airline','Departure time','Arrival time','Duration','Aircraft','Registration','Seat','Seat type','Cabin class','Reason','Occasion','Notes'] });
 }

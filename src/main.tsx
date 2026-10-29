@@ -26,7 +26,7 @@ createRoot(document.getElementById('root')!).render(
 const splash = document.getElementById('splash');
 if (splash) {
   const shownFor = performance.now();
-  const MIN_MS = 1600;
+  const MIN_MS = 1200;
   requestAnimationFrame(() =>
     setTimeout(() => {
       splash.classList.add('is-done');

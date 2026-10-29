@@ -1,6 +1,8 @@
 import type { Breakdown, FlightStats } from '@/lib/stats';
 import { Donut, SegmentBar, type PartItem } from './charts/PartToWhole';
 import { CardHead, Section } from './parts';
+import { RankList } from './TopLists';
+import { OCCASION_EMOJI } from '@/lib/occasions';
 import { fmtDistance, fmtInt, fmtPct, type DistanceUnit } from './format';
 import type { StatsSections } from './sections';
 
@@ -10,7 +12,7 @@ function toParts<K extends string>(b: Breakdown<K>, labels?: Partial<Record<K, s
 }
 
 export function Breakdowns({ stats, unit, sections, readOnly = false }: { stats: FlightStats; unit: DistanceUnit; sections: StatsSections; readOnly?: boolean }) {
-  const { scope, cabin, seat, reason, haul, manufacturer, totals } = stats;
+  const { scope, cabin, seat, reason, occasion, haul, manufacturer, totals } = stats;
   const boeing = manufacturer.items[0].count;
   const airbus = manufacturer.items[1].count;
   const avg = totals.avgDistanceKm;
@@ -56,6 +58,30 @@ export function Breakdowns({ stats, unit, sections, readOnly = false }: { stats:
           <article className="card stats-card">
             <CardHead title="Reason" subtitle={reason.known && topReason ? `Mostly ${topReason.label.toLowerCase()} · ${fmtPct(topReason.share)}` : 'Add a reason to your flights'} />
             <SegmentBar items={toParts(reason)} unknown={reason.unknown} label="Reason for flying" />
+          </article>
+        )}
+
+        {sections.occasion && occasion.known > 0 && (
+          <RankList
+            title="Occasions"
+            subtitle={`${fmtInt(occasion.known)} tagged ${occasion.known === 1 ? 'flight' : 'flights'}`}
+            noun={['flight', 'flights']}
+            rows={occasion.items
+              .filter((it) => it.count > 0)
+              .sort((a, b) => b.count - a.count)
+              .map((it) => ({
+                key: it.key,
+                lead: <span aria-hidden>{OCCASION_EMOJI[it.key]}</span>,
+                primary: it.label,
+                secondary: fmtPct(it.share),
+                count: it.count,
+                href: readOnly ? undefined : `/?occasion=${it.key}`,
+              }))}
+          />
+        )}
+        {sections.occasion && occasion.known === 0 && !readOnly && (
+          <article className="card stats-card">
+            <CardHead title="Occasions" subtitle="Tag flights as vacation, wedding, conference… under More details" />
           </article>
         )}
 

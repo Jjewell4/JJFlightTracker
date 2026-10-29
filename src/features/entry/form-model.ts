@@ -2,7 +2,7 @@
 import { getAircraftType, getAirport } from '@/data/reference';
 import { normalizeFlightNumber, parseFlightNumber } from '@/lib/flight-utils';
 import { computeDuration, isValidTime, todayLocal } from '@/lib/time';
-import type { CabinClass, DatePrecision, Flight, FlightInput, FlightReason, SeatType } from '@/lib/types';
+import type { CabinClass, DatePrecision, Flight, FlightInput, FlightOccasion, FlightReason, SeatType } from '@/lib/types';
 import type { AirlineInfo, FlightLookupResult } from '@/services/lookup';
 
 /** Longest note kept (keeps every flight record small enough to sync). */
@@ -26,6 +26,7 @@ export interface FormValues {
   seatType?: SeatType;
   cabinClass?: CabinClass;
   reason?: FlightReason;
+  occasion?: FlightOccasion;
   note: string;
 }
 
@@ -88,6 +89,7 @@ export function flightToValues(f: Flight): FormValues {
     seatType: f.seatType,
     cabinClass: f.cabinClass,
     reason: f.reason,
+    occasion: f.occasion,
     note: f.note ?? '',
   };
 }
@@ -103,12 +105,13 @@ export function returnValues(f: Flight): FormValues {
     to: f.from,
     cabinClass: f.cabinClass,
     reason: f.reason,
+    occasion: f.occasion,
   };
 }
 
 /** Prefill for "duplicate": same flight on another day (today), minus per-trip details. */
 export function duplicateValues(f: Flight): FormValues {
-  return { ...flightToValues(f), date: todayLocal(), datePrecision: 'day', registration: '', seatNumber: '', note: '' };
+  return { ...flightToValues(f), date: todayLocal(), datePrecision: 'day', registration: '', seatNumber: '', note: '', occasion: undefined };
 }
 
 const WIDEBODY = /^(A30|A31[0]|A33|A34|A35|A38|B74|B76|B77|B78|MD11|DC10|L101|IL96|IL86)/;
@@ -325,6 +328,7 @@ export function valuesToInput(v: FormValues, opts: { source: FlightInput['source
     seatType: v.seatType,
     cabinClass: v.cabinClass,
     reason: v.reason,
+    occasion: v.occasion,
     note: v.note.trim().slice(0, NOTE_MAX) || undefined,
     source: opts.source,
   };

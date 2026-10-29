@@ -1,5 +1,6 @@
 import type { Flight, Settings } from '@/lib/types';
 import type { FlightFields } from '@/lib/flight-source';
+import { isOccasion } from '@/lib/occasions';
 import { todayLocal } from '@/lib/time';
 export const RESERVED_HANDLES = new Set([
   'account',
@@ -52,6 +53,7 @@ export type PublicFlight = Pick<
   | 'seatNumber'
   | 'seatType'
   | 'reason'
+  | 'occasion'
   | 'flightNumber'
   | 'registration'
 >;
@@ -129,6 +131,7 @@ function projectFlight(f: Flight, exactDates: boolean, share: PublicShare): Publ
     if (str(f.seatNumber) && /^[0-9]{1,3}[A-Z]$/.test(f.seatNumber.toUpperCase())) out.seatNumber = f.seatNumber.toUpperCase();
   }
   if (share.reason && str(f.reason) && REASONS.includes(f.reason)) out.reason = f.reason;
+  if (share.reason && isOccasion(f.occasion)) out.occasion = f.occasion;
   if (share.flightNumber && str(f.flightNumber) && /^[A-Z0-9]{2,10}$/.test(f.flightNumber.toUpperCase()))
     out.flightNumber = f.flightNumber.toUpperCase();
   if (share.registration && str(f.registration) && /^[A-Z0-9-]{2,10}$/.test(f.registration.toUpperCase()))
@@ -182,7 +185,7 @@ export function publicFields(flights: Partial<PublicFlight>[]): FlightFields {
     durations: any((f) => f.durationMin),
     cabin: any((f) => f.cabinClass),
     seat: any((f) => f.seatType ?? f.seatNumber),
-    reason: any((f) => f.reason),
+    reason: any((f) => f.reason ?? f.occasion),
     registration: any((f) => f.registration),
     flightNumber: any((f) => f.flightNumber),
     exactDates: flights.some((f) => f.datePrecision === 'day'),

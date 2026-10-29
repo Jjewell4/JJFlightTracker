@@ -8,7 +8,8 @@ import { getAirline, getAirport, getCountry, normalize } from '@/data/reference'
 import { airlineKey, airportCode, flightAircraftName, flightAirlineName, flightDistanceKm, parseFlightNumber } from '@/lib/flight-utils';
 import { estimateDurationMin, kmToMiles } from '@/lib/geo';
 import { zonedToUtc } from '@/lib/time';
-import type { CabinClass, Flight, FlightReason, Settings } from '@/lib/types';
+import { OCCASION_EMOJI, OCCASION_LABELS } from '@/lib/occasions';
+import type { CabinClass, Flight, FlightOccasion, FlightReason, Settings } from '@/lib/types';
 
 // ---------- formatting ----------
 
@@ -122,6 +123,7 @@ export interface FlightFilters {
   airport?: string;
   cabin?: CabinClass;
   reason?: FlightReason;
+  occasion?: FlightOccasion;
 }
 
 export function activeFilterCount(f: FlightFilters): number {
@@ -134,6 +136,7 @@ export function matchesFilters(f: Flight, filters: FlightFilters): boolean {
   if (filters.airport && f.from !== filters.airport && f.to !== filters.airport) return false;
   if (filters.cabin && f.cabinClass !== filters.cabin) return false;
   if (filters.reason && f.reason !== filters.reason) return false;
+  if (filters.occasion && f.occasion !== filters.occasion) return false;
   return true;
 }
 
@@ -149,6 +152,7 @@ export interface FilterOptions {
   airports: FilterOption[];
   cabins: FilterOption[];
   reasons: FilterOption[];
+  occasions: FilterOption[];
 }
 
 const CABIN_LABEL: Record<CabinClass, string> = {
@@ -194,7 +198,11 @@ export function filterOptions(flights: Flight[]): FilterOptions {
   const cabins = [...tally(flights.map((f) => f.cabinClass))].map(([value, count]) => ({ value, label: CABIN_LABEL[value], count })).sort(byCount);
   const reasons = [...tally(flights.map((f) => f.reason))].map(([value, count]) => ({ value, label: REASON_LABEL[value], count })).sort(byCount);
 
-  return { years, airlines, airports, cabins, reasons };
+  const occasions = [...tally(flights.map((f) => f.occasion))]
+    .map(([value, count]) => ({ value, label: `${OCCASION_EMOJI[value]} ${OCCASION_LABELS[value]}`, count }))
+    .sort(byCount);
+
+  return { years, airlines, airports, cabins, reasons, occasions };
 }
 
 // ---------- grouping ----------

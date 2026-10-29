@@ -20,7 +20,7 @@ interface Row {
 const INITIAL = 5;
 const MAX_ALL = 100;
 
-function RankList({ title, subtitle, rows, noun }: { title: string; subtitle?: string; rows: Row[]; noun: [string, string] }) {
+export function RankList({ title, subtitle, rows, noun }: { title: string; subtitle?: string; rows: Row[]; noun: [string, string] }) {
   const [open, setOpen] = useState(false);
   if (!rows.length) return null;
   const max = rows[0].count || 1;

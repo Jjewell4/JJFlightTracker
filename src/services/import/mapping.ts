@@ -24,6 +24,7 @@ export const MAPPING_FIELDS = [
   'seatType',
   'cabinClass',
   'reason',
+  'occasion',
   'note',
 ] as const;
 
@@ -48,6 +49,7 @@ export const FIELD_LABELS: Record<MappingField, { label: string; hint?: string; 
   seatType: { label: 'Seat type', hint: 'window / middle / aisle' },
   cabinClass: { label: 'Cabin class', hint: 'economy, business, …' },
   reason: { label: 'Reason', hint: 'leisure, business, …' },
+  occasion: { label: 'Occasion', hint: 'vacation, wedding, conference, …' },
   note: { label: 'Notes' },
 };
 
@@ -76,6 +78,7 @@ const SYNONYMS: Record<MappingField, string[]> = {
   seatType: ['seat_type', 'seat_position', 'seat_location', 'window_aisle'],
   cabinClass: ['flight_class', 'class', 'cabin', 'cabin_class', 'travel_class', 'fare_class', 'service_class'],
   reason: ['flight_reason', 'reason', 'purpose', 'trip_type', 'trip_purpose', 'flight_purpose', 'trip_reason'],
+  occasion: ['occasion', 'trip_occasion', 'category', 'trip_category', 'tag', 'tags'],
   note: ['note', 'notes', 'comment', 'comments', 'remarks', 'memo', 'description', 'details'],
 };
 

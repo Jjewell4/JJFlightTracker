@@ -27,7 +27,7 @@ export function decodeBytes(buf: ArrayBuffer): string {
 }
 
 /** Headers that identify which row is the header row (used to skip title rows). */
-const HEADER_HINT = /^(date|flight|from|to|origin|destination|dep|arr|departure|arrival|airline|aircraft|carrier|registration|reg|tail|seat|class|cabin|note|notes|duration|number|airport|route|reason)/i;
+const HEADER_HINT = /^(date|flight|from|to|origin|destination|dep|arr|departure|arrival|airline|aircraft|carrier|registration|reg|tail|seat|class|cabin|note|notes|duration|number|airport|route|reason|occasion)/i;
 
 function headerScore(row: Cell[]): number {
   return row.reduce<number>((n, c) => n + (HEADER_HINT.test(cellText(c)) ? 1 : 0), 0);

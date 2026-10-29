@@ -3,10 +3,11 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Icon, type IconName } from '@/components/Icon';
 import { ConfirmSheet, Sheet } from '@/components/Sheet';
 import { useReferenceReady } from '@/data/reference';
-import { renameTrip, saveTrip, unsaveTrip, useFlights, useSettings } from '@/lib/db';
+import { renameTrip, saveTrip, setOccasion, unsaveTrip, useFlights, useSettings } from '@/lib/db';
+import { FLIGHT_OCCASIONS, OCCASION_EMOJI, OCCASION_LABELS } from '@/lib/occasions';
 import { todayLocal } from '@/lib/time';
 import { resolveTrip, suggestTripName, tripCounts, tripDates, tripMinutes, tripTitle, type Trip } from '@/lib/trips';
-import type { Settings } from '@/lib/types';
+import type { FlightOccasion, Settings } from '@/lib/types';
 import { formatDistance } from '@/features/flights/flight-logic';
 import { FlightRow } from '@/features/flights/FlightRow';
 import { TripRouteLine } from './TripCard';
@@ -75,6 +76,7 @@ function TripView({ trip, settings, onBack, onUngrouped }: { trip: Trip; setting
   const [menu, setMenu] = useState(false);
   const [naming, setNaming] = useState<'save' | 'rename' | null>(null);
   const [confirm, setConfirm] = useState(false);
+  const [picking, setPicking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -89,6 +91,24 @@ function TripView({ trip, settings, onBack, onUngrouped }: { trip: Trip; setting
   const closeMenu = useCallback(() => setMenu(false), []);
   const closeNaming = useCallback(() => setNaming(null), []);
   const closeConfirm = useCallback(() => setConfirm(false), []);
+  const closePicking = useCallback(() => setPicking(false), []);
+  // One occasion for the whole trip; legs tagged differently read as "mixed".
+  const occasions = new Set(trip.flights.map((f) => f.occasion));
+  const occasion = occasions.size === 1 ? trip.flights[0].occasion : undefined;
+  const mixed = occasions.size > 1;
+
+  const pickOccasion = async (o: FlightOccasion | undefined) => {
+    setPicking(false);
+    try {
+      await setOccasion(
+        trip.flights.map((f) => f.id),
+        o,
+      );
+      flash(o ? `Tagged as ${OCCASION_LABELS[o].toLowerCase()}` : 'Occasion cleared');
+    } catch {
+      flash('Couldn’t save the occasion');
+    }
+  };
 
   const flash = (msg: string) => {
     clearTimeout(toastTimer.current);
@@ -223,6 +243,14 @@ function TripView({ trip, settings, onBack, onUngrouped }: { trip: Trip; setting
             </section>
           )}
 
+          <button type="button" className="toccasion animate-in" onClick={() => setPicking(true)} aria-haspopup="dialog">
+            <span className="toccasion__label">Occasion</span>
+            <span className={`toccasion__value${occasion ? '' : ' is-placeholder'}`}>
+              {occasion ? `${OCCASION_EMOJI[occasion]} ${OCCASION_LABELS[occasion]}` : mixed ? 'Mixed' : 'Vacation, wedding, conference…'}
+            </span>
+            <Icon name="chevron" size={16} className="toccasion__chev" />
+          </button>
+
           <dl className="tstats animate-in">
             {tiles.map((t) => (
               <div key={t.label} className="tstat">
@@ -311,6 +339,26 @@ function TripView({ trip, settings, onBack, onUngrouped }: { trip: Trip; setting
           </>
         )}
         <button type="button" className="btn btn--block sheet__cancel" onClick={closeMenu}>
+          Cancel
+        </button>
+      </Sheet>
+
+      <Sheet open={picking} onClose={closePicking} label="Trip occasion">
+        <div className="sheet__title">What was this trip for?</div>
+        <p className="toccasion__lead">{trip.flights.length === 1 ? 'Tags this trip’s flight.' : `Tags all ${plural(trip.flights.length, 'flight')} of this trip.`}</p>
+        <div className="chip-group toccasion__chips" role="group" aria-label="Occasion">
+          {FLIGHT_OCCASIONS.map((o) => (
+            <button key={o} type="button" className="chip toccasion__chip" aria-pressed={o === occasion} onClick={() => void pickOccasion(o === occasion ? undefined : o)}>
+              <span aria-hidden>{OCCASION_EMOJI[o]}</span> {OCCASION_LABELS[o]}
+            </button>
+          ))}
+        </div>
+        {(occasion || mixed) && (
+          <button type="button" className="btn btn--block btn--ghost" onClick={() => void pickOccasion(undefined)}>
+            Clear occasion
+          </button>
+        )}
+        <button type="button" className="btn btn--block sheet__cancel" onClick={closePicking}>
           Cancel
         </button>
       </Sheet>

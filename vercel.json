@@ -67,6 +67,12 @@
     }
   ],
   "trailingSlash": false,
+  "crons": [
+    {
+      "path": "/api/keepalive",
+      "schedule": "23 15 * * *"
+    }
+  ],
   "functions": {
     "api/extract-flight.ts": {
       "maxDuration": 60
