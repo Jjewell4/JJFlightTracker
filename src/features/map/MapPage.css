@@ -668,6 +668,29 @@
   grid-area: chev;
   color: var(--text-3);
 }
+.map-trip {
+  grid-template-columns: 20px 1fr 16px;
+  grid-template-areas:
+    'icon date chev'
+    'icon meta chev';
+}
+.map-trip.map-flight--static {
+  grid-template-columns: 20px 1fr;
+  grid-template-areas:
+    'icon date'
+    'icon meta';
+}
+.map-trip__icon {
+  grid-area: icon;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+}
+.map-trip__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .map-flight--static {
   grid-template-columns: 1fr auto;
   grid-template-areas:

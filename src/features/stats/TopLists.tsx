@@ -26,7 +26,7 @@ function RankList({ title, subtitle, rows, noun }: { title: string; subtitle?: s
   const max = rows[0].count || 1;
   const visible = open ? rows.slice(0, MAX_ALL) : rows.slice(0, INITIAL);
   return (
-    <article className="card stats-card stats-rank">
+    <article id={`stats-top-${title.toLowerCase().replace(/\s+/g, '-')}`} className="card stats-card stats-rank">
       <CardHead title={title} subtitle={subtitle} />
       <ol className="stats-rank__list">
         {visible.map((r, i) => {

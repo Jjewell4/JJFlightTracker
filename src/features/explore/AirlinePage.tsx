@@ -9,11 +9,11 @@ import { useFlights, useSettings } from '@/lib/db';
 import { kmToMiles } from '@/lib/geo';
 import type { Breakdown } from '@/lib/stats';
 import { formatFlightDate } from '@/lib/time';
-import type { Settings } from '@/lib/types';
+import type { Flight, Settings } from '@/lib/types';
 import { airlineHistory, resolveAirlineParam, type AirlineHistory } from './explore-logic';
 import { airlineHref, airportHref } from './links';
 import { NetworkMap, type NetworkRoute } from './NetworkMap';
-import { Card, CodeChip, EmptyCard, FlightList, PageSkeleton, plural, RankList, Tiles, TopBar, UpcomingList, useGoBack, YearChart, type RankItem } from './parts';
+import { Card, CodeChip, EmptyCard, FlightList, PageSkeleton, plural, RankList, TripsCard, Tiles, TopBar, UpcomingList, useGoBack, YearChart, type RankItem } from './parts';
 import '@/features/flights/FlightDetailPage.css';
 import '@/features/flights/FlightsPage.css';
 import '@/features/stats/charts/charts.css';
@@ -31,7 +31,7 @@ export default function AirlinePage() {
   if (param?.redirect) return <Navigate to={airlineHref(param.redirect)} replace />;
   if (!param || !history) return <PageSkeleton onBack={goBack} label="Loading airline" />;
   if (!param.airline && !history.flights.length && !history.upcoming.length) return <UnknownAirline code={param.key} onBack={goBack} />;
-  return <AirlineView h={history} settings={settings} onBack={goBack} />;
+  return <AirlineView all={flights ?? []} h={history} settings={settings} onBack={goBack} />;
 }
 
 function UnknownAirline({ code, onBack }: { code: string; onBack: () => void }) {
@@ -59,7 +59,7 @@ function toParts<K extends string>(b: Breakdown<K>): PartItem[] {
   return b.items.map((it, i) => ({ key: it.key, label: it.label, count: it.count, slot: i + 1 }));
 }
 
-function AirlineView({ h, settings, onBack }: { h: AirlineHistory; settings: Settings; onBack: () => void }) {
+function AirlineView({ all, h, settings, onBack }: { all: Flight[]; h: AirlineHistory; settings: Settings; onBack: () => void }) {
   const unit = settings.distanceUnit;
   const currentYear = new Date().getFullYear();
   const flown = h.flights.length;
@@ -235,6 +235,7 @@ function AirlineView({ h, settings, onBack }: { h: AirlineHistory; settings: Set
 
         {flown > 0 && (
           <aside className="xp-side xp-o3">
+            <TripsCard flights={all} legs={h.flights} where="with this airline" />
             {routes.length > 0 && (
               <Card title="Top routes" subtitle={`${routes.length} ${plural(routes.length, 'route')} · both directions`}>
                 <RankList items={routes} noun={['flight', 'flights']} />

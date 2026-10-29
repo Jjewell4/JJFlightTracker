@@ -28,7 +28,7 @@ import './public.css';
 /** Optional categories, each with what it adds to the public journal. Off by default. */
 const SHARE_OPTIONS: { key: ShareKey | 'exactDates'; title: string; adds: string }[] = [
   { key: 'exactDates', title: 'Exact dates', adds: 'Adds day-of-week patterns, the travel calendar and your busiest day.' },
-  { key: 'times', title: 'Flight times', adds: 'Adds time in the air from your recorded times, the departure-time clock and records by duration.' },
+  { key: 'times', title: 'Flight times', adds: 'Adds departure and arrival times to each flight and the departure-time clock.' },
   { key: 'cabin', title: 'Cabin class', adds: 'Adds the cabin class chart and cabin-adjusted CO₂.' },
   { key: 'seat', title: 'Seats', adds: 'Adds window, middle or aisle stats and the seat map.' },
   { key: 'reason', title: 'Trip purpose', adds: 'Adds the leisure, business and crew breakdown.' },
@@ -91,6 +91,7 @@ export function PublicSharing() {
   const summary = sharedSummary({
     exactDates: exact,
     times: !!share.times,
+    durations: true,
     cabin: !!share.cabin,
     seat: !!share.seat,
     reason: !!share.reason,
@@ -238,7 +239,7 @@ export function PublicSharing() {
                 <fieldset className="public-share" disabled={busy}>
                   <legend className="public-share__legend">What visitors can see</legend>
                   <p className="field__hint">
-                    Always shared: routes, months, airlines, aircraft types and saved trips. Switch on more to make
+                    Always shared: routes, months, airlines, aircraft types, flight durations and saved trips. Switch on more to make
                     your public stats match your own.
                   </p>
                   <ul className="public-share__list">

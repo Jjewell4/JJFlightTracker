@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#0a0e16" />
     <script>
       // Apply the saved theme before first paint so launching the app never flashes the wrong theme.
@@ -29,7 +29,7 @@
     <style>
       /* Launch splash: the window-seat mark with the map drifting under the wing. Removed by
          main.tsx once the app has rendered (kept up briefly so it doesn't just flash). */
-      #splash { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: #0a0e16; color: #eef2fa; transition: opacity 280ms ease-out; }
+      #splash { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: #0a0e16; color: #eef2fa; transition: opacity 450ms ease-out; }
       #splash.is-done { opacity: 0; pointer-events: none; }
       #splash .ws-splash { display: flex; flex-direction: column; align-items: center; gap: 18px; font: 800 28px/1 system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: -0.02em; }
       #splash .ws-pan { animation: ws-pan 7s linear infinite; }

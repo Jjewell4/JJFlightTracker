@@ -61,7 +61,7 @@ export default function PublicProfilePage({ slug }: { slug: string }) {
   const brand = (
     <>
       <a className="pj-brand__home" href={import.meta.env.BASE_URL} aria-label="Window Seat — home">
-        <img className="pj-brand__mark" src={`${import.meta.env.BASE_URL}icons/mark.svg`} width="48" height="48" alt="" />
+        <img className="pj-brand__mark" src={`${import.meta.env.BASE_URL}favicon.svg`} width="48" height="48" alt="" />
         Window Seat
       </a>
       <a className="pj-brand__start" href={import.meta.env.BASE_URL} aria-label="Start your own flight journal">

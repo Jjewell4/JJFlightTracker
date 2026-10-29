@@ -17,6 +17,7 @@ import {
   tripMinutes,
   tripOf,
   tripRoute,
+  tripsWith,
   tripTitle,
 } from './trips';
 
@@ -478,5 +479,21 @@ describe('display cities', () => {
     expect(cityName('EBBR')).toBe('Brussels');
     expect(cityName('LFBO')).toBe('Toulouse'); // "Toulouse/Blagnac"
     expect(cityName('KJFK')).toBe('New York');
+  });
+});
+
+describe('tripsWith', () => {
+  it('lists trips through a place, newest first, with how many legs matched', () => {
+    const trips = detectTrips([
+      leg('2026-03-01', 'KSAN', 'KDEN', '07:00', '10:30'),
+      leg('2026-03-01', 'KDEN', 'KBOS', '11:45', '17:50'),
+      leg('2026-03-06', 'KBOS', 'KSAN', '08:00', '11:40'),
+      leg('2026-04-10', 'KSAN', 'KDEN', '08:00', '09:30'),
+      leg('2026-04-12', 'KDEN', 'KSAN', '18:00', '19:30'),
+    ]);
+    const den = tripsWith(trips, (f) => f.from === 'KDEN' || f.to === 'KDEN');
+    expect(den.map((t) => [t.trip.start, t.legs])).toEqual([['2026-04-10', 2], ['2026-03-01', 2]]);
+    expect(tripsWith(trips, (f) => f.to === 'KBOS').map((t) => t.legs)).toEqual([1]);
+    expect(tripsWith(trips, (f) => f.to === 'KSEA')).toEqual([]);
   });
 });

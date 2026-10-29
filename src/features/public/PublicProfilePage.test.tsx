@@ -44,7 +44,7 @@ describe('public profile page', () => {
     expect(home.textContent).toBe('Window Seat');
     expect(home.getAttribute('href')).toBe('/');
     const mark = home.querySelector('img')!;
-    expect(mark.getAttribute('src')).toBe('/icons/mark.svg');
+    expect(mark.getAttribute('src')).toBe('/favicon.svg');
     expect(mark.getAttribute('width')).toBe('48');
     expect(el.querySelector('.pj-brand__start')?.getAttribute('aria-label')).toBe('Start your own flight journal');
   });
@@ -54,6 +54,6 @@ describe('public profile page', () => {
     const el = await render();
     for (let i = 0; i < 20 && !el.textContent?.includes('isn’t public'); i++) await act(async () => new Promise((r) => setTimeout(r, 25)));
     expect(el.textContent).toContain('This journal isn’t public');
-    expect(el.querySelector('.pj-brand__home img')?.getAttribute('src')).toBe('/icons/mark.svg');
+    expect(el.querySelector('.pj-brand__home img')?.getAttribute('src')).toBe('/favicon.svg');
   });
 });

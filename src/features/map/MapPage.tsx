@@ -28,6 +28,8 @@ import {
 } from './map-data';
 import type { BaseMode, ColorMode, OverlayData, Selection } from './map-style';
 import { AirportSheet, RouteSheet } from './MapSheet';
+import { savedTrips } from '@/features/public/PublicTripList';
+import { tripsFor } from '@/features/trips/use-trips';
 import { buildTimeline } from './replay';
 import { ReplayBar } from './ReplayBar';
 import { StaticMap } from './StaticMap';
@@ -129,6 +131,11 @@ function MapPage({ embedded = false }: MapPageProps) {
   const flights = useMemo(() => allFlights && flownFlights(allFlights), [allFlights, ready]);
   const settings = useMemo(() => ({ distanceUnit: source.unit, clock: source.clock }), [source.unit, source.clock]);
   const { readOnly, showFlights } = source;
+  // Trips for the airport/route cards: visitors see saved trips only, the owner suggestions too.
+  const trips = useMemo(() => {
+    if (!allFlights || !ready) return [];
+    return readOnly ? savedTrips(allFlights) : tripsFor(allFlights).filter((t) => t.saved || t.flights.length >= 2);
+  }, [allFlights, ready, readOnly]);
   const theme = useMapTheme();
   const basemap = useBasemap();
   const [prefs, setPrefs] = usePrefs();
@@ -507,6 +514,7 @@ function MapPage({ embedded = false }: MapPageProps) {
           key={`a-${airportAgg.airport.ident}`}
           agg={airportAgg}
           year={year}
+          trips={trips}
           readOnly={readOnly}
           onShowFlights={showFlights}
           onClose={() => setPick(null)}
@@ -520,6 +528,7 @@ function MapPage({ embedded = false }: MapPageProps) {
           route={routeAgg}
           year={year}
           settings={settings}
+          trips={trips}
           readOnly={readOnly}
           onClose={() => setPick(null)}
           onSelectAirport={(id) => setPick({ kind: 'airport', id })}

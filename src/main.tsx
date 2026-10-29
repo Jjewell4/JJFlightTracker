@@ -10,6 +10,7 @@ import { loadReference } from './data/reference';
 import './dev/sample-data';
 import { publicHandleFromPath } from '@/features/public/profile';
 import { startCloudSync } from './services/sync/controller';
+import { keepFocusedFieldVisible } from './components/useKeyboardInset';
 
 // Start fetching reference data immediately; screens await it via useReferenceReady().
 loadReference().catch((e) => console.error(e));
@@ -25,14 +26,16 @@ createRoot(document.getElementById('root')!).render(
 const splash = document.getElementById('splash');
 if (splash) {
   const shownFor = performance.now();
-  const MIN_MS = 900;
+  const MIN_MS = 1600;
   requestAnimationFrame(() =>
     setTimeout(() => {
       splash.classList.add('is-done');
-      setTimeout(() => splash.remove(), 320);
+      setTimeout(() => splash.remove(), 500);
     }, Math.max(0, MIN_MS - shownFor)),
   );
 }
+
+keepFocusedFieldVisible();
 
 // Background cloud sync (no-op unless Supabase env vars are configured).
 if (!publicHandleFromPath(window.location.pathname)) startCloudSync();

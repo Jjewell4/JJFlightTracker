@@ -73,7 +73,7 @@ describe('public sharing settings', () => {
       'Share aircraft registrations',
     ]);
     expect(toggles(el).every((t) => t.getAttribute('aria-checked') === 'false')).toBe(true);
-    expect(el.textContent).toContain('Flight timesAdds time in the air');
+    expect(el.textContent).toContain('Flight timesAdds departure and arrival times');
     expect(el.textContent).toContain('Never shared: notes');
 
     // The preview stays open and follows the switches live.

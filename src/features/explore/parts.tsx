@@ -5,7 +5,9 @@ import { Icon, type IconName } from '@/components/Icon';
 import { FlightRow } from '@/features/flights/FlightRow';
 import { formatDistance, groupFlights, limitGroups } from '@/features/flights/flight-logic';
 import { TrendBars } from '@/features/stats/charts/TrendBars';
+import { tripDates, tripsWith, tripTitle } from '@/lib/trips';
 import type { Flight, Settings } from '@/lib/types';
+import { tripsFor } from '@/features/trips/use-trips';
 import type { YearCount } from './explore-logic';
 
 const nf = new Intl.NumberFormat('en-US');
@@ -90,7 +92,7 @@ export interface RankItem {
 }
 
 /** Ranked rows with proportional bars; the first `initial` rows show until expanded. */
-export function RankList({ items, noun, initial = 5 }: { items: RankItem[]; noun: [string, string]; initial?: number }) {
+export function RankList({ items, noun, initial = 5, bars = true }: { items: RankItem[]; noun: [string, string]; initial?: number; bars?: boolean }) {
   const [open, setOpen] = useState(false);
   if (!items.length) return null;
   const max = items[0].count || 1;
@@ -105,9 +107,11 @@ export function RankList({ items, noun, initial = 5 }: { items: RankItem[]; noun
               <span className="xp-rank__text">
                 <span className="xp-rank__primary">{r.primary}</span>
                 {r.secondary && <span className="xp-rank__secondary">{r.secondary}</span>}
-                <span className="xp-rank__bar" aria-hidden>
-                  <span style={{ width: `${Math.max(3, (r.count / max) * 100)}%` }} />
-                </span>
+                {bars && (
+                  <span className="xp-rank__bar" aria-hidden>
+                    <span style={{ width: `${Math.max(3, (r.count / max) * 100)}%` }} />
+                  </span>
+                )}
               </span>
               <span className="xp-rank__count tabular">
                 {fmtCount(r.count)}
@@ -241,5 +245,31 @@ export function PageSkeleton({ onBack, label }: { onBack: () => void; label: str
         </div>
       </div>
     </div>
+  );
+}
+
+/** Trips (saved, or suggested with 2+ legs) that include a matching leg, as a card. */
+export function TripsCard({ flights, legs, where }: { flights: readonly Flight[]; legs: readonly Flight[]; where: string }) {
+  const items = useMemo(() => {
+    const ids = new Set(legs.map((f) => f.id));
+    return tripsWith(tripsFor(flights).filter((t) => t.saved || t.flights.length >= 2), (f) => ids.has(f.id));
+  }, [flights, legs]);
+  if (!items.length) return null;
+  return (
+    <Card title="Trips" subtitle={`${items.length} ${plural(items.length, 'trip')} ${where}`}>
+      <RankList
+        bars={false}
+        noun={['flight', 'flights']}
+        items={items.map(({ trip, legs }) => ({
+          key: trip.id,
+          lead: <Icon name="suitcase" size={18} />,
+          primary: tripTitle(trip),
+          secondary: [tripDates(trip), trip.saved ? undefined : 'Suggested'].filter(Boolean).join(' · '),
+          count: legs,
+          to: `/trips/${encodeURIComponent(trip.id)}`,
+          label: `${tripTitle(trip)}, ${tripDates(trip)}`,
+        }))}
+      />
+    </Card>
   );
 }

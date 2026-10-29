@@ -454,6 +454,14 @@ export function cityName(ident: string): string {
 }
 
 /** Display title: the saved name, else the automatic one (see suggestTripName). */
+/** Trips with at least one leg matching `leg` (and how many), newest first. */
+export function tripsWith(trips: readonly Trip[], leg: (f: Flight) => boolean): { trip: Trip; legs: number }[] {
+  return trips
+    .map((trip) => ({ trip, legs: trip.flights.filter(leg).length }))
+    .filter((t) => t.legs > 0)
+    .sort((a, b) => b.trip.start.localeCompare(a.trip.start));
+}
+
 export function tripTitle(t: Trip): string {
   return t.name?.trim() || suggestTripName(t);
 }

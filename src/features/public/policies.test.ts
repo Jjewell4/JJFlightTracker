@@ -188,7 +188,7 @@ it('shares optional categories only when the owner switches them on, exactly lik
     );
     const shared = async () => (await db.query<{ flights: Record<string, unknown>[] }>("select flights from public.get_public_profile('jordan')")).rows[0].flights[0];
     // Off by default: nothing beyond the basics leaves the database.
-    assert.deepEqual(Object.keys(await shared()).sort(), ['aircraftType', 'airlineIata', 'airlineIcao', 'date', 'datePrecision', 'from', 'to']);
+    assert.deepEqual(Object.keys(await shared()).sort(), ['aircraftType', 'airlineIata', 'airlineIcao', 'date', 'datePrecision', 'durationMin', 'from', 'to']);
     await db.exec(`update public.public_profiles set share='{"times":true,"seat":true}'`);
     const some = await shared();
     assert.deepEqual([some.depTime, some.arrTime, some.arrDayOffset, some.durationMin, some.seatNumber, some.seatType], ['07:05', '23:59', 1, 312, '12A', 'window']);

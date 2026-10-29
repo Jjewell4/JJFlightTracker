@@ -91,15 +91,16 @@ begin
   'from',data->>'from','to',data->>'to','airlineIcao',data->>'airlineIcao','airlineIata',data->>'airlineIata','aircraftType',data->>'aircraftType',
   -- Saved trips (never suggestions): the grouping id and the name the owner gave it.
   'tripId',case when data->>'tripId' ~ '^[A-Za-z0-9-]{1,40}$' then data->>'tripId' end,
-  'tripName',case when data->>'tripId' ~ '^[A-Za-z0-9-]{1,40}$' then nullif(left(trim(data->>'tripName'),80),'') end
+  'tripName',case when data->>'tripId' ~ '^[A-Za-z0-9-]{1,40}$' then nullif(left(trim(data->>'tripName'),80),'') end,
+  -- Always shared, so time in the air matches the owner's (it reveals nothing a route doesn't).
+  'durationMin',case when jsonb_typeof(data->'durationMin')='number' then
+    case when (data->>'durationMin')::numeric between 1 and 1500 then round((data->>'durationMin')::numeric)::int end end
  ) || jsonb_build_object(
   -- Each category only when the owner opted in; malformed values are dropped, not the flight.
   'depTime',case when times and jsonb_typeof(data->'depTime')='string' and data->>'depTime' ~ hhmm then data->>'depTime' end,
   'arrTime',case when times and jsonb_typeof(data->'arrTime')='string' and data->>'arrTime' ~ hhmm then data->>'arrTime' end,
   'arrDayOffset',case when times and jsonb_typeof(data->'arrDayOffset')='number' then
     case when (data->>'arrDayOffset')::numeric in (-1,0,1,2) then (data->>'arrDayOffset')::numeric::int end end,
-  'durationMin',case when times and jsonb_typeof(data->'durationMin')='number' then
-    case when (data->>'durationMin')::numeric between 1 and 1500 then round((data->>'durationMin')::numeric)::int end end,
   'cabinClass',case when cabin and jsonb_typeof(data->'cabinClass')='string' and data->>'cabinClass' in ('economy','premium','business','first','private') then data->>'cabinClass' end,
   'seatType',case when seat and jsonb_typeof(data->'seatType')='string' and data->>'seatType' in ('window','middle','aisle') then data->>'seatType' end,
   'seatNumber',case when seat and jsonb_typeof(data->'seatNumber')='string' and upper(data->>'seatNumber') ~ '^[0-9]{1,3}[A-Z]$' then upper(data->>'seatNumber') end,

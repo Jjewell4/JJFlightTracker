@@ -29,7 +29,7 @@ const SIDE_NAV = [HOME, LOG, MAP, STATS, SETTINGS, IMPORT];
 
 /** The app mark (same artwork as the favicon and launcher icons). */
 function BrandMark({ size }: { size: number }) {
-  return <img className="brand-mark" src={`${import.meta.env.BASE_URL}icons/mark.svg`} width={size} height={size} alt="" />;
+  return <img className="brand-mark" src={`${import.meta.env.BASE_URL}favicon.svg`} width={size} height={size} alt="" />;
 }
 
 /**

@@ -8,11 +8,11 @@ import { useFlights, useSettings } from '@/lib/db';
 import { flagEmoji } from '@/lib/stats';
 import { kmToMiles } from '@/lib/geo';
 import { formatFlightDate } from '@/lib/time';
-import type { Airport, Settings } from '@/lib/types';
+import type { Flight, Airport, Settings } from '@/lib/types';
 import { airportHistory, airportPlace, resolveAirportParam, tzDeltaLabel, tzDeltaMinutes, type AirportHistory } from './explore-logic';
 import { airlineHref, airportHref } from './links';
 import { NetworkMap, type NetworkRoute } from './NetworkMap';
-import { Card, CodeChip, EmptyCard, FlightList, PageSkeleton, plural, RankList, Tiles, TopBar, UpcomingList, useGoBack, YearChart, type RankItem } from './parts';
+import { Card, CodeChip, EmptyCard, FlightList, PageSkeleton, plural, RankList, TripsCard, Tiles, TopBar, UpcomingList, useGoBack, YearChart, type RankItem } from './parts';
 import '@/features/flights/FlightDetailPage.css';
 import '@/features/flights/FlightsPage.css';
 import '@/features/stats/charts/charts.css';
@@ -30,7 +30,7 @@ export default function AirportPage() {
   if (param?.redirect) return <Navigate to={airportHref(param.redirect)} replace />;
   if (!param || !history) return <PageSkeleton onBack={goBack} label="Loading airport" />;
   if (!param.airport && !history.visits && !history.upcoming.length) return <UnknownAirport code={param.key} onBack={goBack} />;
-  return <AirportView h={history} airport={param.airport} settings={settings} onBack={goBack} />;
+  return <AirportView all={flights ?? []} h={history} airport={param.airport} settings={settings} onBack={goBack} />;
 }
 
 function UnknownAirport({ code, onBack }: { code: string; onBack: () => void }) {
@@ -87,7 +87,7 @@ function LocalClock({ tz, clock }: { tz: string; clock: Settings['clock'] }) {
   );
 }
 
-function AirportView({ h, airport: a, settings, onBack }: { h: AirportHistory; airport: Airport | undefined; settings: Settings; onBack: () => void }) {
+function AirportView({ all, h, airport: a, settings, onBack }: { all: Flight[]; h: AirportHistory; airport: Airport | undefined; settings: Settings; onBack: () => void }) {
   const unit = settings.distanceUnit;
   const code = a?.iata || h.key;
   const place = a ? airportPlace(a) : undefined;
@@ -256,6 +256,7 @@ function AirportView({ h, airport: a, settings, onBack }: { h: AirportHistory; a
 
         {visited && (
           <aside className="xp-side xp-o3">
+            <TripsCard flights={all} legs={h.flights} where="through here" />
             {destinations.length > 0 && (
               <Card
                 title="Destinations from here"

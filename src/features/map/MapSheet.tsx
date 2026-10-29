@@ -1,5 +1,5 @@
 /** Bottom sheet (phones) / floating card (desktop) with airport or route details. */
-import { forwardRef, useRef, useState, type PointerEvent, type ReactNode } from 'react';
+import { forwardRef, useMemo, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
 import { getCountry } from '@/data/reference';
@@ -8,6 +8,7 @@ import { airlineHref, airportHref } from '@/features/explore/links';
 import '@/features/explore/links.css';
 import { kmToMiles } from '@/lib/geo';
 import { formatFlightDate, formatTime } from '@/lib/time';
+import { tripDates, tripsWith, tripTitle, type Trip } from '@/lib/trips';
 import type { Airport, Flight, Settings } from '@/lib/types';
 import { flagEmoji, routeKey, type AirportAgg, type RouteAgg } from './map-data';
 
@@ -61,6 +62,50 @@ const place = (a: Airport) => [a.city, a.region && a.country === 'US' ? a.region
 
 const times = (n: number) => `${n} ${n === 1 ? 'flight' : 'flights'}`;
 
+/** "Trips" list on an airport or route card: each trip that passed through, linked in the app. */
+function TripList({ items, readOnly, what }: { items: { trip: Trip; legs: number }[]; readOnly: boolean; what: string }) {
+  const [all, setAll] = useState(false);
+  if (!items.length) return null;
+  const shown = all ? items : items.slice(0, 4);
+  return (
+    <>
+      <h3 className="map-card__section">Trips</h3>
+      <ul className="map-flights">
+        {shown.map(({ trip, legs }) => {
+          const body = (
+            <>
+              <span className="map-trip__icon" aria-hidden>
+                <Icon name="suitcase" size={16} />
+              </span>
+              <span className="map-flight__date map-trip__name">{tripTitle(trip)}</span>
+              <span className="map-flight__meta subtle">
+                {[tripDates(trip), trip.saved ? undefined : 'Suggested', legs < trip.flights.length ? `${legs} of ${trip.flights.length} flights ${what}` : times(legs)].filter(Boolean).join(' · ')}
+              </span>
+            </>
+          );
+          return (
+            <li key={trip.id}>
+              {readOnly ? (
+                <div className="map-flight map-trip map-flight--static">{body}</div>
+              ) : (
+                <Link to={`/trips/${encodeURIComponent(trip.id)}`} className="map-flight map-trip">
+                  {body}
+                  <Icon name="chevron" size={16} className="map-flight__chev" />
+                </Link>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {items.length > shown.length && (
+        <button type="button" className="btn btn--ghost btn--block" onClick={() => setAll(true)}>
+          Show all {items.length} trips
+        </button>
+      )}
+    </>
+  );
+}
+
 // ---------- airport ----------
 
 export const AirportSheet = forwardRef<
@@ -68,6 +113,8 @@ export const AirportSheet = forwardRef<
   {
     agg: AirportAgg;
     year: number | null;
+    /** Trips to list (saved, plus suggestions in the app). */
+    trips?: readonly Trip[];
     /** Visitor view: never links into the owner's app. */
     readOnly?: boolean;
     /** Hosting page's flight list (public journal); replaces the in-app link. */
@@ -75,11 +122,15 @@ export const AirportSheet = forwardRef<
     onClose: () => void;
     onSelectRoute: (key: string) => void;
   }
->(function AirportSheet({ agg, year, readOnly = false, onShowFlights, onClose, onSelectRoute }, ref) {
+>(function AirportSheet({ agg, year, trips = [], readOnly = false, onShowFlights, onClose, onSelectRoute }, ref) {
   const { airport: a } = agg;
   const top = agg.destinations.slice(0, 6);
   const max = top[0]?.count ?? 1;
   const code = a.iata || a.ident;
+  const tripItems = useMemo(
+    () => tripsWith(trips, (f) => (f.from === a.ident || f.to === a.ident) && (!year || f.date.startsWith(String(year)))),
+    [trips, a.ident, year],
+  );
   const params = new URLSearchParams({ airport: a.ident });
   if (year) params.set('year', String(year));
   return (
@@ -140,6 +191,8 @@ export const AirportSheet = forwardRef<
         </>
       )}
 
+      <TripList items={tripItems} readOnly={readOnly} what="here" />
+
       {onShowFlights ? (
         <button type="button" className="btn btn--block map-card__cta" onClick={() => onShowFlights({ airport: a.ident, year })}>
           View {times(agg.visits)}
@@ -198,9 +251,21 @@ function FlightRow({ f, route, clock, readOnly }: { f: Flight; route: RouteAgg; 
 
 export const RouteSheet = forwardRef<
   HTMLDivElement,
-  { route: RouteAgg; year: number | null; settings: SheetSettings; readOnly?: boolean; onClose: () => void; onSelectAirport: (ident: string) => void }
->(function RouteSheet({ route, year, settings, readOnly = false, onClose, onSelectAirport }, ref) {
+  {
+    route: RouteAgg;
+    year: number | null;
+    settings: SheetSettings;
+    trips?: readonly Trip[];
+    readOnly?: boolean;
+    onClose: () => void;
+    onSelectAirport: (ident: string) => void;
+  }
+>(function RouteSheet({ route, year, settings, trips = [], readOnly = false, onClose, onSelectAirport }, ref) {
   const [all, setAll] = useState(false);
+  const tripItems = useMemo(() => {
+    const ids = new Set(route.flights.map((f) => f.id));
+    return tripsWith(trips, (f) => ids.has(f.id));
+  }, [trips, route.flights]);
   const shown = all ? route.flights : route.flights.slice(0, 8);
   const { a, b } = route;
   return (
@@ -264,6 +329,8 @@ export const RouteSheet = forwardRef<
           })}
         </div>
       )}
+
+      <TripList items={tripItems} readOnly={readOnly} what="on this route" />
 
       <h3 className="map-card__section">Flights</h3>
       <ul className="map-flights">

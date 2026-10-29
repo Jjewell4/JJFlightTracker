@@ -19,8 +19,10 @@ import type { Flight, Settings } from './types';
 
 /** Optional flight fields a source may carry. */
 export interface FlightFields {
-  /** Departure/arrival times and recorded durations. */
+  /** Departure/arrival times. */
   times: boolean;
+  /** Recorded durations (time in the air isn't just estimated from distance). */
+  durations: boolean;
   cabin: boolean;
   /** Seat type / seat number. */
   seat: boolean;
@@ -35,6 +37,7 @@ export interface FlightFields {
 /** The owner's own log can contain every field. */
 export const ALL_FIELDS: FlightFields = {
   times: true,
+  durations: true,
   cabin: true,
   seat: true,
   reason: true,

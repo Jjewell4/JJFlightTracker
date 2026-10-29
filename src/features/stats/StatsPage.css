@@ -232,6 +232,60 @@
 .stats-tile__label svg {
   color: var(--accent);
 }
+/* tiles that drill into the card with their details */
+.stats-tile--link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    transform var(--dur) var(--ease-out),
+    border-color var(--dur-fast);
+}
+.stats-tile--link:active {
+  transform: scale(0.985);
+}
+@media (hover: hover) {
+  .stats-tile--link:hover {
+    border-color: var(--border-strong);
+  }
+}
+.stats-tile--link > span {
+  display: block;
+}
+.stats-tile--link > .stats-tile__label,
+.stats-tile--link > .stats-tile__value {
+  display: flex;
+}
+.stats-tile__label .stats-tile__go {
+  margin-left: auto;
+  color: var(--text-3);
+}
+/* drill-down targets: clear the sticky year chips, then flash once on arrival */
+#stats-timeline,
+.stats-rank,
+.stats-section > .section-title {
+  scroll-margin-top: calc(var(--stats-sticky-top, var(--safe-top)) + var(--space-12) + var(--space-6));
+}
+.is-flash {
+  animation: stats-flash 1.6s var(--ease-out);
+}
+@keyframes stats-flash {
+  0%,
+  30% {
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+  100% {
+    box-shadow: 0 0 0 2px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-flash {
+    animation: none;
+  }
+}
 .stats-tile__value {
   --tile-fs: var(--text-3xl);
   display: flex;

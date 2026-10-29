@@ -43,11 +43,11 @@ export type PublicFlight = Pick<
   | 'aircraftType'
   | 'tripId'
   | 'tripName'
+  | 'durationMin'
   // Optional categories, only when the owner shares them (see PublicShare).
   | 'depTime'
   | 'arrTime'
   | 'arrDayOffset'
-  | 'durationMin'
   | 'cabinClass'
   | 'seatNumber'
   | 'seatType'
@@ -116,11 +116,12 @@ function projectFlight(f: Flight, exactDates: boolean, share: PublicShare): Publ
     ...(f.tripId ? { tripId: f.tripId } : {}),
     ...(f.tripId && f.tripName?.trim() ? { tripName: f.tripName.trim().slice(0, 80) } : {}),
   };
+  // Duration alone reveals nothing a route doesn't, and keeps "time in the air" matching the owner's.
+  if (num(f.durationMin) && f.durationMin >= 1 && f.durationMin <= 1500) out.durationMin = Math.round(f.durationMin);
   if (share.times) {
     if (str(f.depTime) && HHMM.test(f.depTime)) out.depTime = f.depTime;
     if (str(f.arrTime) && HHMM.test(f.arrTime)) out.arrTime = f.arrTime;
     if (num(f.arrDayOffset) && [-1, 0, 1, 2].includes(f.arrDayOffset)) out.arrDayOffset = f.arrDayOffset;
-    if (num(f.durationMin) && f.durationMin >= 1 && f.durationMin <= 1500) out.durationMin = Math.round(f.durationMin);
   }
   if (share.cabin && str(f.cabinClass) && CABINS.includes(f.cabinClass)) out.cabinClass = f.cabinClass;
   if (share.seat) {
@@ -177,7 +178,8 @@ export function profileUrl(slug: string) {
 export function publicFields(flights: Partial<PublicFlight>[]): FlightFields {
   const any = (pick: (f: Partial<PublicFlight>) => unknown) => flights.some((f) => pick(f) != null);
   return {
-    times: any((f) => f.depTime ?? f.durationMin),
+    times: any((f) => f.depTime ?? f.arrTime),
+    durations: any((f) => f.durationMin),
     cabin: any((f) => f.cabinClass),
     seat: any((f) => f.seatType ?? f.seatNumber),
     reason: any((f) => f.reason),
@@ -190,6 +192,7 @@ export function publicFields(flights: Partial<PublicFlight>[]): FlightFields {
 /** Plain-language list of what a journal shares, e.g. for the public footer. */
 export function sharedSummary(fields: FlightFields): string {
   const parts = ['routes', fields.exactDates ? 'dates' : 'months', 'airlines', 'aircraft types'];
+  if (fields.durations && !fields.times) parts.push('flight durations');
   if (fields.times) parts.push('flight times');
   if (fields.cabin) parts.push('cabin classes');
   if (fields.seat) parts.push('seats');

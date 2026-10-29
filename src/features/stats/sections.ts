@@ -42,10 +42,10 @@ export function statsSections(fields: FlightFields, stats: Pick<FlightStats, 'we
     seatMap: fields.seat,
     reason: fields.reason,
     registrations: fields.registration && stats.registrations.length > 0,
-    durationRecords: fields.times,
+    durationRecords: fields.durations,
     busiestDay: fields.exactDates,
     calendar: fields.exactDates && sum(stats.weekday) > 0,
-    timeEstimated: !fields.times,
+    timeEstimated: !fields.durations,
   };
 }
 

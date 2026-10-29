@@ -116,6 +116,8 @@ export function Hero({ stats, scope, unit, prev, firstYear, timeEstimated = fals
           label="Distance"
           value={toUnit(t.distanceKm, unit)}
           unit={unit}
+          target="stats-timeline"
+          metric="distance"
         >
           {fmtInt(toUnit(t.distanceKm, other))} {other}
           {prev && (
@@ -133,6 +135,8 @@ export function Hero({ stats, scope, unit, prev, firstYear, timeEstimated = fals
           value={hours}
           unit="h"
           approx={timeEstimated || t.estimatedDuration > t.flights * 0.1}
+          target="stats-timeline"
+          metric="hours"
         >
           {timeEstimated ? (
             `From distance · ${t.days >= 2 ? `${fmt1(t.days)} days` : `${fmt1(t.durationMin / 60)} hours`}`
@@ -153,21 +157,22 @@ export function Hero({ stats, scope, unit, prev, firstYear, timeEstimated = fals
             />
           )}
         </Tile>
-        <Tile icon="takeoff" label="Airports" value={stats.unique.airports}>
+        <Tile icon="takeoff" label="Airports" value={stats.unique.airports} target="stats-top-airports">
           {fmtInt(stats.unique.routes)} unique{' '}
           {plural(stats.unique.routes, 'route')}
         </Tile>
-        <Tile icon="map" label="Countries" value={stats.unique.countries}>
+        <Tile icon="map" label="Countries" value={stats.unique.countries} target="stats-places">
           {stats.unique.continents}{' '}
           {plural(stats.unique.continents, 'continent')}
         </Tile>
-        <Tile icon="plane" label="Airlines" value={stats.unique.airlines}>
+        <Tile icon="plane" label="Airlines" value={stats.unique.airlines} target="stats-top-airlines">
           {topAirline ? `Mostly ${topAirline.name}` : 'None recorded'}
         </Tile>
         <Tile
           icon="layers"
           label="Aircraft types"
           value={stats.unique.aircraft}
+          target="stats-top-aircraft"
         >
           {stats.unique.registrations > 0
             ? `${fmtInt(stats.unique.registrations)} tail ${plural(stats.unique.registrations, 'number')}`
@@ -191,12 +196,30 @@ function tileSize(chars: number): React.CSSProperties | undefined {
   return undefined;
 }
 
+/** Event asking the year-by-year chart to show a metric (a tile drilled into it). */
+export const STATS_METRIC_EVENT = 'ws:stats-metric';
+
+/** Scrolls to the card with the details behind a tile and flashes it. */
+function drillTo(target: string, metric?: 'distance' | 'hours') {
+  if (metric) window.dispatchEvent(new CustomEvent(STATS_METRIC_EVENT, { detail: metric }));
+  const el = document.getElementById(target);
+  if (!el) return;
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  el.classList.remove('is-flash');
+  void el.offsetWidth; // restart the animation on repeat taps
+  el.classList.add('is-flash');
+  window.setTimeout(() => el.classList.remove('is-flash'), 1600);
+}
+
 function Tile({
   icon,
   label,
   value,
   unit,
   approx,
+  target,
+  metric,
   children,
 }: {
   icon: Parameters<typeof Icon>[0]['name'];
@@ -204,15 +227,19 @@ function Tile({
   value: number;
   unit?: string;
   approx?: boolean;
+  /** Id of the card with the details; the tile becomes a button that scrolls there. */
+  target?: string;
+  metric?: 'distance' | 'hours';
   children?: React.ReactNode;
 }) {
-  return (
-    <div className="stats-tile">
-      <p className="stats-tile__label">
+  const body = (
+    <>
+      <span className="stats-tile__label">
         <Icon name={icon} size={14} />
         {label}
-      </p>
-      <p
+        {target && <Icon name="chevron" size={14} className="stats-tile__go" />}
+      </span>
+      <span
         className="stats-tile__value"
         style={tileSize(
           fmtInt(value).length + (unit?.length ?? 0) + (approx ? 1 : 0),
@@ -221,9 +248,16 @@ function Tile({
         {approx && <span className="stats-tile__approx">≈</span>}
         <CountUp value={value} format={fmtInt} />
         {unit && <span className="stats-tile__unit">{unit}</span>}
-      </p>
-      <p className="stats-tile__sub">{children}</p>
-    </div>
+      </span>
+      <span className="stats-tile__sub">{children}</span>
+    </>
+  );
+  return target ? (
+    <button type="button" className="stats-tile stats-tile--link" onClick={() => drillTo(target, metric)}>
+      {body}
+    </button>
+  ) : (
+    <div className="stats-tile">{body}</div>
   );
 }
 

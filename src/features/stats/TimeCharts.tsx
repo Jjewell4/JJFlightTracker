@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { MONTH_LABELS, WEEKDAY_LABELS, type FlightStats, type YearScope } from '@/lib/stats';
 import { ColumnChart, type ColumnDatum } from './charts/ColumnChart';
 import { RadialHourChart } from './charts/RadialHourChart';
 import { CardHead, Section, Seg } from './parts';
 import { fmtCompact, fmtHour, fmtInt, fmtPct, plural, toUnit, type DistanceUnit } from './format';
 import type { StatsSections } from './sections';
+import { STATS_METRIC_EVENT } from './Hero';
 
 type Metric = 'flights' | 'distance' | 'hours';
 const FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -24,6 +25,12 @@ export function TimeCharts({ stats, scope, unit, clock, currentYear, sections, r
   const [metric, setMetric] = useState<Metric>('flights');
   const isAll = scope === 'all';
   const estHours = sections.timeEstimated;
+  // The Distance / Time in the air tiles drill into this chart.
+  useEffect(() => {
+    const show = (e: Event) => setMetric((e as CustomEvent<Metric>).detail);
+    window.addEventListener(STATS_METRIC_EVENT, show);
+    return () => window.removeEventListener(STATS_METRIC_EVENT, show);
+  }, []);
 
   const formatMetric = useMemo(() => {
     if (metric === 'distance') return (v: number) => `${fmtInt(v)} ${unit}`;
@@ -60,7 +67,7 @@ export function TimeCharts({ stats, scope, unit, clock, currentYear, sections, r
   return (
     <Section id="time" title={readOnly ? 'Patterns' : 'When you fly'}>
       <div className="stats-grid stats-grid--time">
-        <article className="card stats-card stats-card--wide">
+        <article id="stats-timeline" className="card stats-card stats-card--wide">
           <CardHead
             title={isAll ? 'Year by year' : 'Month by month'}
             subtitle={
