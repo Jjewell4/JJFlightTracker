@@ -16,6 +16,8 @@ export interface StatsSections {
   departureHour: boolean;
   cabin: boolean;
   seat: boolean;
+  /** Seat heatmap — needs seat numbers (it also hides itself with too few of them). */
+  seatMap: boolean;
   reason: boolean;
   /** Tail-number ranking. */
   registrations: boolean;
@@ -37,6 +39,7 @@ export function statsSections(fields: FlightFields, stats: Pick<FlightStats, 'we
     departureHour: fields.times && sum(stats.hour) > 0,
     cabin: fields.cabin,
     seat: fields.seat,
+    seatMap: fields.seat,
     reason: fields.reason,
     registrations: fields.registration && stats.registrations.length > 0,
     durationRecords: fields.times,

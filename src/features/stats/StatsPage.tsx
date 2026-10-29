@@ -16,6 +16,7 @@ import { TopLists } from './TopLists';
 import { Records } from './Records';
 import { Places } from './Places';
 import { Footprint } from './Footprint';
+import { SeatMap } from './SeatMap';
 import { fmtInt, plural } from './format';
 import './charts/charts.css';
 import './StatsPage.css';
@@ -135,6 +136,7 @@ function StatsDashboard({ flights, upcoming, unit, clock, homeCountry, readOnly,
         <Records stats={stats} unit={unit} sections={sections} readOnly={readOnly} />
         <div id="stats-favorites" /><TopLists stats={stats} unit={unit} sections={sections} readOnly={readOnly} />
         <Places stats={stats} homeCountry={homeCountry} />
+        {sections.seatMap && <SeatMap flights={scoped} />}
         <Footprint stats={stats} readOnly={readOnly} />
 
         <footer className="stats-notes">

@@ -78,6 +78,42 @@ describe('StatsPage', () => {
   });
 });
 
+describe('seat heatmap', () => {
+  const legs = (seats: string[], aircraftType = 'B738') =>
+    seats.map((seat, i) => f({ from: 'LAX', to: 'SFO', date: `2024-04-${String(i + 1).padStart(2, '0')}`, aircraftType, seatNumber: seat }));
+
+  it('draws a cabin row shaded by how often each seat was picked', async () => {
+    await addFlights([...legs(['12A', '14A', '3A', '20F', '9C', '16E']), ...legs(['40K', '41A', '42C', '43B', '44H'], 'B77W'), f({ from: 'LAX', to: 'SFO', date: '2024-05-01', seatType: 'aisle' })]);
+    const el = await render();
+    const card = el.querySelector('.seatmap')!;
+    expect(card).not.toBeNull();
+    expect(card.textContent).toContain('You pick A most — window on the left');
+    expect(card.textContent).toContain('Narrowbody');
+    expect(card.textContent).toContain('Widebody');
+    const rows = card.querySelectorAll('.seatmap-cabin');
+    expect(rows).toHaveLength(2);
+    expect(rows[0].querySelectorAll('button')).toHaveLength(6);
+    expect(rows[1].querySelectorAll('button')).toHaveLength(10);
+    const seatA = rows[0].querySelector<HTMLButtonElement>('button[aria-label^="Seat A,"]')!;
+    expect(seatA.getAttribute('aria-label')).toBe('Seat A, window on the left: 3 flights');
+    expect(seatA.dataset.level).toBe('4');
+    expect(rows[0].querySelector('button[aria-label^="Seat B,"]')?.getAttribute('data-level')).toBe('0');
+    expect(card.textContent).toContain('1 more flight has only a seat type: 1 aisle.');
+
+    const seatF = rows[0].querySelector<HTMLButtonElement>('button[aria-label^="Seat F,"]')!;
+    await act(async () => seatF.click());
+    expect(seatF.getAttribute('aria-pressed')).toBe('true');
+    expect(card.querySelector('[role="status"]')?.textContent).toContain('Seat F · window on the right');
+  });
+
+  it('stays hidden with too few seat numbers', async () => {
+    await addFlights(legs(['12A', '14A', '3A', '20F']));
+    const el = await render();
+    expect(el.textContent).toContain('4 flights flown');
+    expect(el.querySelector('.seatmap')).toBeNull();
+  });
+});
+
 describe('highlight icons', () => {
   it('match what each highlight is about', async () => {
     const { insightIcon } = await import('./insight-icons');
