@@ -75,6 +75,21 @@ do $$ begin
 end $$;
 drop function if exists public.get_public_profile(text);
 drop function if exists public.project_public_flight(jsonb, boolean);
+-- The owner's Stats tab arrangement (section ids in order + hidden ones), shown to visitors too.
+create or replace function public.valid_public_layout(l jsonb)
+returns boolean language sql immutable set search_path=public as $$
+ select jsonb_typeof(l)='object'
+  and not exists(select 1 from jsonb_object_keys(l) k where k not in ('order','hidden'))
+  and not exists(
+   select 1 from jsonb_each(l) e
+   where jsonb_typeof(e.value)<>'array' or jsonb_array_length(e.value)>40
+    or exists(select 1 from jsonb_array_elements(e.value) v where jsonb_typeof(v)<>'string' or (v#>>'{}') !~ '^[a-z]{1,24}$'))
+$$;
+do $$ begin
+ if not exists(select 1 from information_schema.columns where table_schema='public' and table_name='public_profiles' and column_name='layout') then
+  alter table public.public_profiles add column layout jsonb not null default '{}'::jsonb constraint public_profiles_layout_check check (public.valid_public_layout(layout));
+ end if;
+end $$;
 -- Mirrored exactly by publicFlights() in src/features/public/profile.ts (the owner's preview).
 create or replace function public.project_public_flight(data jsonb, exact_dates boolean, share jsonb)
 returns jsonb language plpgsql immutable set search_path=public as $$
@@ -116,9 +131,9 @@ begin
  return result;
 end $$;
 create function public.get_public_profile(handle text)
-returns table(slug text,display_name text,flights jsonb,published_at timestamptz,exact_dates boolean)
+returns table(slug text,display_name text,flights jsonb,published_at timestamptz,exact_dates boolean,layout jsonb)
 language sql stable security definer set search_path=public as $$
- select p.slug,p.display_name,coalesce(live.flights,'[]'::jsonb),greatest(p.published_at,live.changed_at),p.exact_dates
+ select p.slug,p.display_name,coalesce(live.flights,'[]'::jsonb),greatest(p.published_at,live.changed_at),p.exact_dates,p.layout
  from public.public_profiles p
  left join lateral (
   select jsonb_agg(public.project_public_flight(f.data,p.exact_dates,p.share) order by f.data->>'date' desc,coalesce(f.data->>'depTime','') desc,case when jsonb_typeof(f.data->'createdAt')='number' then (f.data->>'createdAt')::numeric end desc nulls last,f.id) filter (where not f.deleted and public.project_public_flight(f.data,p.exact_dates,p.share) is not null and

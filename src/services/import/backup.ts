@@ -49,6 +49,8 @@ const SETTING_TYPES: { [K in keyof Settings]-?: (v: unknown) => boolean } = {
   aeroDataBoxKey: (v) => typeof v === 'string' && v.trim() !== '',
   enableAdsbdb: (v) => typeof v === 'boolean',
   showAirlineLogos: (v) => typeof v === 'boolean',
+  // Normalized wherever it is read (unknown sections are ignored).
+  statsLayout: (v) => !!v && typeof v === 'object' && !Array.isArray(v),
 };
 
 function sanitizeSettings(raw: unknown): Partial<Settings> | undefined {

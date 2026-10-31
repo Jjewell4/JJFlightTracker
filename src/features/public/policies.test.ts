@@ -204,6 +204,14 @@ it('shares optional categories only when the owner switches them on, exactly lik
     // A snapshot can never carry notes or malformed optional values either.
     await assert.rejects(() => db.exec(`update public.public_profiles set flights='[{"date":"2024-01-01","datePrecision":"day","from":"KSAN","to":"KLAX","seatNumber":"12a"}]'`));
     await assert.rejects(() => db.exec(`update public.public_profiles set flights='[{"date":"2024-01-01","datePrecision":"day","from":"KSAN","to":"KLAX","durationMin":"90"}]'`));
+    // The Stats arrangement: section ids only, returned to visitors.
+    const layout = (async () => (await db.query<{ layout: unknown }>("select layout from public.get_public_profile('jordan')")).rows[0].layout)();
+    assert.deepEqual(await layout, {});
+    await db.exec(`update public.public_profiles set layout='{"order":["places","patterns"],"hidden":["footprint"]}'`);
+    assert.deepEqual((await db.query<{ layout: unknown }>("select layout from public.get_public_profile('jordan')")).rows[0].layout, { order: ['places', 'patterns'], hidden: ['footprint'] });
+    await assert.rejects(() => db.exec(`update public.public_profiles set layout='{"order":["<script>"]}'`));
+    await assert.rejects(() => db.exec(`update public.public_profiles set layout='{"notes":["x"]}'`));
+    await assert.rejects(() => db.exec(`update public.public_profiles set layout='{"order":"places"}'`));
   } finally {
     await db.close();
   }

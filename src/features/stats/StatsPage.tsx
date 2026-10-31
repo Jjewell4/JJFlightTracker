@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
 import { useFlightSource, withFlightSource, type FlightFields, type ViewParams } from '@/lib/flight-source';
 import { useReferenceReady } from '@/data/reference';
 import { flownFlights } from '@/lib/flight-utils';
 import { availableYears, computeStats, filterByYear, flightYear, summarizeTotals, type Insight, type YearScope } from '@/lib/stats';
-import type { Flight } from '@/lib/types';
+import type { Flight, StatsLayout } from '@/lib/types';
+import { ArrangeSheet } from './ArrangeSheet';
+import { resolveLayout, sectionNav, type StatsSectionId } from './layout';
+import { Occasions } from './Occasions';
 import { insightAvailable, statsSections } from './sections';
 import { insightIcon } from './insight-icons';
 import { Hero } from './Hero';
@@ -45,6 +48,7 @@ function StatsPage({ embedded = false }: StatsPageProps) {
       readOnly={source.readOnly}
       fields={source.fields}
       params={source.params}
+      layout={source.statsLayout}
       embedded={embedded}
     />
   );
@@ -69,10 +73,12 @@ interface DashboardProps {
   readOnly: boolean;
   fields: FlightFields;
   params: ViewParams;
+  layout: StatsLayout | undefined;
   embedded: boolean;
 }
 
-function StatsDashboard({ flights, upcoming, unit, clock, homeCountry, readOnly, fields, params, embedded }: DashboardProps) {
+function StatsDashboard({ flights, upcoming, unit, clock, homeCountry, readOnly, fields, params, layout, embedded }: DashboardProps) {
+  const [arranging, setArranging] = useState(false);
   const years = useMemo(() => availableYears(flights), [flights]);
   const [scope, setScope] = useScope(years, params);
   const scoped = useMemo(() => filterByYear(flights, scope), [flights, scope]);
@@ -99,6 +105,20 @@ function StatsDashboard({ flights, upcoming, unit, clock, homeCountry, readOnly,
   }, [flights]);
   const currentYear = new Date().getFullYear();
   const q = stats.quality;
+  // Every movable section; null when it has nothing to show here.
+  const blocks: Record<StatsSectionId, ReactNode> = {
+    highlights: insights.length > 0 ? <Insights items={insights} /> : null,
+    patterns: <TimeCharts stats={stats} scope={scope} unit={unit} clock={clock} currentYear={currentYear} sections={sections} readOnly={readOnly} />,
+    calendar: sections.calendar ? <TravelCalendar flights={flights} scope={scope} readOnly={readOnly} /> : null,
+    mix: <Breakdowns stats={stats} unit={unit} sections={sections} readOnly={readOnly} />,
+    occasions: sections.occasion ? <Occasions stats={stats} unit={unit} readOnly={readOnly} /> : null,
+    records: <Records stats={stats} unit={unit} sections={sections} readOnly={readOnly} />,
+    favorites: <TopLists stats={stats} unit={unit} sections={sections} readOnly={readOnly} />,
+    places: <Places stats={stats} homeCountry={homeCountry} />,
+    seatmap: sections.seatMap ? <SeatMap flights={scoped} /> : null,
+    footprint: <Footprint stats={stats} readOnly={readOnly} />,
+  };
+  const shown = resolveLayout(layout).filter((s) => !s.hidden && blocks[s.id]);
   const t = stats.totals;
 
   return (
@@ -107,7 +127,7 @@ function StatsDashboard({ flights, upcoming, unit, clock, homeCountry, readOnly,
         <h2 className="visually-hidden">Stats</h2>
       ) : (
         <header className="page-header stats-header">
-          <div>
+          <div className="stats-header__main">
             <h1 className="page-title">Stats</h1>
             <p className="page-subtitle">
               {fmtInt(flights.length)} {plural(flights.length, 'flight')} flown
@@ -115,29 +135,33 @@ function StatsDashboard({ flights, upcoming, unit, clock, homeCountry, readOnly,
               {upcoming > 0 && <span title="Upcoming flights are counted once they depart">{` · ${upcoming} upcoming`}</span>}
             </p>
           </div>
+          {!readOnly && (
+            <button type="button" className="btn btn--ghost stats-arrange-btn" onClick={() => setArranging(true)}>
+              <Icon name="layers" size={18} /> Arrange
+            </button>
+          )}
         </header>
       )}
 
       <ScopeChips years={years} scope={scope} onChange={setScope} counts={countsByYear} total={flights.length} />
 
       <nav className="stats-jump" aria-label="Statistics sections">
-        {['Summary', 'Patterns', 'Records', 'Favorites', 'Places'].map((label) => <button key={label} type="button" onClick={() => document.getElementById(`stats-${label.toLowerCase()}`)?.scrollIntoView({block: 'start'})}>{label}</button>)}
+        {[{ id: 'summary', label: 'Summary' }, ...shown.map((sec) => ({ id: sec.id, label: sectionNav(sec.id) }))].map(({ id, label }) => (
+          <button key={id} type="button" onClick={() => document.getElementById(`stats-sec-${id}`)?.scrollIntoView({ block: 'start' })}>
+            {label}
+          </button>
+        ))}
       </nav>
-      <div className="stats-body" id="stats-summary">
+      <div className="stats-body" id="stats-sec-summary">
         <div className="stats-top">
           <Hero stats={stats} scope={scope} unit={unit} prev={prev} firstYear={years[years.length - 1]} timeEstimated={sections.timeEstimated} lifetimeKm={lifetimeKm} />
         </div>
 
-        {insights.length > 0 && <Insights items={insights} />}
-
-        <div id="stats-patterns" /><TimeCharts stats={stats} scope={scope} unit={unit} clock={clock} currentYear={currentYear} sections={sections} readOnly={readOnly} />
-        {sections.calendar && <TravelCalendar flights={flights} scope={scope} readOnly={readOnly} />}
-        <Breakdowns stats={stats} unit={unit} sections={sections} readOnly={readOnly} />
-        <Records stats={stats} unit={unit} sections={sections} readOnly={readOnly} />
-        <div id="stats-favorites" /><TopLists stats={stats} unit={unit} sections={sections} readOnly={readOnly} />
-        <Places stats={stats} homeCountry={homeCountry} />
-        {sections.seatMap && <SeatMap flights={scoped} />}
-        <Footprint stats={stats} readOnly={readOnly} />
+        {shown.map((sec) => (
+          <div key={sec.id} id={`stats-sec-${sec.id}`} className="stats-block">
+            {blocks[sec.id]}
+          </div>
+        ))}
 
         <footer className="stats-notes">
           <Icon name="info" size={14} />
@@ -160,6 +184,7 @@ function StatsDashboard({ flights, upcoming, unit, clock, homeCountry, readOnly,
           )}
         </footer>
       </div>
+      {!readOnly && <ArrangeSheet open={arranging} layout={layout} onClose={() => setArranging(false)} />}
     </div>
   );
 }

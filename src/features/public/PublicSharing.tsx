@@ -104,6 +104,7 @@ export function PublicSharing() {
     display_name: name.trim() || 'Your flight journal',
     flights: previewFlights,
     published_at: new Date().toISOString(),
+    layout: settings.statsLayout,
   };
   async function publish() {
     if (!sync.userId || busy) return;
@@ -117,6 +118,7 @@ export function PublicSharing() {
         display_name: name.trim(),
         exact_dates: exact,
         share,
+        layout: settings.statsLayout,
       });
       setSaved(p);
       setNotice('Your public journal is published.');

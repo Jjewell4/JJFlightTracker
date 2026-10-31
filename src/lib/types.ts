@@ -148,6 +148,14 @@ export interface Settings {
   enableAdsbdb: boolean;
   /** Load airline logos from pics.avs.io (false = letter badges only). Missing = true. */
   showAirlineLogos?: boolean;
+  /** The owner's arrangement of the Stats tab (also what visitors of the public journal see). */
+  statsLayout?: StatsLayout;
+}
+
+/** Stats tab arrangement: section ids in order, and the ones switched off. */
+export interface StatsLayout {
+  order?: string[];
+  hidden?: string[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {

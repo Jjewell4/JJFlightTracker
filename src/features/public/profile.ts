@@ -1,4 +1,4 @@
-import type { Flight, Settings } from '@/lib/types';
+import type { Flight, Settings, StatsLayout } from '@/lib/types';
 import type { FlightFields } from '@/lib/flight-source';
 import { isOccasion } from '@/lib/occasions';
 import { todayLocal } from '@/lib/time';
@@ -84,6 +84,8 @@ export interface PublicProfile {
   exact_dates?: boolean;
   /** Owner's settings only; visitors infer what's shared from the flights themselves. */
   share?: PublicShare | null;
+  /** The owner's Stats tab arrangement, which visitors see too. */
+  layout?: StatsLayout | null;
 }
 
 const HHMM = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;

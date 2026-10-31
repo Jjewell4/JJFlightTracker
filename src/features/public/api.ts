@@ -1,5 +1,7 @@
 import { getSupabase } from '@/services/sync/supabase';
 import { normalizeShare, type PublicProfile, type PublicShare } from './profile';
+import { normalizeLayout } from '@/features/stats/layout';
+import type { StatsLayout } from '@/lib/types';
 const COLUMNS = 'slug,display_name,flights,published_at,exact_dates';
 /** Before public-profiles.sql adds `share`, a missing column must not lock owners out. */
 const missingColumn = (e: { code?: string } | null) => e?.code === '42703' || e?.code === 'PGRST204';
@@ -16,17 +18,26 @@ export async function loadOwnProfile(
 }
 export async function publishProfile(
   userId: string,
-  profile: Pick<PublicProfile, 'slug' | 'display_name' | 'exact_dates'> & { share: PublicShare },
+  profile: Pick<PublicProfile, 'slug' | 'display_name' | 'exact_dates'> & { share: PublicShare; layout?: StatsLayout },
 ): Promise<PublicProfile> {
   const sb = await getSupabase();
   const share = normalizeShare(profile.share);
+  const layout = normalizeLayout(profile.layout);
+  const base = { slug: profile.slug, display_name: profile.display_name, exact_dates: profile.exact_dates };
   const upsert = (row: object, columns: string) =>
     sb.from('public_profiles').upsert({ ...row, user_id: userId }, { onConflict: 'user_id' }).select(columns).single<PublicProfile>();
-  let { data, error } = await upsert({ ...profile, share }, `${COLUMNS},share`);
-  // Nothing extra to share yet: publishing still works on an older database.
-  if (missingColumn(error) && !Object.keys(share).length) ({ data, error } = await upsert({ slug: profile.slug, display_name: profile.display_name, exact_dates: profile.exact_dates }, COLUMNS));
+  let { data, error } = await upsert({ ...base, share, layout }, `${COLUMNS},share,layout`);
+  // Older databases: without the layout column, then (when nothing extra is shared) without share.
+  if (missingColumn(error)) ({ data, error } = await upsert({ ...base, share }, `${COLUMNS},share`));
+  if (missingColumn(error) && !Object.keys(share).length) ({ data, error } = await upsert(base, COLUMNS));
   if (error || !data) throw error;
   return { ...data, share: normalizeShare(data.share) };
+}
+/** Keeps the public journal's Stats arrangement in step with the owner's (no-op when unpublished). */
+export async function savePublicLayout(userId: string, layout: StatsLayout): Promise<void> {
+  const sb = await getSupabase();
+  const { error } = await sb.from('public_profiles').update({ layout: normalizeLayout(layout) }).eq('user_id', userId);
+  if (error && !missingColumn(error)) throw error;
 }
 export async function unpublishProfile(userId: string) {
   const sb = await getSupabase();

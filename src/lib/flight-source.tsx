@@ -15,7 +15,7 @@
 import { createContext, useContext, useMemo, type ComponentType, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useFlights, useSettings } from './db';
-import type { Flight, Settings } from './types';
+import type { Flight, Settings, StatsLayout } from './types';
 
 /** Optional flight fields a source may carry. */
 export interface FlightFields {
@@ -66,6 +66,8 @@ export interface FlightSource {
   homeCountry: string;
   fields: FlightFields;
   params: ViewParams;
+  /** How the Stats tab is arranged (the owner's choice; public journals follow it). */
+  statsLayout?: StatsLayout;
   /** Lets a hosting page show a filtered flight list (e.g. from a map airport card). */
   showFlights?: (filter: { airport?: string; year?: number | null }) => void;
 }
@@ -113,8 +115,9 @@ export function LocalFlightSource({ children }: { children: ReactNode }) {
       homeCountry: settings.homeCountry,
       fields: ALL_FIELDS,
       params,
+      statsLayout: settings.statsLayout,
     }),
-    [flights, settings.distanceUnit, settings.clock, settings.homeCountry, params],
+    [flights, settings.distanceUnit, settings.clock, settings.homeCountry, params, settings.statsLayout],
   );
   return <FlightSourceProvider value={value}>{children}</FlightSourceProvider>;
 }

@@ -356,22 +356,33 @@ function breakdown<K extends string>(values: (K | undefined)[], order: readonly 
 export const cabinBreakdown = (flights: Flight[]) => breakdown(flights.map((f) => f.cabinClass), CABIN_CLASSES, CABIN_LABELS);
 export const seatBreakdown = (flights: Flight[]) => breakdown(flights.map((f) => f.seatType), SEAT_TYPES, SEAT_LABELS);
 export const reasonBreakdown = (flights: Flight[]) => breakdown(flights.map((f) => f.reason), FLIGHT_REASONS, REASON_LABELS);
+/** A saved trip (its legs) or a flight outside any trip, with the occasions it carries. */
+interface OccasionUnit {
+  flights: Flight[];
+  occasions: FlightOccasion[];
+}
+
+function occasionUnits(flights: Flight[]): OccasionUnit[] {
+  const trips = new Map<string, Flight[]>();
+  const units: OccasionUnit[] = [];
+  for (const f of flights) {
+    if (f.tripId) trips.set(f.tripId, [...(trips.get(f.tripId) ?? []), f]);
+    else units.push({ flights: [f], occasions: occasionsOf(f) });
+  }
+  for (const legs of trips.values()) units.push({ flights: legs, occasions: tripOccasions({ flights: legs }).occasions });
+  return units;
+}
+
 /**
  * Occasions count once per saved trip (its legs share them) and once per flight outside a trip.
  * A trip with two occasions counts under both, so shares are of tagged trips and can add up to
  * more than 100%.
  */
 export function occasionBreakdown(flights: Flight[]): Breakdown<FlightOccasion> {
-  const trips = new Map<string, Flight[]>();
-  const units: FlightOccasion[][] = [];
-  for (const f of flights) {
-    if (f.tripId) trips.set(f.tripId, [...(trips.get(f.tripId) ?? []), f]);
-    else units.push(occasionsOf(f));
-  }
-  for (const legs of trips.values()) units.push(tripOccasions({ flights: legs }).occasions);
+  const units = occasionUnits(flights);
   const counts = new Map<FlightOccasion, number>();
-  for (const u of units) for (const o of u) counts.set(o, (counts.get(o) ?? 0) + 1);
-  const known = units.filter((u) => u.length).length;
+  for (const u of units) for (const o of u.occasions) counts.set(o, (counts.get(o) ?? 0) + 1);
+  const known = units.filter((u) => u.occasions.length).length;
   return {
     items: FLIGHT_OCCASIONS.map((key) => {
       const count = counts.get(key) ?? 0;
@@ -380,6 +391,47 @@ export function occasionBreakdown(flights: Flight[]): Breakdown<FlightOccasion> 
     known,
     unknown: units.length - known,
   };
+}
+
+/** Everything behind one occasion's row on the Stats tab. */
+export interface OccasionDetail {
+  /** Trips (saved trips plus flights outside one) tagged with it. */
+  trips: number;
+  flights: number;
+  distanceKm: number;
+  /** Trips per year (by the trip's first flight), oldest first, gaps filled. */
+  byYear: { year: number; trips: number }[];
+  /** Where these trips went: arrival airports other than where each trip started, most first. */
+  places: { ident: string; count: number }[];
+}
+
+export function occasionDetails(flights: Flight[]): Partial<Record<FlightOccasion, OccasionDetail>> {
+  const out: Partial<Record<FlightOccasion, OccasionDetail & { years: Map<number, number>; placeCounts: Map<string, number> }>> = {};
+  for (const u of occasionUnits(flights)) {
+    if (!u.occasions.length) continue;
+    const legs = [...u.flights].sort((a, b) => a.date.localeCompare(b.date) || (a.depTime ?? '').localeCompare(b.depTime ?? ''));
+    const start = legs[0].from;
+    const year = Number(legs[0].date.slice(0, 4));
+    const km = legs.reduce((sum, f) => sum + (resolveFlight(f).distanceKm ?? 0), 0);
+    const stops = new Set(legs.map((f) => f.to).filter((to) => to !== start));
+    for (const o of u.occasions) {
+      const d = (out[o] ??= { trips: 0, flights: 0, distanceKm: 0, byYear: [], places: [], years: new Map(), placeCounts: new Map() });
+      d.trips++;
+      d.flights += legs.length;
+      d.distanceKm += km;
+      d.years.set(year, (d.years.get(year) ?? 0) + 1);
+      for (const s of stops) d.placeCounts.set(s, (d.placeCounts.get(s) ?? 0) + 1);
+    }
+  }
+  const result: Partial<Record<FlightOccasion, OccasionDetail>> = {};
+  for (const [key, d] of Object.entries(out) as [FlightOccasion, (typeof out)[FlightOccasion] & object][]) {
+    const ys = [...d.years.keys()];
+    const byYear: OccasionDetail['byYear'] = [];
+    for (let y = Math.min(...ys); y <= Math.max(...ys); y++) byYear.push({ year: y, trips: d.years.get(y) ?? 0 });
+    const places = [...d.placeCounts].map(([ident, count]) => ({ ident, count })).sort((a, b) => b.count - a.count || a.ident.localeCompare(b.ident));
+    result[key] = { trips: d.trips, flights: d.flights, distanceKm: d.distanceKm, byYear, places };
+  }
+  return result;
 }
 
 export function scopeBreakdown(rs: ResolvedFlight[]): Breakdown<'domestic' | 'international'> {
@@ -914,6 +966,7 @@ export interface FlightStats {
   seat: Breakdown<SeatType>;
   reason: Breakdown<FlightReason>;
   occasion: Breakdown<FlightOccasion>;
+  occasionDetails: Partial<Record<FlightOccasion, OccasionDetail>>;
   haul: Breakdown<'short' | 'medium' | 'long'>;
   manufacturer: Breakdown<Manufacturer>;
   countries: CountryVisit[];
@@ -955,6 +1008,7 @@ export function computeStats(flights: Flight[], opts: StatsOptions = {}): Flight
     cabin: cabinBreakdown(flights),
     reason: reasonBreakdown(flights),
     occasion: occasionBreakdown(flights),
+    occasionDetails: occasionDetails(flights),
     haul: haulBreakdown(rs),
     weekday: flightsByWeekday(rs),
     hour: flightsByHour(rs),

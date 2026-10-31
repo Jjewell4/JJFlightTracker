@@ -82,10 +82,11 @@ export function PublicDashboard({
       homeCountry: '',
       fields,
       params,
+      statsLayout: profile.layout ?? undefined,
       showFlights: ({ airport, year }) =>
         params.update({ view: 'flights', mode: null, airport: airport ?? null, year: year == null ? null : String(year) }, 'push'),
     }),
-    [flights, unit, fields, params],
+    [flights, unit, fields, params, profile.layout],
   );
 
   // Each view opens at its top.
