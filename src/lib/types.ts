@@ -10,11 +10,13 @@ export type FlightReason = 'leisure' | 'business' | 'crew' | 'other';
 /** Optional "what the trip was for" tag (see src/lib/occasions.ts). */
 export type FlightOccasion =
   | 'vacation'
+  | 'nature'
   | 'family'
   | 'friends'
   | 'wedding'
   | 'holiday'
   | 'event'
+  | 'sports'
   | 'conference'
   | 'work'
   | 'school'

@@ -4,13 +4,14 @@ import { Icon, type IconName } from '@/components/Icon';
 import { ConfirmSheet, Sheet } from '@/components/Sheet';
 import { useReferenceReady } from '@/data/reference';
 import { renameTrip, saveTrip, setOccasion, unsaveTrip, useFlights, useSettings } from '@/lib/db';
-import { FLIGHT_OCCASIONS, OCCASION_ICON, OCCASION_LABELS } from '@/lib/occasions';
+import { OCCASION_ICON, OCCASION_LABELS, tripOccasion } from '@/lib/occasions';
 import { todayLocal } from '@/lib/time';
 import { resolveTrip, suggestTripName, tripCounts, tripDates, tripMinutes, tripTitle, type Trip } from '@/lib/trips';
 import type { FlightOccasion, Settings } from '@/lib/types';
 import { formatDistance } from '@/features/flights/flight-logic';
 import { FlightRow } from '@/features/flights/FlightRow';
 import { TripRouteLine } from './TripCard';
+import { OccasionPicker } from './OccasionPicker';
 import { TripMap } from './TripMap';
 import { nightsLabel, placeName, plural, routeText, stopLabel, tripShareText } from './trip-format';
 import { useTrips } from './use-trips';
@@ -93,9 +94,8 @@ function TripView({ trip, settings, onBack, onUngrouped }: { trip: Trip; setting
   const closeConfirm = useCallback(() => setConfirm(false), []);
   const closePicking = useCallback(() => setPicking(false), []);
   // One occasion for the whole trip; legs tagged differently read as "mixed".
-  const occasions = new Set(trip.flights.map((f) => f.occasion));
-  const occasion = occasions.size === 1 ? trip.flights[0].occasion : undefined;
-  const mixed = occasions.size > 1;
+  const occasion = tripOccasion(trip);
+  const mixed = new Set(trip.flights.map((f) => f.occasion).filter(Boolean)).size > 1;
 
   const pickOccasion = async (o: FlightOccasion | undefined) => {
     setPicking(false);
@@ -117,12 +117,13 @@ function TripView({ trip, settings, onBack, onUngrouped }: { trip: Trip; setting
   };
   useEffect(() => () => clearTimeout(toastTimer.current), []);
 
-  const submitName = async (name: string) => {
+  const submitName = async (name: string, chosen?: FlightOccasion) => {
     setBusy(true);
     try {
       if (naming === 'save') {
         // The page follows the legs to their new saved id (see resolveTrip).
         await saveTrip(trip.flights.map((f) => f.id), name);
+        if (chosen !== occasion) await setOccasion(trip.flights.map((f) => f.id), chosen);
         flash('Trip saved');
       } else {
         await renameTrip(trip.id, name);
@@ -347,12 +348,8 @@ function TripView({ trip, settings, onBack, onUngrouped }: { trip: Trip; setting
       <Sheet open={picking} onClose={closePicking} label="Trip occasion">
         <div className="sheet__title">What was this trip for?</div>
         <p className="toccasion__lead">{trip.flights.length === 1 ? 'Tags this trip’s flight.' : `Tags all ${plural(trip.flights.length, 'flight')} of this trip.`}</p>
-        <div className="chip-group toccasion__chips" role="group" aria-label="Occasion">
-          {FLIGHT_OCCASIONS.map((o) => (
-            <button key={o} type="button" className="chip toccasion__chip" aria-pressed={o === occasion} onClick={() => void pickOccasion(o === occasion ? undefined : o)}>
-              <Icon name={OCCASION_ICON[o]} size={16} /> {OCCASION_LABELS[o]}
-            </button>
-          ))}
+        <div className="toccasion__chips">
+          <OccasionPicker value={occasion} onChange={(o) => void pickOccasion(o)} />
         </div>
         {(occasion || mixed) && (
           <button type="button" className="btn btn--block btn--ghost" onClick={() => void pickOccasion(undefined)}>
@@ -370,6 +367,7 @@ function TripView({ trip, settings, onBack, onUngrouped }: { trip: Trip; setting
         initial={trip.saved ? (trip.name ?? '') : title}
         placeholder={suggestTripName(trip)}
         legs={trip.flights.length}
+        occasion={occasion}
         busy={busy}
         onSubmit={submitName}
         onClose={closeNaming}
@@ -417,6 +415,7 @@ function TripNameSheet({
   initial,
   placeholder,
   legs,
+  occasion: initialOccasion,
   busy,
   onSubmit,
   onClose,
@@ -426,19 +425,24 @@ function TripNameSheet({
   initial: string;
   placeholder: string;
   legs: number;
+  occasion?: FlightOccasion;
   busy: boolean;
-  onSubmit: (name: string) => void;
+  onSubmit: (name: string, occasion?: FlightOccasion) => void;
   onClose: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(initial);
+  const [occasion, setOccasionChoice] = useState(initialOccasion);
   // Prefill each time the sheet opens (not on background updates while typing).
   useEffect(() => {
-    if (open) setName(initial);
+    if (open) {
+      setName(initial);
+      setOccasionChoice(initialOccasion);
+    }
   }, [open]);
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!busy) onSubmit(name);
+    if (!busy) onSubmit(name, occasion);
   };
   return (
     <Sheet open={open} onClose={onClose} labelledBy="trip-name-title" initialFocus={inputRef} dismissible={!busy}>
@@ -465,6 +469,12 @@ function TripNameSheet({
             placeholder={placeholder}
           />
         </label>
+        {mode === 'save' && (
+          <div className="tname__occasion">
+            <span className="field__label">What was it for? (optional)</span>
+            <OccasionPicker value={occasion} onChange={setOccasionChoice} />
+          </div>
+        )}
         <div className="tname__actions">
           <button type="button" className="btn btn--lg" onClick={onClose} disabled={busy}>
             Cancel

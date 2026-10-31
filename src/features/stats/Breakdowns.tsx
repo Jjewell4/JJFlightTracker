@@ -65,8 +65,8 @@ export function Breakdowns({ stats, unit, sections, readOnly = false }: { stats:
         {sections.occasion && occasion.known > 0 && (
           <RankList
             title="Occasions"
-            subtitle={`${fmtInt(occasion.known)} tagged ${occasion.known === 1 ? 'flight' : 'flights'}`}
-            noun={['flight', 'flights']}
+            subtitle={`${fmtInt(occasion.known)} tagged · a saved trip counts once`}
+            noun={['trip', 'trips']}
             rows={occasion.items
               .filter((it) => it.count > 0)
               .sort((a, b) => b.count - a.count)
@@ -82,7 +82,7 @@ export function Breakdowns({ stats, unit, sections, readOnly = false }: { stats:
         )}
         {sections.occasion && occasion.known === 0 && !readOnly && (
           <article className="card stats-card">
-            <CardHead title="Occasions" subtitle="Tag flights as vacation, wedding, conference… under More details" />
+            <CardHead title="Occasions" subtitle="Tag your trips as vacation, wedding, conference… from each trip’s page" />
           </article>
         )}
 

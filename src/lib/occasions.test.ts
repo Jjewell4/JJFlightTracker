@@ -21,6 +21,8 @@ describe('occasions', () => {
     expect(parseOccasion('Christmas at home')).toBe('holiday');
     expect(parseOccasion('Re:Invent conference')).toBe('conference');
     expect(parseOccasion('Taylor Swift concert')).toBe('event');
+    expect(parseOccasion('Lakers game')).toBe('sports');
+    expect(parseOccasion('Hiking in Zion National Park')).toBe('nature');
     expect(parseOccasion('')).toBeUndefined();
     expect(parseOccasion('???')).toBeUndefined();
     expect(parseOccasion(3)).toBeUndefined();
@@ -53,5 +55,10 @@ describe('occasions', () => {
     expect(s.occasion.known).toBe(3);
     expect(s.occasion.unknown).toBe(1);
     expect(s.occasion.items.find((i) => i.key === 'vacation')?.count).toBe(2);
+    // A saved trip counts once, whatever its number of legs.
+    const trip = [f('wedding'), f('wedding'), f()].map((x) => ({ ...x, tripId: 't1' }));
+    const t = computeStats([...trip, f('vacation')]);
+    expect(t.occasion.items.find((i) => i.key === 'wedding')?.count).toBe(1);
+    expect(t.occasion.known).toBe(2);
   });
 });

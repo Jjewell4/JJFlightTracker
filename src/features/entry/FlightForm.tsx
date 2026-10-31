@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { AirlineLogo } from '@/components/AirlineLogo';
 import { Icon } from '@/components/Icon';
 import { getAircraftType, getAirline } from '@/data/reference';
-import { addFlight, deleteFlight, updateFlight, useSettings } from '@/lib/db';
+import { addFlight, deleteFlight, setTripOccasion, updateFlight, useSettings } from '@/lib/db';
 import { enrichFlight, parseFlightNumber } from '@/lib/flight-utils';
 import { todayLocal } from '@/lib/time';
 import type { DatePrecision, Flight, SeatType } from '@/lib/types';
@@ -461,6 +461,8 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note, 
       const input = enrichFlight(valuesToInput(v, { source, base }));
       if (base) {
         await updateFlight(base.id, input);
+        // Occasions belong to the trip: a change on one leg applies to all of them.
+        if (base.tripId && input.occasion !== base.occasion) await setTripOccasion(base.tripId, input.occasion);
         setSavedLocally(true);
         announceLocalSave();
         void requestPersistentStorageOnce();
@@ -667,6 +669,7 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note, 
           onSeatType={setSeatType}
           onPrecision={setPrecision}
           onPickAircraft={() => setSheet('aircraft')}
+          tripName={base?.tripId ? base.tripName?.trim() || 'this trip' : undefined}
           filled={{ aircraft: isFilled('aircraft'), registration: isFilled('registration'), seat: isFilled('seat') }}
         />
 

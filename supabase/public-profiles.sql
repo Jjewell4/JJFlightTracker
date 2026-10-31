@@ -31,7 +31,7 @@ begin
   if f ? 'seatType' and (f->>'seatType') not in ('window','middle','aisle') then return false; end if;
   if f ? 'seatNumber' and (f->>'seatNumber') !~ '^[0-9]{1,3}[A-Z]$' then return false; end if;
   if f ? 'reason' and (f->>'reason') not in ('leisure','business','crew','other') then return false; end if;
-  if f ? 'occasion' and (f->>'occasion') not in ('vacation','family','friends','wedding','holiday','event','conference','work','school','moving','other') then return false; end if;
+  if f ? 'occasion' and (f->>'occasion') not in ('vacation','nature','family','friends','wedding','holiday','event','sports','conference','work','school','moving','other') then return false; end if;
   if f ? 'flightNumber' and (f->>'flightNumber') !~ '^[A-Z0-9]{2,10}$' then return false; end if;
   if f ? 'registration' and (f->>'registration') !~ '^[A-Z0-9-]{2,10}$' then return false; end if;
  end loop;
@@ -106,7 +106,7 @@ begin
   'seatType',case when seat and jsonb_typeof(data->'seatType')='string' and data->>'seatType' in ('window','middle','aisle') then data->>'seatType' end,
   'seatNumber',case when seat and jsonb_typeof(data->'seatNumber')='string' and upper(data->>'seatNumber') ~ '^[0-9]{1,3}[A-Z]$' then upper(data->>'seatNumber') end,
   'reason',case when reason and jsonb_typeof(data->'reason')='string' and data->>'reason' in ('leisure','business','crew','other') then data->>'reason' end,
-  'occasion',case when reason and jsonb_typeof(data->'occasion')='string' and data->>'occasion' in ('vacation','family','friends','wedding','holiday','event','conference','work','school','moving','other') then data->>'occasion' end,
+  'occasion',case when reason and jsonb_typeof(data->'occasion')='string' and data->>'occasion' in ('vacation','nature','family','friends','wedding','holiday','event','sports','conference','work','school','moving','other') then data->>'occasion' end,
   'flightNumber',case when fnum and jsonb_typeof(data->'flightNumber')='string' and upper(data->>'flightNumber') ~ '^[A-Z0-9]{2,10}$' then upper(data->>'flightNumber') end,
   'registration',case when reg and jsonb_typeof(data->'registration')='string' and upper(data->>'registration') ~ '^[A-Z0-9-]{2,10}$' then upper(data->>'registration') end
  ));

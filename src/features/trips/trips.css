@@ -227,6 +227,16 @@
   font-weight: 550;
   color: var(--text-2);
 }
+.tcard__occasion {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: var(--space-2);
+  color: var(--accent);
+}
+.tcard__occasion svg {
+  flex: none;
+}
 .tcard__route {
   margin-top: 4px;
 }
@@ -404,4 +414,15 @@
   .tripchip {
     max-width: 560px;
   }
+}
+
+/* ---------- occasion chips ---------- */
+.occpick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.occpick__chip {
+  min-height: 44px;
+  padding: 0 var(--space-4);
 }

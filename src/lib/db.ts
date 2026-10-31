@@ -148,6 +148,12 @@ export async function setOccasion(flightIds: string[], occasion: FlightOccasion 
   });
 }
 
+/** Sets (or clears) the occasion on every leg of a saved trip. */
+export async function setTripOccasion(tripId: string, occasion: FlightOccasion | undefined): Promise<void> {
+  const ids = (await db.flights.filter((f) => f.tripId === tripId).toArray()).map((f) => f.id);
+  await setOccasion(ids, occasion);
+}
+
 /** Removes the trip grouping: clears tripId/tripName on its legs; the flights stay. */
 export async function unsaveTrip(tripId: string): Promise<number> {
   return updateTripLegs(tripId, { tripId: undefined, tripName: undefined });

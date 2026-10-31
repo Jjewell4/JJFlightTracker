@@ -116,6 +116,7 @@ export function DetailsSection({
   onSeatType,
   onPrecision,
   onPickAircraft,
+  tripName,
   filled,
 }: {
   v: FormValues;
@@ -125,6 +126,8 @@ export function DetailsSection({
   onSeatType: (t: SeatType | undefined) => void;
   onPrecision: (p: DatePrecision) => void;
   onPickAircraft: () => void;
+  /** Set when the flight is part of a saved trip: its occasion is the trip's. */
+  tripName?: string;
   filled: { aircraft?: boolean; registration?: boolean; seat?: boolean };
 }) {
   const panelId = useId();
@@ -202,14 +205,17 @@ export function DetailsSection({
 
           <Choice label="Cabin class" options={CABINS} value={v.cabinClass} onChange={(c) => onPatch({ cabinClass: c })} variant="chips" />
           <Choice label="Reason" options={REASONS} value={v.reason} onChange={(r) => onPatch({ reason: r })} />
-          <Choice
-            label="Occasion"
-            options={OCCASIONS}
-            value={v.occasion}
-            // An occasion implies a reason when none was picked (a wedding is leisure, a conference business).
-            onChange={(o) => onPatch({ occasion: o, ...(!v.reason && o && OCCASION_REASON[o] ? { reason: OCCASION_REASON[o] } : {}) })}
-            variant="chips"
-          />
+          <div>
+            <Choice
+              label={tripName ? 'Trip occasion' : 'Occasion'}
+              options={OCCASIONS}
+              value={v.occasion}
+              // An occasion implies a reason when none was picked (a wedding is leisure, a conference business).
+              onChange={(o) => onPatch({ occasion: o, ...(!v.reason && o && OCCASION_REASON[o] ? { reason: OCCASION_REASON[o] } : {}) })}
+              variant="chips"
+            />
+            {tripName && <p className="field__hint details__hint">Applies to every flight in {tripName === 'this trip' ? tripName : `“${tripName}”`}.</p>}
+          </div>
 
           <div className="entry-field">
             <label className="field__label" htmlFor="entry-note">

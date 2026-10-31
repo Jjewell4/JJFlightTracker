@@ -564,12 +564,11 @@
   font-size: var(--text-sm);
 }
 .toccasion__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
   margin-bottom: var(--space-4);
 }
-.toccasion__chip {
-  min-height: 44px;
-  padding: 0 var(--space-4);
+
+.tname__occasion {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
 }

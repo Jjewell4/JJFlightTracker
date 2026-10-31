@@ -3,11 +3,12 @@
  * tested): what each leg still needs, whether it's already in the log, and saving several legs
  * at once — optionally as one trip.
  */
+import { OCCASION_REASON } from '@/lib/occasions';
 import { getAircraftType, getAirport } from '@/data/reference';
 import { addFlights, newId } from '@/lib/db';
 import { enrichFlight } from '@/lib/flight-utils';
 import { suggestTripName, tripFromLegs } from '@/lib/trips';
-import type { DraftLeg, Flight, FlightInput } from '@/lib/types';
+import type { DraftLeg, Flight, FlightInput, FlightOccasion } from '@/lib/types';
 import { inferAirline } from '@/services/lookup';
 import { markLegsHandled } from '@/services/screenshot/drafts';
 import { findDuplicates } from '@/features/entry/duplicates';
@@ -126,12 +127,20 @@ export function suggestedTripName(inputs: readonly FlightInput[]): string {
  * Saves the given legs in one write — as one trip when `trip` is passed and there are two or
  * more — and marks them handled on the draft. Resolves with the saved flights (chronological).
  */
-export async function saveLegs(draftId: string, checks: readonly LegCheck[], trip?: { name: string }): Promise<{ saved: Flight[]; tripId?: string }> {
+export async function saveLegs(
+  draftId: string,
+  checks: readonly LegCheck[],
+  trip?: { name: string; occasion?: FlightOccasion },
+): Promise<{ saved: Flight[]; tripId?: string }> {
   const ready = checks.filter((c): c is LegCheck & { input: FlightInput } => !!c.input);
   if (!ready.length) return { saved: [] };
   const tripId = trip && ready.length >= 2 ? newId() : undefined;
   const ordered = [...ready].sort((a, b) => a.input.date.localeCompare(b.input.date) || (a.input.depTime ?? '').localeCompare(b.input.depTime ?? ''));
-  const saved = await addFlights(ordered.map((c) => (tripId ? { ...c.input, tripId, tripName: trip!.name.trim() } : c.input)));
+  const occasion = tripId ? trip?.occasion : undefined;
+  const reason = occasion && OCCASION_REASON[occasion];
+  const saved = await addFlights(
+    ordered.map((c) => (tripId ? { ...c.input, tripId, tripName: trip!.name.trim(), ...(occasion ? { occasion, reason: c.input.reason ?? reason } : {}) } : c.input)),
+  );
   await markLegsHandled(
     draftId,
     ready.map((c) => c.index),

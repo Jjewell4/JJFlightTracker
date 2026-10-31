@@ -1,4 +1,5 @@
 import { memo, useId, useMemo } from 'react';
+import { OCCASION_ICON, OCCASION_LABELS, tripOccasion } from '@/lib/occasions';
 import { Link } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
 import { airportCode } from '@/lib/flight-utils';
@@ -60,6 +61,7 @@ export function TripRouteLine({ trip, compact, className = '' }: { trip: Trip; c
 /** One trip in the Log → Trips list. Suggestions are drawn a little lighter than saved trips. */
 export const TripCard = memo(function TripCard({ trip, unit, upcoming }: { trip: Trip; unit: Settings['distanceUnit']; upcoming?: boolean }) {
   const title = tripTitle(trip);
+  const occasion = tripOccasion(trip);
   return (
     <Link to={`/trips/${encodeURIComponent(trip.id)}`} className={`tcard${trip.saved ? ' tcard--saved' : ''}`}>
       <span className="tcard__map">
@@ -71,7 +73,15 @@ export const TripCard = memo(function TripCard({ trip, unit, upcoming }: { trip:
           <span className="tcard__title">{title}</span>
           {upcoming ? <span className="tcard__tag tcard__tag--soon">Upcoming</span> : !trip.saved && <span className="tcard__tag">Suggested</span>}
         </span>
-        <span className="tcard__dates">{tripDates(trip)}</span>
+        <span className="tcard__dates">
+          {tripDates(trip)}
+          {occasion && (
+            <span className="tcard__occasion">
+              <Icon name={OCCASION_ICON[occasion]} size={13} strokeWidth={2} />
+              {OCCASION_LABELS[occasion]}
+            </span>
+          )}
+        </span>
         <TripRouteLine trip={trip} compact className="tcard__route" />
         <span className="tcard__stats tabular">{tripStatsLine(trip, unit)}</span>
       </span>
