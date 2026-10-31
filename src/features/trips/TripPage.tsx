@@ -3,8 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Icon, type IconName } from '@/components/Icon';
 import { ConfirmSheet, Sheet } from '@/components/Sheet';
 import { useReferenceReady } from '@/data/reference';
-import { renameTrip, saveTrip, setOccasion, unsaveTrip, useFlights, useSettings } from '@/lib/db';
-import { OCCASION_ICON, OCCASION_LABELS, tripOccasion } from '@/lib/occasions';
+import { renameTrip, saveTrip, setOccasions, unsaveTrip, useFlights, useSettings } from '@/lib/db';
+import { formatOccasions, OCCASION_ICON, OCCASION_LABELS, tripOccasions } from '@/lib/occasions';
 import { todayLocal } from '@/lib/time';
 import { resolveTrip, suggestTripName, tripCounts, tripDates, tripMinutes, tripTitle, type Trip } from '@/lib/trips';
 import type { FlightOccasion, Settings } from '@/lib/types';
@@ -93,18 +93,22 @@ function TripView({ trip, settings, onBack, onUngrouped }: { trip: Trip; setting
   const closeNaming = useCallback(() => setNaming(null), []);
   const closeConfirm = useCallback(() => setConfirm(false), []);
   const closePicking = useCallback(() => setPicking(false), []);
-  // One occasion for the whole trip; legs tagged differently read as "mixed".
-  const occasion = tripOccasion(trip);
-  const mixed = new Set(trip.flights.map((f) => f.occasion).filter(Boolean)).size > 1;
+  // Up to two occasions for the whole trip; more across its legs reads as "mixed".
+  const { occasions, mixed } = tripOccasions(trip);
+  const [pickDraft, setPickDraft] = useState<FlightOccasion[]>([]);
+  const openPicker = () => {
+    setPickDraft(occasions);
+    setPicking(true);
+  };
 
-  const pickOccasion = async (o: FlightOccasion | undefined) => {
+  const saveOccasions = async (list: FlightOccasion[]) => {
     setPicking(false);
     try {
-      await setOccasion(
+      await setOccasions(
         trip.flights.map((f) => f.id),
-        o,
+        list,
       );
-      flash(o ? `Tagged as ${OCCASION_LABELS[o].toLowerCase()}` : 'Occasion cleared');
+      flash(list.length ? `Tagged as ${formatOccasions(list).toLowerCase()}` : 'Occasion cleared');
     } catch {
       flash('Couldn’t save the occasion');
     }
@@ -117,13 +121,13 @@ function TripView({ trip, settings, onBack, onUngrouped }: { trip: Trip; setting
   };
   useEffect(() => () => clearTimeout(toastTimer.current), []);
 
-  const submitName = async (name: string, chosen?: FlightOccasion) => {
+  const submitName = async (name: string, chosen: FlightOccasion[] = []) => {
     setBusy(true);
     try {
       if (naming === 'save') {
         // The page follows the legs to their new saved id (see resolveTrip).
         await saveTrip(trip.flights.map((f) => f.id), name);
-        if (chosen !== occasion) await setOccasion(trip.flights.map((f) => f.id), chosen);
+        if (chosen.join() !== occasions.join()) await setOccasions(trip.flights.map((f) => f.id), chosen);
         flash('Trip saved');
       } else {
         await renameTrip(trip.id, name);
@@ -244,11 +248,16 @@ function TripView({ trip, settings, onBack, onUngrouped }: { trip: Trip; setting
             </section>
           )}
 
-          <button type="button" className="toccasion animate-in" onClick={() => setPicking(true)} aria-haspopup="dialog">
+          <button type="button" className="toccasion animate-in" onClick={openPicker} aria-haspopup="dialog">
             <span className="toccasion__label">Occasion</span>
-            <span className={`toccasion__value${occasion ? '' : ' is-placeholder'}`}>
-              {occasion && <Icon name={OCCASION_ICON[occasion]} size={16} className="toccasion__icon" />}
-              <span className="toccasion__text">{occasion ? OCCASION_LABELS[occasion] : mixed ? 'Mixed' : 'Vacation, wedding, conference…'}</span>
+            <span className={`toccasion__value${occasions.length ? '' : ' is-placeholder'}`}>
+              {occasions.map((o) => (
+                <span key={o} className="toccasion__item">
+                  <Icon name={OCCASION_ICON[o]} size={16} className="toccasion__icon" />
+                  <span className="toccasion__text">{OCCASION_LABELS[o]}</span>
+                </span>
+              ))}
+              {!occasions.length && <span className="toccasion__text">{mixed ? 'Mixed' : 'Vacation, wedding, conference…'}</span>}
             </span>
             <Icon name="chevron" size={16} className="toccasion__chev" />
           </button>
@@ -347,18 +356,21 @@ function TripView({ trip, settings, onBack, onUngrouped }: { trip: Trip; setting
 
       <Sheet open={picking} onClose={closePicking} label="Trip occasion">
         <div className="sheet__title">What was this trip for?</div>
-        <p className="toccasion__lead">{trip.flights.length === 1 ? 'Tags this trip’s flight.' : `Tags all ${plural(trip.flights.length, 'flight')} of this trip.`}</p>
+        <p className="toccasion__lead">
+          Pick up to two, like a wedding plus a vacation.{' '}
+          {trip.flights.length === 1 ? 'Tags this trip’s flight.' : `Tags all ${plural(trip.flights.length, 'flight')} of this trip.`}
+        </p>
         <div className="toccasion__chips">
-          <OccasionPicker value={occasion} onChange={(o) => void pickOccasion(o)} />
+          <OccasionPicker value={pickDraft} onChange={setPickDraft} />
         </div>
-        {(occasion || mixed) && (
-          <button type="button" className="btn btn--block btn--ghost" onClick={() => void pickOccasion(undefined)}>
-            Clear occasion
+        <div className="tname__actions">
+          <button type="button" className="btn btn--lg" onClick={closePicking}>
+            Cancel
           </button>
-        )}
-        <button type="button" className="btn btn--block sheet__cancel" onClick={closePicking}>
-          Cancel
-        </button>
+          <button type="button" className="btn btn--lg btn--primary" onClick={() => void saveOccasions(pickDraft)}>
+            {pickDraft.length || !(occasions.length || mixed) ? 'Save' : 'Clear occasion'}
+          </button>
+        </div>
       </Sheet>
 
       <TripNameSheet
@@ -367,7 +379,7 @@ function TripView({ trip, settings, onBack, onUngrouped }: { trip: Trip; setting
         initial={trip.saved ? (trip.name ?? '') : title}
         placeholder={suggestTripName(trip)}
         legs={trip.flights.length}
-        occasion={occasion}
+        occasions={occasions}
         busy={busy}
         onSubmit={submitName}
         onClose={closeNaming}
@@ -415,7 +427,7 @@ function TripNameSheet({
   initial,
   placeholder,
   legs,
-  occasion: initialOccasion,
+  occasions: initialOccasions = [],
   busy,
   onSubmit,
   onClose,
@@ -425,24 +437,24 @@ function TripNameSheet({
   initial: string;
   placeholder: string;
   legs: number;
-  occasion?: FlightOccasion;
+  occasions?: FlightOccasion[];
   busy: boolean;
-  onSubmit: (name: string, occasion?: FlightOccasion) => void;
+  onSubmit: (name: string, occasions?: FlightOccasion[]) => void;
   onClose: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(initial);
-  const [occasion, setOccasionChoice] = useState(initialOccasion);
+  const [chosen, setChosen] = useState(initialOccasions);
   // Prefill each time the sheet opens (not on background updates while typing).
   useEffect(() => {
     if (open) {
       setName(initial);
-      setOccasionChoice(initialOccasion);
+      setChosen(initialOccasions);
     }
   }, [open]);
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!busy) onSubmit(name, occasion);
+    if (!busy) onSubmit(name, chosen);
   };
   return (
     <Sheet open={open} onClose={onClose} labelledBy="trip-name-title" initialFocus={inputRef} dismissible={!busy}>
@@ -471,8 +483,8 @@ function TripNameSheet({
         </label>
         {mode === 'save' && (
           <div className="tname__occasion">
-            <span className="field__label">What was it for? (optional)</span>
-            <OccasionPicker value={occasion} onChange={setOccasionChoice} />
+            <span className="field__label">What was it for? Up to two, optional</span>
+            <OccasionPicker value={chosen} onChange={setChosen} />
           </div>
         )}
         <div className="tname__actions">

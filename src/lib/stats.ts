@@ -30,7 +30,7 @@
 import { getAircraftType, getAirline, getAirport, getCountry, normalize } from '@/data/reference';
 import { airlineKey } from './flight-utils';
 import { EARTH_CIRCUMFERENCE_KM, distanceKm as greatCircleKm, estimateDurationMin, kmToMiles } from './geo';
-import { FLIGHT_OCCASIONS, OCCASION_LABELS, tripOccasion } from './occasions';
+import { FLIGHT_OCCASIONS, OCCASION_LABELS, occasionsOf, tripOccasions } from './occasions';
 import type { Airport, CabinClass, Continent, Flight, FlightOccasion, FlightReason, SeatType } from './types';
 
 export const MOON_DISTANCE_KM = 384_400;
@@ -356,16 +356,30 @@ function breakdown<K extends string>(values: (K | undefined)[], order: readonly 
 export const cabinBreakdown = (flights: Flight[]) => breakdown(flights.map((f) => f.cabinClass), CABIN_CLASSES, CABIN_LABELS);
 export const seatBreakdown = (flights: Flight[]) => breakdown(flights.map((f) => f.seatType), SEAT_TYPES, SEAT_LABELS);
 export const reasonBreakdown = (flights: Flight[]) => breakdown(flights.map((f) => f.reason), FLIGHT_REASONS, REASON_LABELS);
-/** Occasions count once per saved trip (its legs share one), and once per flight outside a trip. */
+/**
+ * Occasions count once per saved trip (its legs share them) and once per flight outside a trip.
+ * A trip with two occasions counts under both, so shares are of tagged trips and can add up to
+ * more than 100%.
+ */
 export function occasionBreakdown(flights: Flight[]): Breakdown<FlightOccasion> {
   const trips = new Map<string, Flight[]>();
-  const values: (FlightOccasion | undefined)[] = [];
+  const units: FlightOccasion[][] = [];
   for (const f of flights) {
     if (f.tripId) trips.set(f.tripId, [...(trips.get(f.tripId) ?? []), f]);
-    else values.push(f.occasion);
+    else units.push(occasionsOf(f));
   }
-  for (const legs of trips.values()) values.push(tripOccasion({ flights: legs }));
-  return breakdown(values, FLIGHT_OCCASIONS, OCCASION_LABELS);
+  for (const legs of trips.values()) units.push(tripOccasions({ flights: legs }).occasions);
+  const counts = new Map<FlightOccasion, number>();
+  for (const u of units) for (const o of u) counts.set(o, (counts.get(o) ?? 0) + 1);
+  const known = units.filter((u) => u.length).length;
+  return {
+    items: FLIGHT_OCCASIONS.map((key) => {
+      const count = counts.get(key) ?? 0;
+      return { key, label: OCCASION_LABELS[key], count, share: known ? count / known : 0 };
+    }),
+    known,
+    unknown: units.length - known,
+  };
 }
 
 export function scopeBreakdown(rs: ResolvedFlight[]): Breakdown<'domestic' | 'international'> {

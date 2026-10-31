@@ -89,9 +89,12 @@ export function sanitizeFlight(raw: unknown): ImportFlight | undefined {
     ['cabinClass', ['economy', 'premium', 'business', 'first', 'private']],
     ['reason', ['leisure', 'business', 'crew', 'other']],
     ['occasion', [...FLIGHT_OCCASIONS]],
+    ['occasion2', [...FLIGHT_OCCASIONS]],
     ['source', ['manual', 'lookup', 'screenshot', 'fr24', 'csv', 'backup']],
   ];
   for (const [k, allowed] of enums) if (f[k] !== undefined && !allowed.includes(f[k] as string)) delete f[k];
+  // A second occasion only alongside a different first one.
+  if (!f.occasion || f.occasion2 === f.occasion) delete f.occasion2;
   if (typeof f.id !== 'string' || !f.id) delete f.id;
   f.from = r.from.trim();
   f.to = r.to.trim();

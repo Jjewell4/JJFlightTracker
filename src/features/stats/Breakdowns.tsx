@@ -65,7 +65,7 @@ export function Breakdowns({ stats, unit, sections, readOnly = false }: { stats:
         {sections.occasion && occasion.known > 0 && (
           <RankList
             title="Occasions"
-            subtitle={`${fmtInt(occasion.known)} tagged · a saved trip counts once`}
+            subtitle={`${fmtInt(occasion.known)} tagged · a trip counts once per occasion`}
             noun={['trip', 'trips']}
             rows={occasion.items
               .filter((it) => it.count > 0)

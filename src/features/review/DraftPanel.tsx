@@ -144,7 +144,7 @@ export function DraftReview({
   const autoName = useMemo(() => suggestedTripName(inputs), [chosenKey]);
   const [tripChoice, setTripChoice] = useState<boolean | null>(null);
   const [name, setName] = useState<string | null>(null);
-  const [occasion, setOccasion] = useState<FlightOccasion | undefined>(undefined);
+  const [occasions, setOccasions] = useState<FlightOccasion[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const asTrip = chosen.length >= 2 && (tripChoice ?? looksLikeTrip(inputs));
@@ -164,7 +164,7 @@ export function DraftReview({
     setBusy(true);
     setError('');
     try {
-      const result = await saveLegs(draft.id, chosen, asTrip ? { name: tripName, occasion } : undefined);
+      const result = await saveLegs(draft.id, chosen, asTrip ? { name: tripName, occasions } : undefined);
       onSaved({ ...result, tripName: asTrip ? tripName.trim() || autoName : undefined });
     } catch (e) {
       console.error(e);
@@ -230,8 +230,8 @@ export function DraftReview({
           )}
           {asTrip && (
             <div className="dtrip__occasion">
-              <span className="field__label">What was it for? (optional)</span>
-              <OccasionPicker value={occasion} onChange={setOccasion} />
+              <span className="field__label">What was it for? Up to two, optional</span>
+              <OccasionPicker value={occasions} onChange={setOccasions} />
             </div>
           )}
         </div>

@@ -8,7 +8,7 @@ import { getAirline, getAirport, getCountry, normalize } from '@/data/reference'
 import { airlineKey, airportCode, flightAircraftName, flightAirlineName, flightDistanceKm, parseFlightNumber } from '@/lib/flight-utils';
 import { estimateDurationMin, kmToMiles } from '@/lib/geo';
 import { zonedToUtc } from '@/lib/time';
-import { OCCASION_LABELS } from '@/lib/occasions';
+import { OCCASION_LABELS, occasionsOf } from '@/lib/occasions';
 import type { CabinClass, Flight, FlightOccasion, FlightReason, Settings } from '@/lib/types';
 
 // ---------- formatting ----------
@@ -136,7 +136,7 @@ export function matchesFilters(f: Flight, filters: FlightFilters): boolean {
   if (filters.airport && f.from !== filters.airport && f.to !== filters.airport) return false;
   if (filters.cabin && f.cabinClass !== filters.cabin) return false;
   if (filters.reason && f.reason !== filters.reason) return false;
-  if (filters.occasion && f.occasion !== filters.occasion) return false;
+  if (filters.occasion && f.occasion !== filters.occasion && f.occasion2 !== filters.occasion) return false;
   return true;
 }
 
@@ -198,7 +198,7 @@ export function filterOptions(flights: Flight[]): FilterOptions {
   const cabins = [...tally(flights.map((f) => f.cabinClass))].map(([value, count]) => ({ value, label: CABIN_LABEL[value], count })).sort(byCount);
   const reasons = [...tally(flights.map((f) => f.reason))].map(([value, count]) => ({ value, label: REASON_LABEL[value], count })).sort(byCount);
 
-  const occasions = [...tally(flights.map((f) => f.occasion))]
+  const occasions = [...tally(flights.flatMap(occasionsOf))]
     .map(([value, count]) => ({ value, label: OCCASION_LABELS[value], count }))
     .sort(byCount);
 

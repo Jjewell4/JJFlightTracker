@@ -67,8 +67,10 @@ export interface Flight {
   seatType?: SeatType;
   cabinClass?: CabinClass;
   reason?: FlightReason;
-  /** Optional occasion tag: vacation, wedding, conference, … */
+  /** Optional occasion tag: vacation, wedding, conference, … (the first, if there are two). */
   occasion?: FlightOccasion;
+  /** A second occasion (a wedding plus a vacation). Only set alongside `occasion`. */
+  occasion2?: FlightOccasion;
   note?: string;
 
   /** Set when the user saves a (suggested) trip: every leg of the trip shares the id. */

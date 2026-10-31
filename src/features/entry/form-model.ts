@@ -1,4 +1,5 @@
 /** Pure form logic for the flight entry screen (no React) — unit tested. */
+import { occasionFields, occasionsOf } from '@/lib/occasions';
 import { getAircraftType, getAirport } from '@/data/reference';
 import { normalizeFlightNumber, parseFlightNumber } from '@/lib/flight-utils';
 import { computeDuration, isValidTime, todayLocal } from '@/lib/time';
@@ -26,7 +27,8 @@ export interface FormValues {
   seatType?: SeatType;
   cabinClass?: CabinClass;
   reason?: FlightReason;
-  occasion?: FlightOccasion;
+  /** Up to two (see src/lib/occasions.ts). */
+  occasions: FlightOccasion[];
   note: string;
 }
 
@@ -48,6 +50,7 @@ export function emptyValues(defaults: Partial<FormValues> = {}): FormValues {
     registration: '',
     seatNumber: '',
     note: '',
+    occasions: [],
     ...defaults,
   };
 }
@@ -89,7 +92,7 @@ export function flightToValues(f: Flight): FormValues {
     seatType: f.seatType,
     cabinClass: f.cabinClass,
     reason: f.reason,
-    occasion: f.occasion,
+    occasions: occasionsOf(f),
     note: f.note ?? '',
   };
 }
@@ -105,13 +108,13 @@ export function returnValues(f: Flight): FormValues {
     to: f.from,
     cabinClass: f.cabinClass,
     reason: f.reason,
-    occasion: f.occasion,
+    occasions: occasionsOf(f),
   };
 }
 
 /** Prefill for "duplicate": same flight on another day (today), minus per-trip details. */
 export function duplicateValues(f: Flight): FormValues {
-  return { ...flightToValues(f), date: todayLocal(), datePrecision: 'day', registration: '', seatNumber: '', note: '', occasion: undefined };
+  return { ...flightToValues(f), date: todayLocal(), datePrecision: 'day', registration: '', seatNumber: '', note: '', occasions: [] };
 }
 
 const WIDEBODY = /^(A30|A31[0]|A33|A34|A35|A38|B74|B76|B77|B78|MD11|DC10|L101|IL96|IL86)/;
@@ -328,7 +331,7 @@ export function valuesToInput(v: FormValues, opts: { source: FlightInput['source
     seatType: v.seatType,
     cabinClass: v.cabinClass,
     reason: v.reason,
-    occasion: v.occasion,
+    ...occasionFields(v.occasions),
     note: v.note.trim().slice(0, NOTE_MAX) || undefined,
     source: opts.source,
   };

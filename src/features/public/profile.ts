@@ -54,6 +54,7 @@ export type PublicFlight = Pick<
   | 'seatType'
   | 'reason'
   | 'occasion'
+  | 'occasion2'
   | 'flightNumber'
   | 'registration'
 >;
@@ -131,7 +132,10 @@ function projectFlight(f: Flight, exactDates: boolean, share: PublicShare): Publ
     if (str(f.seatNumber) && /^[0-9]{1,3}[A-Z]$/.test(f.seatNumber.toUpperCase())) out.seatNumber = f.seatNumber.toUpperCase();
   }
   if (share.reason && str(f.reason) && REASONS.includes(f.reason)) out.reason = f.reason;
-  if (share.reason && isOccasion(f.occasion)) out.occasion = f.occasion;
+  if (share.reason && isOccasion(f.occasion)) {
+    out.occasion = f.occasion;
+    if (isOccasion(f.occasion2) && f.occasion2 !== f.occasion) out.occasion2 = f.occasion2;
+  }
   if (share.flightNumber && str(f.flightNumber) && /^[A-Z0-9]{2,10}$/.test(f.flightNumber.toUpperCase()))
     out.flightNumber = f.flightNumber.toUpperCase();
   if (share.registration && str(f.registration) && /^[A-Z0-9-]{2,10}$/.test(f.registration.toUpperCase()))

@@ -3,7 +3,7 @@
  * tested): what each leg still needs, whether it's already in the log, and saving several legs
  * at once — optionally as one trip.
  */
-import { OCCASION_REASON } from '@/lib/occasions';
+import { occasionFields, occasionReason } from '@/lib/occasions';
 import { getAircraftType, getAirport } from '@/data/reference';
 import { addFlights, newId } from '@/lib/db';
 import { enrichFlight } from '@/lib/flight-utils';
@@ -130,16 +130,16 @@ export function suggestedTripName(inputs: readonly FlightInput[]): string {
 export async function saveLegs(
   draftId: string,
   checks: readonly LegCheck[],
-  trip?: { name: string; occasion?: FlightOccasion },
+  trip?: { name: string; occasions?: FlightOccasion[] },
 ): Promise<{ saved: Flight[]; tripId?: string }> {
   const ready = checks.filter((c): c is LegCheck & { input: FlightInput } => !!c.input);
   if (!ready.length) return { saved: [] };
   const tripId = trip && ready.length >= 2 ? newId() : undefined;
   const ordered = [...ready].sort((a, b) => a.input.date.localeCompare(b.input.date) || (a.input.depTime ?? '').localeCompare(b.input.depTime ?? ''));
-  const occasion = tripId ? trip?.occasion : undefined;
-  const reason = occasion && OCCASION_REASON[occasion];
+  const occasions = (tripId && trip?.occasions) || [];
+  const reason = occasionReason(occasions);
   const saved = await addFlights(
-    ordered.map((c) => (tripId ? { ...c.input, tripId, tripName: trip!.name.trim(), ...(occasion ? { occasion, reason: c.input.reason ?? reason } : {}) } : c.input)),
+    ordered.map((c) => (tripId ? { ...c.input, tripId, tripName: trip!.name.trim(), ...(occasions.length ? { ...occasionFields(occasions), reason: c.input.reason ?? reason } : {}) } : c.input)),
   );
   await markLegsHandled(
     draftId,

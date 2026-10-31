@@ -92,8 +92,52 @@ export function parseOccasion(v: unknown): FlightOccasion | undefined {
   return undefined;
 }
 
-/** A trip's occasion: the one its tagged legs share (untagged legs don't count against it). */
-export function tripOccasion(trip: { flights: readonly { occasion?: FlightOccasion }[] }): FlightOccasion | undefined {
-  const tags = new Set(trip.flights.map((f) => f.occasion).filter(Boolean));
-  return tags.size === 1 ? [...tags][0] : undefined;
+/** A trip or flight has at most this many occasions (a wedding plus a vacation). */
+export const MAX_OCCASIONS = 2;
+
+/** The flight's occasions, first one first. */
+export function occasionsOf(f: { occasion?: FlightOccasion; occasion2?: FlightOccasion }): FlightOccasion[] {
+  const out: FlightOccasion[] = [];
+  for (const o of [f.occasion, f.occasion2]) if (isOccasion(o) && !out.includes(o)) out.push(o);
+  return out;
+}
+
+/** Stored form of a list: `occasion` (+ `occasion2`); both cleared when the list is empty. */
+export function occasionFields(list: readonly (FlightOccasion | undefined)[]): { occasion?: FlightOccasion; occasion2?: FlightOccasion } {
+  const clean = list.filter(isOccasion).filter((o, i, all) => all.indexOf(o) === i).slice(0, MAX_OCCASIONS);
+  return { occasion: clean[0], occasion2: clean[1] };
+}
+
+/** Tapping an occasion: removes it if picked, else adds it (replacing the oldest when full). */
+export function toggleOccasion(list: readonly FlightOccasion[], o: FlightOccasion): FlightOccasion[] {
+  if (list.includes(o)) return list.filter((x) => x !== o);
+  return [...list, o].slice(-MAX_OCCASIONS);
+}
+
+/** "Wedding · Vacation". */
+export const formatOccasions = (list: readonly FlightOccasion[]) => list.map((o) => OCCASION_LABELS[o]).join(' · ');
+
+/** The reason the occasions imply (the first one that implies any). */
+export function occasionReason(list: readonly FlightOccasion[]): FlightReason | undefined {
+  for (const o of list) if (OCCASION_REASON[o]) return OCCASION_REASON[o];
+  return undefined;
+}
+
+/**
+ * A trip's occasions: every occasion its legs carry (untagged legs don't count against it).
+ * More than two different ones across the legs reads as `mixed`.
+ */
+export function tripOccasions(trip: { flights: readonly { occasion?: FlightOccasion; occasion2?: FlightOccasion }[] }): { occasions: FlightOccasion[]; mixed: boolean } {
+  const all: FlightOccasion[] = [];
+  for (const f of trip.flights) for (const o of occasionsOf(f)) if (!all.includes(o)) all.push(o);
+  return all.length > MAX_OCCASIONS ? { occasions: [], mixed: true } : { occasions: all, mixed: false };
+}
+
+/** Imported text with up to two occasions ("wedding, vacation" / "Wedding & honeymoon"). */
+export function parseOccasions(v: unknown): FlightOccasion[] {
+  if (typeof v !== 'string') return [];
+  const whole = parseOccasion(v);
+  const parts = v.split(/[,;/&+|]| and /i).map(parseOccasion).filter((o): o is FlightOccasion => !!o);
+  const list = parts.length > 1 ? parts : whole ? [whole] : parts;
+  return occasionsOf({ occasion: list[0], occasion2: list.find((o) => o !== list[0]) });
 }

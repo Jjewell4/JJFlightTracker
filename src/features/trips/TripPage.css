@@ -547,6 +547,15 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.toccasion__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.toccasion__item + .toccasion__item {
+  margin-left: var(--space-2);
+}
 .toccasion__icon {
   flex: none;
   color: var(--accent);

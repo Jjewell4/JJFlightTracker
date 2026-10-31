@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import { Icon, type IconName } from '@/components/Icon';
-import { FLIGHT_OCCASIONS, OCCASION_ICON, OCCASION_LABELS, OCCASION_REASON } from '@/lib/occasions';
+import { formatOccasions, occasionReason } from '@/lib/occasions';
+import { OccasionPicker } from '@/features/trips/OccasionPicker';
 import type { CabinClass, DatePrecision, FlightReason, SeatType } from '@/lib/types';
 import { inferSeatType, type FormValues } from './form-model';
 
@@ -17,14 +18,6 @@ const REASONS: { value: FlightReason; label: string }[] = [
   { value: 'crew', label: 'Crew' },
   { value: 'other', label: 'Other' },
 ];
-const OCCASIONS = FLIGHT_OCCASIONS.map((value) => ({
-  value,
-  label: (
-    <>
-      <Icon name={OCCASION_ICON[value]} size={16} /> {OCCASION_LABELS[value]}
-    </>
-  ),
-}));
 const SEATS: { value: SeatType; label: string }[] = [
   { value: 'window', label: 'Window' },
   { value: 'middle', label: 'Middle' },
@@ -46,7 +39,7 @@ function Choice<T extends string>({
   clearable = true,
 }: {
   label: string;
-  options: { value: T; label: React.ReactNode }[];
+  options: { value: T; label: string }[];
   value: T | undefined;
   onChange: (v: T | undefined) => void;
   variant?: 'seg' | 'chips';
@@ -137,7 +130,7 @@ export function DetailsSection({
     v.seatNumber && `Seat ${v.seatNumber.toUpperCase()}`,
     CABINS.find((c) => c.value === v.cabinClass)?.label,
     REASONS.find((r) => r.value === v.reason)?.label,
-    v.occasion && OCCASION_LABELS[v.occasion],
+    formatOccasions(v.occasions),
   ].filter(Boolean);
 
   return (
@@ -205,14 +198,12 @@ export function DetailsSection({
 
           <Choice label="Cabin class" options={CABINS} value={v.cabinClass} onChange={(c) => onPatch({ cabinClass: c })} variant="chips" />
           <Choice label="Reason" options={REASONS} value={v.reason} onChange={(r) => onPatch({ reason: r })} />
-          <div>
-            <Choice
-              label={tripName ? 'Trip occasion' : 'Occasion'}
-              options={OCCASIONS}
-              value={v.occasion}
-              // An occasion implies a reason when none was picked (a wedding is leisure, a conference business).
-              onChange={(o) => onPatch({ occasion: o, ...(!v.reason && o && OCCASION_REASON[o] ? { reason: OCCASION_REASON[o] } : {}) })}
-              variant="chips"
+          <div className="entry-field">
+            <span className="field__label">{tripName ? 'Trip occasion' : 'Occasion'} · up to two</span>
+            <OccasionPicker
+              value={v.occasions}
+              // Occasions imply a reason when none was picked (a wedding is leisure, a conference business).
+              onChange={(list) => onPatch({ occasions: list, ...(!v.reason && occasionReason(list) ? { reason: occasionReason(list) } : {}) })}
             />
             {tripName && <p className="field__hint details__hint">Applies to every flight in {tripName === 'this trip' ? tripName : `“${tripName}”`}.</p>}
           </div>

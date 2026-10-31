@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { sanitizeFlight } from '@/services/import/backup';
-import { addFlights, deleteAllFlights, getAllFlights, setOccasion } from './db';
-import { FLIGHT_OCCASIONS, OCCASION_ICON, OCCASION_LABELS, parseOccasion } from './occasions';
+import { addFlights, deleteAllFlights, getAllFlights, setOccasions } from './db';
+import { FLIGHT_OCCASIONS, OCCASION_ICON, OCCASION_LABELS, occasionFields, parseOccasion, parseOccasions, toggleOccasion, tripOccasions } from './occasions';
 import { computeStats } from './stats';
 
 afterEach(deleteAllFlights);
@@ -28,10 +28,26 @@ describe('occasions', () => {
     expect(parseOccasion(3)).toBeUndefined();
   });
 
+  it('keeps at most two, a third pick replacing the oldest', () => {
+    expect(toggleOccasion([], 'wedding')).toEqual(['wedding']);
+    expect(toggleOccasion(['wedding'], 'vacation')).toEqual(['wedding', 'vacation']);
+    expect(toggleOccasion(['wedding', 'vacation'], 'sports')).toEqual(['vacation', 'sports']);
+    expect(toggleOccasion(['wedding', 'vacation'], 'wedding')).toEqual(['vacation']);
+    expect(occasionFields(['wedding', 'wedding', 'family'])).toEqual({ occasion: 'wedding', occasion2: 'family' });
+    expect(occasionFields([])).toEqual({ occasion: undefined, occasion2: undefined });
+    expect(parseOccasions('Wedding, vacation')).toEqual(['wedding', 'vacation']);
+    expect(parseOccasions('Christmas at home')).toEqual(['holiday']);
+    expect(tripOccasions({ flights: [{ occasion: 'wedding' }, { occasion: 'wedding', occasion2: 'vacation' }, {}] })).toEqual({ occasions: ['wedding', 'vacation'], mixed: false });
+    expect(tripOccasions({ flights: [{ occasion: 'wedding', occasion2: 'vacation' }, { occasion: 'sports' }] })).toEqual({ occasions: [], mixed: true });
+  });
+
   it('keeps known occasions in backups and drops unknown ones', () => {
     const base = { date: '2024-05-01', from: 'KSAN', to: 'KSFO' };
     expect(sanitizeFlight({ ...base, occasion: 'vacation' })?.occasion).toBe('vacation');
     expect(sanitizeFlight({ ...base, occasion: 'party' })).not.toHaveProperty('occasion');
+    expect(sanitizeFlight({ ...base, occasion: 'wedding', occasion2: 'vacation' })?.occasion2).toBe('vacation');
+    expect(sanitizeFlight({ ...base, occasion2: 'vacation' })).not.toHaveProperty('occasion2');
+    expect(sanitizeFlight({ ...base, occasion: 'wedding', occasion2: 'wedding' })).not.toHaveProperty('occasion2');
   });
 
   it('tags a trip’s legs, filling only empty reasons, and clears them again', async () => {
@@ -39,14 +55,14 @@ describe('occasions', () => {
       { date: '2024-05-01', datePrecision: 'day', from: 'KSAN', to: 'KSFO', source: 'manual' },
       { date: '2024-05-04', datePrecision: 'day', from: 'KSFO', to: 'KSAN', source: 'manual', reason: 'other' },
     ]);
-    await setOccasion([a.id, b.id], 'wedding');
+    await setOccasions([a.id, b.id], ['wedding', 'vacation']);
     let all = await getAllFlights();
     const byId = (id: string) => all.find((f) => f.id === id)!;
-    expect([byId(a.id).occasion, byId(a.id).reason]).toEqual(['wedding', 'leisure']);
+    expect([byId(a.id).occasion, byId(a.id).occasion2, byId(a.id).reason]).toEqual(['wedding', 'vacation', 'leisure']);
     expect([byId(b.id).occasion, byId(b.id).reason]).toEqual(['wedding', 'other']);
-    await setOccasion([a.id, b.id], undefined);
+    await setOccasions([a.id, b.id], []);
     all = await getAllFlights();
-    expect(all.every((f) => !('occasion' in f))).toBe(true);
+    expect(all.every((f) => !('occasion' in f) && !('occasion2' in f))).toBe(true);
   });
 
   it('counts occasions in the stats', () => {
@@ -60,5 +76,8 @@ describe('occasions', () => {
     const t = computeStats([...trip, f('vacation')]);
     expect(t.occasion.items.find((i) => i.key === 'wedding')?.count).toBe(1);
     expect(t.occasion.known).toBe(2);
+    // Two occasions count under both.
+    const both = computeStats([{ ...f('wedding'), occasion2: 'vacation' as const }]);
+    expect(both.occasion.items.filter((i) => i.count).map((i) => [i.key, i.share])).toEqual([['vacation', 1], ['wedding', 1]]);
   });
 });

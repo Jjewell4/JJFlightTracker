@@ -2,7 +2,7 @@
  * Builds import candidates (validated, enriched flights + warnings) from sheet rows,
  * and re-validates a candidate after an inline fix.
  */
-import { parseOccasion } from '@/lib/occasions';
+import { occasionFields, parseOccasions } from '@/lib/occasions';
 import { getAirport, normalize, searchAircraftTypes } from '@/data/reference';
 import { enrichFlight, normalizeFlightNumber } from '@/lib/flight-utils';
 import { computeDuration, tzOffsetMinutes, zonedToUtc } from '@/lib/time';
@@ -235,7 +235,7 @@ export function candidateFromFields(raw: RawFields, rowNumber: number, opts: Bui
     seatType: parseSeatType(raw.seatType),
     cabinClass: parseCabinClass(raw.cabinClass),
     reason: parseFlightReason(raw.reason),
-    occasion: parseOccasion(cellText(raw.occasion)),
+    ...occasionFields(parseOccasions(cellText(raw.occasion))),
     note: cellText(raw.note) || undefined,
     source: opts.source,
   };

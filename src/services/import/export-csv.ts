@@ -1,4 +1,5 @@
 /** Export flights as a Flightradar24-compatible CSV (importable again by this app or FR24 tools). */
+import { occasionsOf } from '@/lib/occasions';
 import Papa from 'papaparse';
 import { getAircraftType, getAirline, getAirport } from '@/data/reference';
 import type { Flight } from '@/lib/types';
@@ -95,6 +96,6 @@ export function exportSpreadsheetCsv(flights: Flight[]): string {
     Duration: f.durationMin ? `${pad(f.durationMin / 60)}:${pad(f.durationMin % 60)}` : '',
     Aircraft: f.aircraftType || f.aircraftName || '', Registration: f.registration ?? '',
     Seat: f.seatNumber ?? '', 'Seat type': f.seatType ?? '',
-    'Cabin class': f.cabinClass ?? '', Reason: f.reason ?? '', Occasion: f.occasion ?? '', Notes: f.note ?? '',
+    'Cabin class': f.cabinClass ?? '', Reason: f.reason ?? '', Occasion: occasionsOf(f).join(', '), Notes: f.note ?? '',
   })), { newline: '\r\n', escapeFormulae: true, columns: ['Date','From','To','Flight number','Airline','Departure time','Arrival time','Duration','Aircraft','Registration','Seat','Seat type','Cabin class','Reason','Occasion','Notes'] });
 }

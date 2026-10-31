@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { occasionsOf } from '@/lib/occasions';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AirlineLogo } from '@/components/AirlineLogo';
 import { Icon } from '@/components/Icon';
 import { getAircraftType, getAirline } from '@/data/reference';
-import { addFlight, deleteFlight, setTripOccasion, updateFlight, useSettings } from '@/lib/db';
+import { addFlight, deleteFlight, setTripOccasions, updateFlight, useSettings } from '@/lib/db';
 import { enrichFlight, parseFlightNumber } from '@/lib/flight-utils';
 import { todayLocal } from '@/lib/time';
 import type { DatePrecision, Flight, SeatType } from '@/lib/types';
@@ -462,7 +463,7 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note, 
       if (base) {
         await updateFlight(base.id, input);
         // Occasions belong to the trip: a change on one leg applies to all of them.
-        if (base.tripId && input.occasion !== base.occasion) await setTripOccasion(base.tripId, input.occasion);
+        if (base.tripId && (input.occasion !== base.occasion || input.occasion2 !== base.occasion2)) await setTripOccasions(base.tripId, occasionsOf(input));
         setSavedLocally(true);
         announceLocalSave();
         void requestPersistentStorageOnce();

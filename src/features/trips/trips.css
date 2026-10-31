@@ -227,11 +227,17 @@
   font-weight: 550;
   color: var(--text-2);
 }
+.tcard__occasions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: 550;
+}
 .tcard__occasion {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-left: var(--space-2);
   color: var(--accent);
 }
 .tcard__occasion svg {

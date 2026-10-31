@@ -80,11 +80,11 @@ describe('draft legs', () => {
     const draft: ImportDraft = { id: 'd1', source: 'screenshot', status: 'ready', createdAt: 1, updatedAt: 1, result: { flights: [leg(), back], warnings: [] }, handled: [] };
     await db.drafts.put(draft);
     const checks = checkLegs(draft.result!.flights, []);
-    const { saved, tripId } = await saveLegs('d1', checks, { name: '  Bay Area  ', occasion: 'sports' });
+    const { saved, tripId } = await saveLegs('d1', checks, { name: '  Bay Area  ', occasions: ['sports', 'friends'] });
     expect(saved.map((f) => f.from)).toEqual(['KMCO', 'KSFO']);
     const all = await getAllFlights();
     expect(all).toHaveLength(2);
-    expect(all.every((f) => f.tripId === tripId && f.tripName === 'Bay Area' && f.occasion === 'sports')).toBe(true);
+    expect(all.every((f) => f.tripId === tripId && f.tripName === 'Bay Area' && f.occasion === 'sports' && f.occasion2 === 'friends')).toBe(true);
     expect(await db.drafts.get('d1')).toBeUndefined();
   });
 
