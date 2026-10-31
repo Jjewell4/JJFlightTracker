@@ -79,8 +79,10 @@ export async function generateSampleFlights(): Promise<FlightInput[]> {
       const month = 1 + Math.floor(r() * (year === 2026 ? 9 : 12));
       const day = 1 + Math.floor(r() * 27);
       const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const back = new Date(Date.UTC(year, month - 1, day + 2 + Math.floor(r() * 6))).toISOString().slice(0, 10);
+      const stay = Math.floor(r() * 6);
       const reason: FlightReason = r() < 0.62 ? 'business' : 'leisure';
+      // Work trips are short; leisure trips run longer (gives the Insights something real to find).
+      const back = new Date(Date.UTC(year, month - 1, day + (reason === 'business' ? 1 + (stay % 3) : 4 + stay))).toISOString().slice(0, 10);
       const cabin: CabinClass = r() < 0.9 ? 'economy' : r() < 0.9 ? 'premium' : 'first';
       const seatType: SeatType = r() < 0.73 ? 'window' : r() < 0.75 ? 'aisle' : 'middle';
       const seatRow = 6 + Math.floor(r() * 28);

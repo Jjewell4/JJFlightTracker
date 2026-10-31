@@ -5,7 +5,7 @@
 import type { StatsLayout } from '@/lib/types';
 
 export const STATS_SECTIONS = [
-  { id: 'highlights', title: 'Highlights', nav: 'Highlights' },
+  { id: 'highlights', title: 'Insights', nav: 'Insights' },
   { id: 'patterns', title: 'When you fly', nav: 'Patterns' },
   { id: 'calendar', title: 'Time away', nav: 'Calendar' },
   { id: 'mix', title: 'How you fly', nav: 'Flight mix' },

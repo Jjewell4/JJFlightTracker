@@ -1268,3 +1268,107 @@
     transition: none;
   }
 }
+
+/* ---------- findings (Insights section) ---------- */
+#stats-sec-highlights .stats-insights {
+  margin-top: 0;
+}
+.stats-findings {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 720px) {
+  .stats-findings {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+.stats-finding {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+.stats-finding__head {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+.stats-finding__icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.stats-finding__icon--trend,
+.stats-finding__icon--streak {
+  background: var(--accent-2-soft);
+  color: var(--accent-2);
+}
+.stats-finding__title {
+  margin: 0;
+  font-weight: 700;
+  font-size: var(--text-md);
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+.stats-finding__detail {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.stats-finding__bars {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.stats-finding__bars li {
+  display: grid;
+  grid-template-columns: minmax(64px, 30%) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+}
+.stats-finding__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+}
+.stats-finding__track {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.stats-finding__track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transform-origin: left;
+  animation: stats-bar var(--dur-slow) var(--ease-out) both;
+}
+.stats-finding__value {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.stats-finding__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  margin: calc(var(--space-2) * -1) 0 calc(var(--space-2) * -1);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--accent);
+}

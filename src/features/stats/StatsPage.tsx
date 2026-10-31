@@ -9,6 +9,10 @@ import type { Flight, StatsLayout } from '@/lib/types';
 import { ArrangeSheet } from './ArrangeSheet';
 import { resolveLayout, sectionNav, type StatsSectionId } from './layout';
 import { Occasions } from './Occasions';
+import { InsightsSection } from './Findings';
+import { findInsights } from '@/lib/insights';
+import { tripsFor } from '@/features/trips/use-trips';
+import { savedTrips } from '@/features/public/PublicTripList';
 import { insightAvailable, statsSections } from './sections';
 import { insightIcon } from './insight-icons';
 import { Hero } from './Hero';
@@ -105,9 +109,24 @@ function StatsDashboard({ flights, upcoming, unit, clock, homeCountry, readOnly,
   }, [flights]);
   const currentYear = new Date().getFullYear();
   const q = stats.quality;
+  // Trips for the findings: visitors of month-only journals get only the trips the owner saved.
+  const trips = useMemo(() => {
+    const all = readOnly && !fields.exactDates ? savedTrips(flights) : tripsFor(flights).filter((t) => t.saved || t.flights.length >= 2);
+    return scope === 'all' ? all : all.filter((t) => Number(t.start.slice(0, 4)) === scope);
+  }, [flights, readOnly, fields.exactDates, scope]);
+  const findings = useMemo(
+    () =>
+      findInsights({ flights: scoped, trips, allFlights: flights, scope, unit, audience: readOnly ? 'visitor' : 'owner' }).filter((f) =>
+        f.needs.every((n) => fields[n]),
+      ),
+    [scoped, trips, flights, scope, unit, readOnly, fields],
+  );
   // Every movable section; null when it has nothing to show here.
   const blocks: Record<StatsSectionId, ReactNode> = {
-    highlights: insights.length > 0 ? <Insights items={insights} /> : null,
+    highlights:
+      insights.length || findings.length ? (
+        <InsightsSection highlights={insights.length > 0 ? <Insights items={insights} /> : null} findings={findings} readOnly={readOnly} />
+      ) : null,
     patterns: <TimeCharts stats={stats} scope={scope} unit={unit} clock={clock} currentYear={currentYear} sections={sections} readOnly={readOnly} />,
     calendar: sections.calendar ? <TravelCalendar flights={flights} scope={scope} readOnly={readOnly} /> : null,
     mix: <Breakdowns stats={stats} unit={unit} sections={sections} readOnly={readOnly} />,
