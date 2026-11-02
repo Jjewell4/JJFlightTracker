@@ -1,7 +1,7 @@
 {
   "name": "Window Seat",
   "short_name": "Window Seat",
-  "description": "Your flight journal — every flight, route and mile, from the window seat.",
+  "description": "Your personal flight log. Every flight, route and mile, from the window seat.",
   "id": "./",
   "lang": "en",
   "categories": ["travel", "lifestyle"],

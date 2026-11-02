@@ -17,10 +17,11 @@
  *   public/icons/apple-touch-icon.png (180)            full-bleed (iOS applies its own mask)
  *   public/icons/favicon-32.png, favicon-64.png
  *   public/icons/shortcut-add-192.png, shortcut-stats-192.png   manifest shortcut icons
+ *   public/og-image.png (1200×630)                     link preview card (Open Graph / Twitter)
  */
 import { chromium } from 'playwright';
 import { existsSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -150,6 +151,23 @@ try {
     await page.screenshot({ path: join(iconsDir, name), omitBackground: transparent, clip: { x: 0, y: 0, width: size, height: size } });
     console.log('wrote', join('public/icons', name));
   }
+
+  // Link preview card: the mark beside the name and what the app does, on the app's night sky.
+  const font = (await readFile(join(root, 'node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2'))).toString('base64');
+  await page.setViewportSize({ width: 1200, height: 630 });
+  await page.setContent(`<!doctype html><style>
+    @font-face{font-family:Inter;src:url(data:font/woff2;base64,${font}) format('woff2');font-weight:100 900}
+    html,body{margin:0}
+    body{width:1200px;height:630px;display:flex;align-items:center;gap:64px;padding:0 96px;box-sizing:border-box;font-family:Inter,sans-serif;color:#eef2fa;
+      background:radial-gradient(circle at 22% 50%,rgba(92,200,255,.18),transparent 46%),radial-gradient(rgba(91,143,230,.16) 1.6px,transparent 1.8px) 0 0/28px 28px,#0a0e16}
+    svg{flex:none;width:340px;height:340px;filter:drop-shadow(0 24px 48px rgba(0,0,0,.45))}
+    h1{margin:0;font-size:92px;font-weight:800;letter-spacing:-.035em;line-height:1}
+    p{margin:24px 0 0;font-size:36px;font-weight:500;line-height:1.3;color:#b9c4d8;letter-spacing:-.01em}
+    .url{margin-top:40px;font-size:28px;font-weight:650;color:#5cc8ff}
+  </style>${anyIcon}<div><h1>Window Seat</h1><p>Your personal flight log.<br>Map every flight, route and mile.</p><div class="url">windowseat.me</div></div>`);
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: join(root, 'public', 'og-image.png'), clip: { x: 0, y: 0, width: 1200, height: 630 } });
+  console.log('wrote public/og-image.png');
 } finally {
   await browser.close();
 }
