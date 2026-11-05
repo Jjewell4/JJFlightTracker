@@ -4,6 +4,7 @@ import { ChartTooltip } from './ChartTooltip';
 import { columnPath, niceTicks } from './scale';
 
 export interface ColumnDatum {
+  href?: string;
   key: string;
   /** Axis label. */
   label: string;
@@ -133,7 +134,7 @@ export function ColumnChart({ data, formatValue, formatTick = formatValue, heigh
                 onPointerMove={(e) => onPointer(e, i)}
                 onPointerDown={(e) => onPointer(e, i)}
                 onFocus={() => setActive(i)}
-                onBlur={clear}
+                onBlur={e => { if (!wrapRef.current?.contains(e.relatedTarget as Node)) clear(); }}
                 onKeyDown={(e) => {
                   onKey(e, i);
                   if (e.key === 'ArrowRight') focusBar(Math.min(data.length - 1, i + 1));
@@ -145,6 +146,7 @@ export function ColumnChart({ data, formatValue, formatTick = formatValue, heigh
         })}
         <line className="viz-baseline" x1={0} x2={geo.plotW} y1={TOP_PAD + height} y2={TOP_PAD + height} />
       </svg>
+      {a?.href && <a className="btn btn--ghost" href={a.href}>View flights · {a.title ?? a.label}</a>}
       <ChartTooltip
         visible={!!a}
         x={ax}

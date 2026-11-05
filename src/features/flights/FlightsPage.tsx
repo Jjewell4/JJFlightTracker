@@ -1,3 +1,4 @@
+import { BulkEditor } from '@/features/manage/BulkEditor';
 import { isOccasion } from '@/lib/occasions';
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
@@ -45,16 +46,23 @@ export function FlightsPage() {
   const flights = useFlights();
   const ready = useReferenceReady();
   const { distanceUnit: unit, clock } = useSettings();
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulk, setBulk] = useState(false);
   const [query, setQuery] = useState(memory.query);
   const [filters, setFilters] = useState<FlightFilters>(memory.filters);
   // Deep links such as /?airport=KSAN&year=2024 (from the map) apply filters once, then clear the URL.
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
     const linked: FlightFilters = {};
-    for (const key of ['year', 'airline', 'airport'] as const) {
+    for (const key of ['year', 'airline', 'airport', 'month', 'weekday', 'flown', 'seat'] as const) {
       const v = searchParams.get(key);
       if (v) linked[key] = v;
     }
+    const cabin = searchParams.get('cabin');
+    if(cabin && ['economy','premium','business','first','private'].includes(cabin)) linked.cabin = cabin as FlightFilters['cabin'];
+    const reason = searchParams.get('reason');
+    if(reason && ['leisure','business','crew','other'].includes(reason)) linked.reason = reason as FlightFilters['reason'];
     const occasion = searchParams.get('occasion');
     if (isOccasion(occasion)) linked.occasion = occasion;
     if (Object.keys(linked).length) {
@@ -161,6 +169,9 @@ export function FlightsPage() {
           <p className="page-subtitle">{archive ? 'Every journey, easy to find.' : 'The places you’ve been. The journeys still ahead.'}</p>
         </div>
       </header>
+      {archive && <div className="manage-actions"><button className="btn" onClick={() => { setSelecting(!selecting); setView('flights'); setSelected(new Set()); }}>{selecting ? 'Done selecting' : 'Select flights'}</button><Link to="/history">History & recovery</Link></div>}
+      {archive && selecting && <div className="manage-toolbar manage-actions"><strong>{selected.size} selected</strong><button className="btn" onClick={() => setSelected(new Set([...shownPast, ...shownUpcoming].map(f => f.id)))}>Select matching flights</button><button className="btn btn--primary" disabled={!selected.size} onClick={() => setBulk(true)}>Edit selected</button></div>}
+      {bulk && <BulkEditor ids={[...selected].filter(id => all.some(f => f.id === id))} flights={all} onClose={() => { setBulk(false); setSelected(new Set()); setSelecting(false); }} />}
       {archive && <LogViewSwitch value={view} onChange={setView} />}
       {view === 'trips' ? <TripsList flights={all} unit={unit} today={today} /> : <>
 
@@ -176,7 +187,7 @@ export function FlightsPage() {
           </h2>
           <div className="flights__upcoming-list">
             {shownUpcoming.map((f) => (
-              <UpcomingCard key={f.id} flight={f} today={today} clock={clock} />
+              <div key={f.id}>{archive && selecting && <label className="manage-actions"><input type="checkbox" checked={selected.has(f.id)} onChange={() => setSelected(prev => { const next = new Set(prev); if(next.has(f.id)) next.delete(f.id); else next.add(f.id); return next; })} /> Select {f.flightNumber || f.from}</label>}<UpcomingCard flight={f} today={today} clock={clock} /></div>
             ))}
           </div>
         </section>
@@ -193,6 +204,7 @@ export function FlightsPage() {
       <div className="overview__section-head"><h2 className="section-title">{archive || filtering ? 'Your flights' : 'Recent journeys'}</h2>{!archive && <Link to="/flights">View full log <Icon name="chevron" size={14} /></Link>}</div>
       {(archive || filtering) && <SearchBar ref={searchRef} query={query} onQuery={setQuery} filters={filters} onFilters={setFilters} options={options} />}
 
+      {filtering && <button className="btn btn--ghost" onClick={() => {setFilters({});setQuery('');}}>Clear all filters</button>}
       {filtering && (
         <p className="flights__results" aria-live="polite">
           {resultCount === 0 ? (
@@ -213,7 +225,7 @@ export function FlightsPage() {
           </h2>
           <div className="flights__upcoming-list">
             {shownUpcoming.map((f) => (
-              <UpcomingCard key={f.id} flight={f} today={today} clock={clock} />
+              <div key={f.id}>{archive && selecting && <label className="manage-actions"><input type="checkbox" checked={selected.has(f.id)} onChange={() => setSelected(prev => { const next = new Set(prev); if(next.has(f.id)) next.delete(f.id); else next.add(f.id); return next; })} /> Select {f.flightNumber || f.from}</label>}<UpcomingCard flight={f} today={today} clock={clock} /></div>
             ))}
           </div>
         </section>
@@ -256,7 +268,7 @@ export function FlightsPage() {
                 </h3>
                 <div className="flist">
                   {m.flights.map((f) => (
-                    <FlightRow key={f.id} flight={f} unit={unit} clock={clock} />
+                    selecting && archive ? <div className="manage-select" key={f.id}><input type="checkbox" aria-label={`Select ${f.date} ${f.from} to ${f.to}`} checked={selected.has(f.id)} onChange={() => setSelected(prev => { const next = new Set(prev); if (next.has(f.id)) next.delete(f.id); else next.add(f.id); return next; })} /><FlightRow flight={f} unit={unit} clock={clock} /></div> : <FlightRow key={f.id} flight={f} unit={unit} clock={clock} />
                   ))}
                 </div>
               </div>

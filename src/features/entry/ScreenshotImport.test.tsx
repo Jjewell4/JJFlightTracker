@@ -143,6 +143,7 @@ describe('ScreenshotImport sheet', () => {
     expect(saved[0].tripId).toBeDefined();
     expect(saved[0].tripId).toBe(saved[1].tripId);
     expect(saved[0].tripName).toBe(name.value);
+    await vi.waitFor(async () => { await settle(); expect(button('View trip')).toBeDefined(); });
     expect(button('View trip').getAttribute('href')).toBe(`#/trips/${saved[0].tripId}`);
   });
 
@@ -180,7 +181,7 @@ describe('ScreenshotImport sheet', () => {
     await settle();
     const [draft] = await db.drafts.toArray();
     expect(draft).toMatchObject({ status: 'ready', result: { flights: [flight] } });
-    expect(draft.image).toBeUndefined();
+    expect(draft.image).toBe("data:image/jpeg;base64,AAAA");
   });
 
   it('can cancel a read in progress', async () => {

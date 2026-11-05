@@ -44,10 +44,12 @@ export function TimeCharts({ stats, scope, unit, clock, currentYear, sections, r
   const timeline: ColumnDatum[] = isAll
     ? stats.byYear.map((y) => ({ key: String(y.year), label: String(y.year), shortLabel: `’${String(y.year).slice(2)}`, value: pick(y) }))
     : stats.byMonth.map((m) => ({ key: String(m.month), label: MONTH_LABELS[m.month - 1].slice(0, 1), value: pick(m), title: `${FULL_MONTHS[m.month - 1]} ${scope}` }));
+  if (!readOnly) timeline.forEach(d => { d.href = `#/flights?flown=1&year=${isAll ? d.key : scope}${isAll ? '' : `&month=${d.key}`}`; });
   const partialKey = isAll ? String(currentYear) : undefined;
   const peak = timeline.reduce<ColumnDatum | undefined>((a, b) => (!a || b.value > a.value ? b : a), undefined);
 
   const seasonality: ColumnDatum[] = stats.byMonth.map((m) => ({ key: String(m.month), label: MONTH_LABELS[m.month - 1].slice(0, 1), value: m.flights, title: FULL_MONTHS[m.month - 1] }));
+  if(!readOnly) seasonality.forEach(d => {d.href = `#/flights?flown=1&month=${d.key}${scope === 'all' ? '' : `&year=${scope}`}`;});
   const seasonTotal = seasonality.reduce((a, b) => a + b.value, 0);
   const seasonPeak = seasonality.reduce((a, b) => (b.value > a.value ? b : a), seasonality[0]);
   // Share of flights in Jun–Aug vs Dec–Feb, for a one-line takeaway.
@@ -55,6 +57,7 @@ export function TimeCharts({ stats, scope, unit, clock, currentYear, sections, r
   const winter = [11, 0, 1].reduce((a, i) => a + seasonality[i].value, 0);
 
   const weekdays: ColumnDatum[] = stats.weekday.map((v, i) => ({ key: String(i), label: WEEKDAY_LABELS[i], value: v, title: FULL_DAYS[i] }));
+  if(!readOnly) weekdays.forEach(d => {d.href = `#/flights?flown=1&weekday=${d.key}${scope === 'all' ? '' : `&year=${scope}`}`;});
   const weekdayTotal = stats.weekday.reduce((a, b) => a + b, 0);
   const wdPeak = stats.weekday.indexOf(Math.max(...stats.weekday));
   const weekend = stats.weekday[5] + stats.weekday[6];

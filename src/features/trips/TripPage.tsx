@@ -1,3 +1,4 @@
+import { TripJournal } from './TripJournal';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Icon, type IconName } from '@/components/Icon';
@@ -275,6 +276,7 @@ function TripView({ trip, settings, onBack, onUngrouped }: { trip: Trip; setting
           </dl>
         </div>
 
+        <TripJournal key={trip.id} trip={trip} settings={settings} />
         <section className="titin animate-in" aria-labelledby="itin-title">
           <h2 id="itin-title" className="section-title titin__title">
             Itinerary

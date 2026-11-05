@@ -24,7 +24,7 @@ describe('screenshot drafts', () => {
     await resumeDrafts(now);
     await settle();
     expect(await db.drafts.get('recent')).toMatchObject({ status: 'ready', result: { flights: [leg] } });
-    expect((await db.drafts.get('recent'))?.image).toBeUndefined();
+    expect((await db.drafts.get('recent'))?.image).toBe("data:image/jpeg;base64,AAAA");
     expect(await db.drafts.get('stale')).toMatchObject({ status: 'failed', error: { message: expect.stringContaining('interrupted') } });
     expect(mocks.readScreenshot).toHaveBeenCalledTimes(1);
   });

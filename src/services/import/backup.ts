@@ -1,3 +1,4 @@
+import { readFieldSources, readTripDocument } from '@/lib/metadata';
 /** JSON backup: versioned export of all flights + settings, and a validating parser. */
 import { FLIGHT_OCCASIONS } from '@/lib/occasions';
 import { getAirport } from '@/data/reference';
@@ -79,6 +80,8 @@ export function sanitizeFlight(raw: unknown): ImportFlight | undefined {
   const r = raw as Record<string, unknown>;
   if (!isStr(r.from) || !isStr(r.to) || !isStr(r.date) || !isCalendarDate(r.date)) return undefined;
   const f: Record<string, unknown> = { ...r };
+  if ('fieldSources' in f) f.fieldSources = readFieldSources(f.fieldSources);
+  if ('tripDetails' in f) f.tripDetails = readTripDocument(f.tripDetails);
   const strings = ['flightNumber', 'airlineIcao', 'airlineIata', 'airlineName', 'depTime', 'arrTime', 'aircraftType', 'aircraftName', 'registration', 'seatNumber', 'note', 'tripId', 'tripName'];
   for (const k of strings) if (f[k] !== undefined && typeof f[k] !== 'string') delete f[k];
   const numbers = ['arrDayOffset', 'durationMin', 'distanceKm', 'createdAt', 'updatedAt'];

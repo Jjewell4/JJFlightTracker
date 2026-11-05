@@ -1,3 +1,4 @@
+import { readFieldSources, readTripDocument } from '@/lib/metadata';
 /**
  * Builds import candidates (validated, enriched flights + warnings) from sheet rows,
  * and re-validates a candidate after an inline fix.
@@ -230,7 +231,14 @@ export function candidateFromFields(raw: RawFields, rowNumber: number, opts: Bui
   }
   const registration = cellText(raw.registration).toUpperCase().replace(/\s+/g, '') || undefined;
 
+  let fieldSources: Flight['fieldSources'];
+  let tripDetails: Flight['tripDetails'];
+  try { fieldSources = readFieldSources(JSON.parse(text('fieldSources') || 'null')); } catch { issues.push({level:'warn',field:'flight',message:'Could not read field sources'}); }
+  try { tripDetails = readTripDocument(JSON.parse(text('tripDetails') || 'null')); } catch { issues.push({level:'warn',field:'flight',message:'Could not read trip journal'}); }
+  if (!opts.native && !fieldSources) fieldSources = readFieldSources(Object.fromEntries(Object.entries(raw).filter(([,v]) => !isBlank(v)).map(([k]) => [k,opts.source])));
   const flight: ImportFlight = {
+    tripDetails,
+    fieldSources,
     id: text('id') || undefined,
     date,
     datePrecision: precision,

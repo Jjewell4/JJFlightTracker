@@ -33,7 +33,7 @@ it('enforces public-profile ownership, privacy, handles and revocation in Postgr
     `insert into public.public_profiles(slug,display_name,flights) values ('jordan','Jordan','[{"date":"2024-01-01","datePrecision":"month","from":"KSAN","to":"KLAX"}]');`,
   );
   await db.exec(
-    `insert into public.flights(id,data,updated_at) values ('first','{"date":"2024-01-14","datePrecision":"day","from":"KSAN","to":"KLAX","note":"secret","seatNumber":"12A"}',1)`,
+    `insert into public.flights(id,data,updated_at) values ('first','{"date":"2024-01-14","datePrecision":"day","from":"KSAN","to":"KLAX","note":"secret","seatNumber":"12A","fieldSources":{"note":"manual"},"tripDetails":{"id":"private-trip","note":"private notes","updatedAt":1}}',1)`,
   );
   await as('00000000-0000-0000-0000-000000000002');
   assert.equal(

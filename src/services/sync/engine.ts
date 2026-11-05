@@ -1,3 +1,4 @@
+import { stableJson } from '@/lib/metadata';
 /**
  * Two-way sync between the local IndexedDB log and a cloud table.
  *
@@ -7,9 +8,10 @@
  *   - flight with no meta, or meta.updatedAt ≠ flight.updatedAt → changed locally → push
  *   - meta with no flight → deleted locally → soft-delete in the cloud
  * Pulls fetch rows the server stamped since the last sync. Conflicts (both sides edited
- * since the last sync) resolve last-write-wins on `updatedAt`.
+ * since the last sync) merge independent fields against the saved base. Same-field conflicts
+ * preserve a recovery snapshot; production pushes use conditional server revisions.
  */
-import { db } from '@/lib/db';
+import { db, recordChange } from '@/lib/db';
 import type { Flight } from '@/lib/types';
 
 export interface RemoteRow {
@@ -22,6 +24,8 @@ export interface RemoteRow {
 }
 
 export interface SyncRemote {
+  /** Atomic compare-and-set; omitted by legacy adapters. */
+  exchange?(writes: SyncWrite[]): Promise<{ accepted: boolean; row: RemoteRow }[]>;
   /** All of the user's rows changed after `since` (ISO), or every row when null. */
   pull(since: string | null): Promise<RemoteRow[]>;
   /** Insert or update live flights. */
@@ -30,6 +34,12 @@ export interface SyncRemote {
   markDeleted(ids: string[], at: number): Promise<void>;
 }
 
+export interface SyncWrite {
+  id: string;
+  flight?: Flight;
+  deleted: boolean;
+  expected: string | null;
+}
 export interface SyncResult {
   pulled: number;
   pushed: number;
@@ -56,7 +66,9 @@ const FULL_PULL_EVERY_MS = 7 * 24 * 60 * 60 * 1000;
  */
 export class AccountSwitchError extends Error {
   constructor(public count: number) {
-    super(`This device has ${count} ${count === 1 ? 'flight' : 'flights'} from another account. Choose in Settings whether to add them to this account.`);
+    super(
+      `This device has ${count} ${count === 1 ? 'flight' : 'flights'} from another account. Choose in Settings whether to add them to this account.`,
+    );
     this.name = 'AccountSwitchError';
   }
 }
@@ -102,6 +114,7 @@ export async function syncOnce(remote: SyncRemote, userId: string, now: () => nu
     await resetSyncState();
     state = { userId, cursor: null };
   }
+  if (!(await db.kv.get(OWNER_KEY))?.value) await db.history.filter((c) => !c.owner).modify({ owner: userId });
   await db.kv.put({ key: OWNER_KEY, value: userId });
 
   // ---- pull ----
@@ -120,38 +133,86 @@ export async function syncOnce(remote: SyncRemote, userId: string, now: () => nu
   const changed = flights.filter((f) => meta.get(f.id) !== f.updatedAt);
   const removed = metas.filter((m) => !liveIds.has(m.id)).map((m) => m.id);
 
-  for (let i = 0; i < changed.length; i += PUSH_CHUNK) {
-    const part = changed.slice(i, i + PUSH_CHUNK);
-    await remote.upsert(part);
-    await db.syncMeta.bulkPut(part.map((f) => ({ id: f.id, updatedAt: f.updatedAt })));
-  }
-  for (let i = 0; i < removed.length; i += PUSH_CHUNK) {
-    const part = removed.slice(i, i + PUSH_CHUNK);
-    await remote.markDeleted(part, now());
-    // Only forget ids that are still deleted locally (a pull could have restored one meanwhile).
-    await db.transaction('rw', db.flights, db.syncMeta, async () => {
-      const still = await db.flights.bulkGet(part);
-      await db.syncMeta.bulkDelete(part.filter((_, j) => !still[j]));
-    });
+  if (remote.exchange) {
+    const metaRows = new Map(metas.map((m) => [m.id, m]));
+    const writes: SyncWrite[] = [
+      ...changed.map((f) => ({ id: f.id, flight: f, deleted: false, expected: metaRows.get(f.id)?.serverStamp ?? null })),
+      ...removed.map((id) => ({ id, deleted: true, expected: metaRows.get(id)?.serverStamp ?? null })),
+    ];
+    for (let i = 0; i < writes.length; i += PUSH_CHUNK) {
+      const part = writes.slice(i, i + PUSH_CHUNK);
+      const results = await remote.exchange(part);
+      for (const result of results) {
+        const sent = part.find((w) => w.id === result.row.id)!;
+        if (!result.accepted) {
+          await applyRemoteRows([result.row]);
+          continue;
+        }
+        await db.transaction('rw', db.flights, db.syncMeta, async () => {
+          const current = await db.flights.get(sent.id);
+          if (sent.deleted) {
+            if (!current) await db.syncMeta.delete(sent.id);
+            else {
+              await db.flights.put({ ...current, updatedAt: Math.max(current.updatedAt, result.row.updated_at + 1) });
+              await db.syncMeta.put({
+                id: sent.id,
+                updatedAt: result.row.updated_at,
+                base: result.row.data,
+                serverStamp: result.row.server_updated_at,
+              });
+            }
+          } else {
+            // A user may have edited/deleted the flight while the request was running.
+            if (current?.updatedAt === sent.flight?.updatedAt) await db.flights.put(result.row.data);
+            else if (current) await db.flights.put({ ...current, updatedAt: Math.max(current.updatedAt, result.row.updated_at + 1) });
+            await db.syncMeta.put({
+              id: sent.id,
+              updatedAt: result.row.updated_at,
+              base: result.row.data,
+              serverStamp: result.row.server_updated_at,
+            });
+          }
+        });
+      }
+      if (results.some((r) => !r.accepted)) throw new Error('Another device updated your log. Changes were merged; sync will retry.');
+    }
+  } else {
+    for (let i = 0; i < changed.length; i += PUSH_CHUNK) {
+      const part = changed.slice(i, i + PUSH_CHUNK);
+      await remote.upsert(part);
+      await db.syncMeta.bulkPut(part.map((f) => ({ id: f.id, updatedAt: f.updatedAt, base: f })));
+    }
+    for (let i = 0; i < removed.length; i += PUSH_CHUNK) {
+      const part = removed.slice(i, i + PUSH_CHUNK);
+      await remote.markDeleted(part, now());
+      // Only forget ids that are still deleted locally (a pull could have restored one meanwhile).
+      await db.transaction('rw', db.flights, db.syncMeta, async () => {
+        const still = await db.flights.bulkGet(part);
+        await db.syncMeta.bulkDelete(part.filter((_, j) => !still[j]));
+      });
+    }
   }
 
   const at = now();
-  await db.kv.put({ key: STATE_KEY, value: { userId, cursor, lastSyncAt: at, lastFullAt: full ? at : state.lastFullAt } satisfies SyncState });
+  await db.kv.put({
+    key: STATE_KEY,
+    value: { userId, cursor, lastSyncAt: at, lastFullAt: full ? at : state.lastFullAt } satisfies SyncState,
+  });
   return { pulled, pushed: changed.length, deleted: removed.length, at };
 }
 
 /** Applies pulled rows to the local log; returns how many local records changed. */
 async function applyRemoteRows(rows: RemoteRow[]): Promise<number> {
   if (!rows.length) return 0;
-  return db.transaction('rw', db.flights, db.syncMeta, async () => {
+  return db.transaction('rw', db.flights, db.syncMeta, db.history, db.kv, async () => {
     const ids = rows.map((r) => r.id);
     const [locals, metas] = await Promise.all([db.flights.bulkGet(ids), db.syncMeta.bulkGet(ids)]);
     const putFlights: Flight[] = [];
     const delFlights: string[] = [];
-    const putMeta: { id: string; updatedAt: number }[] = [];
+    const putMeta: import('@/lib/db').SyncMeta[] = [];
     const delMeta: string[] = [];
 
-    rows.forEach((row, i) => {
+    for (const [i, row] of rows.entries()) {
       const local = locals[i];
       const meta = metas[i];
       const dirty = !!local && (!meta || meta.updatedAt !== local.updatedAt);
@@ -160,27 +221,49 @@ async function applyRemoteRows(rows: RemoteRow[]): Promise<number> {
         if (!local) {
           if (meta) delMeta.push(row.id);
         } else if (!dirty || row.updated_at >= local.updatedAt) {
+          await recordChange('Deleted on another device', [local], []);
           delFlights.push(row.id);
           delMeta.push(row.id);
-        } // else: edited locally after the remote delete → keep; it gets pushed back.
-        return;
+        } else {
+          putMeta.push({ id: row.id, updatedAt: row.updated_at, base: row.data, serverStamp: row.server_updated_at });
+        } // local edit after remote delete is kept and pushed back.
+        continue;
       }
 
       const take = () => {
         putFlights.push({ ...row.data, id: row.id, updatedAt: row.updated_at });
-        putMeta.push({ id: row.id, updatedAt: row.updated_at });
+        putMeta.push({ id: row.id, updatedAt: row.updated_at, base: row.data, serverStamp: row.server_updated_at });
       };
       if (!local) {
         // Deleted locally and the cloud copy hasn't changed since → the delete wins (pushed later).
-        if (meta && meta.updatedAt >= row.updated_at) return;
+        if (meta && meta.updatedAt >= row.updated_at) {
+          putMeta.push({ ...meta, serverStamp: row.server_updated_at, base: row.data });
+          continue;
+        }
         take();
+      } else if (dirty && meta?.base && stableJson(meta.base) !== stableJson(row.data)) {
+        const { merged, conflicts } = mergeFlightVersions(meta.base, local, { ...row.data, updatedAt: row.updated_at });
+        if (conflicts.length)
+          await recordChange(
+            `Sync conflict: ${conflicts.join(', ')}`,
+            [local.updatedAt > row.updated_at ? row.data : local],
+            [merged],
+            true,
+          );
+        putFlights.push(merged);
+        putMeta.push({ id: row.id, updatedAt: row.updated_at, base: row.data, serverStamp: row.server_updated_at });
       } else if (local.updatedAt === row.updated_at) {
         // Same version on both sides (e.g. a fresh device that already had this flight).
-        if (meta?.updatedAt !== row.updated_at) putMeta.push({ id: row.id, updatedAt: row.updated_at });
+        if (meta?.updatedAt !== row.updated_at || meta?.serverStamp !== row.server_updated_at)
+          putMeta.push({ id: row.id, updatedAt: row.updated_at, base: row.data, serverStamp: row.server_updated_at });
       } else if (!dirty || row.updated_at > local.updatedAt) {
+        if (dirty) await recordChange('Sync conflict (older device)', [local], [{ ...row.data, updatedAt: row.updated_at }], true);
         take();
-      } // else: local edit is newer → keep; it gets pushed.
-    });
+      } else {
+        if (!meta?.base) await recordChange('Sync conflict (older device)', [row.data], [local], true);
+        putMeta.push({ id: row.id, updatedAt: row.updated_at, base: row.data, serverStamp: row.server_updated_at });
+      } // local edit is newer: retain the cloud revision so its next push is conditional.
+    }
 
     if (delFlights.length) await db.flights.bulkDelete(delFlights);
     if (putFlights.length) await db.flights.bulkPut(putFlights);
@@ -188,4 +271,36 @@ async function applyRemoteRows(rows: RemoteRow[]): Promise<number> {
     if (putMeta.length) await db.syncMeta.bulkPut(putMeta);
     return delFlights.length + putFlights.length;
   });
+}
+
+/** Three-way merge. Related timing/route fields stay together to avoid impossible hybrids. */
+export function mergeFlightVersions(base: Flight, local: Flight, remote: Flight): { merged: Flight; conflicts: string[] } {
+  const merged = { ...remote } as Flight;
+  const conflicts: string[] = [];
+  const groups = [
+    ['date', 'datePrecision', 'from', 'to', 'depTime', 'arrTime', 'arrDayOffset', 'durationMin', 'distanceKm'],
+    ['airlineIcao', 'airlineIata', 'airlineName', 'flightNumber'],
+    ['aircraftType', 'aircraftName'],
+    ['seatNumber', 'seatType'],
+    ['tripId', 'tripName'],
+    ['occasion', 'occasion2', 'reason'],
+  ];
+  const grouped = new Set(groups.flat());
+  for (const key of new Set([...Object.keys(base), ...Object.keys(local), ...Object.keys(remote)])) {
+    if (!grouped.has(key) && !['id', 'createdAt', 'updatedAt', 'fieldSources'].includes(key)) groups.push([key]);
+  }
+  for (const group of groups) {
+    const pick = (f: Flight) => stableJson(group.map((k) => f[k as keyof Flight]));
+    const l = pick(local) !== pick(base),
+      r = pick(remote) !== pick(base);
+    if (l && r && pick(local) !== pick(remote)) conflicts.push(group[0]);
+    if (l && (!r || local.updatedAt > remote.updatedAt)) {
+      for (const key of group) {
+        (merged as unknown as Record<string, unknown>)[key] = local[key as keyof Flight];
+        if (local.fieldSources?.[key]) merged.fieldSources = { ...merged.fieldSources, [key]: local.fieldSources[key] };
+      }
+    }
+  }
+  merged.updatedAt = Math.max(Date.now(), local.updatedAt + 1, remote.updatedAt + 1);
+  return { merged: JSON.parse(JSON.stringify(merged)), conflicts };
 }

@@ -9,7 +9,8 @@ function toParts<K extends string>(b: Breakdown<K>, labels?: Partial<Record<K, s
   return b.items.map((it, i) => ({ key: it.key, label: labels?.[it.key] ?? it.label, count: it.count, slot: i + 1 }));
 }
 
-export function Breakdowns({ stats, unit, sections, readOnly = false }: { stats: FlightStats; unit: DistanceUnit; sections: StatsSections; readOnly?: boolean }) {
+export function Breakdowns({ stats, unit, sections, readOnly = false, year }: { year?: number | 'all'; stats: FlightStats; unit: DistanceUnit; sections: StatsSections; readOnly?: boolean }) {
+  const linked = (parts:PartItem[],filter:string) => parts.map(p=>({...p,href:readOnly?undefined:`#/flights?${filter}=${encodeURIComponent(p.key)}&flown=1${year && year !== 'all' ? `&year=${year}` : ''}`}));
   const { scope, cabin, seat, reason, haul, manufacturer, totals } = stats;
   const boeing = manufacturer.items[0].count;
   const airbus = manufacturer.items[1].count;
@@ -41,21 +42,21 @@ export function Breakdowns({ stats, unit, sections, readOnly = false }: { stats:
         {sections.cabin && (
           <article className="card stats-card">
             <CardHead title="Cabin class" subtitle={cabin.known ? `${fmtInt(cabin.known)} flights with a recorded cabin` : 'Add a cabin class to your flights'} />
-            <Donut items={toParts(cabin, { premium: 'Premium' })} unknown={cabin.unknown} label="Cabin class" />
+            <Donut items={linked(toParts(cabin, { premium: 'Premium' }), 'cabin')} unknown={cabin.unknown} label="Cabin class" />
           </article>
         )}
 
         {sections.seat && (
           <article className="card stats-card">
             <CardHead title="Seat" subtitle={seat.known && topSeat ? `${topSeat.label} wins ${fmtPct(topSeat.share)} of the time` : 'Add seat types to your flights'} />
-            <SegmentBar items={toParts(seat)} unknown={seat.unknown} label="Seat type" />
+            <SegmentBar items={linked(toParts(seat), 'seat')} unknown={seat.unknown} label="Seat type" />
           </article>
         )}
 
         {sections.reason && (
           <article className="card stats-card">
             <CardHead title="Reason" subtitle={reason.known && topReason ? `Mostly ${topReason.label.toLowerCase()} · ${fmtPct(topReason.share)}` : 'Add a reason to your flights'} />
-            <SegmentBar items={toParts(reason)} unknown={reason.unknown} label="Reason for flying" />
+            <SegmentBar items={linked(toParts(reason), 'reason')} unknown={reason.unknown} label="Reason for flying" />
           </article>
         )}
 

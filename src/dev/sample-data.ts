@@ -115,7 +115,7 @@ export async function generateSampleFlights(): Promise<FlightInput[]> {
 export async function seedSampleFlights({ replace = true } = {}): Promise<number> {
   const flights = await generateSampleFlights();
   // One transaction: a failure never leaves the log wiped but not re-filled.
-  await db.transaction('rw', db.flights, async () => {
+  await db.transaction('rw', db.flights, db.history, db.kv, db.trips, async () => {
     if (replace) await deleteAllFlights();
     await addFlights(flights);
   });

@@ -5,7 +5,7 @@
  */
 import { occasionFields, occasionReason } from '@/lib/occasions';
 import { getAircraftType, getAirport } from '@/data/reference';
-import { addFlights, newId } from '@/lib/db';
+import { db, addFlights, newId } from '@/lib/db';
 import { enrichFlight } from '@/lib/flight-utils';
 import { suggestTripName, tripFromLegs } from '@/lib/trips';
 import type { DraftLeg, Flight, FlightInput, FlightOccasion } from '@/lib/types';
@@ -67,12 +67,16 @@ export function checkLeg(leg: DraftLeg, index: number, flights: readonly Flight[
   if (errors.to) problems.push(leg.to && !values.to ? `Unknown airport ${leg.to}` : leg.to ? errors.to : 'Needs the arrival airport');
   if (errors.times) problems.push('Check the times');
   if (errors.flightNumber) problems.push('Check the flight number');
-  const duplicate = problems.length
+  let duplicate = problems.length
     ? undefined
     : findDuplicates(
         { date: values.date, datePrecision: values.datePrecision, from: values.from, to: values.to, flightNumber: values.flightNumber, depTime: values.depTime },
         flights,
       ).find((m) => m.kind === 'duplicate')?.flight;
+  if (!duplicate && !problems.length && values.flightNumber) {
+    const matches = (flights ?? []).filter(f => f.datePrecision === 'day' && f.date === values.date && (f.flightNumber ?? '').replace(/\s/g,'') === values.flightNumber.replace(/\s/g,''));
+    if (matches.length === 1) duplicate = matches[0];
+  }
   return {
     index,
     leg,
@@ -138,6 +142,8 @@ export async function saveLegs(
   const ordered = [...ready].sort((a, b) => a.input.date.localeCompare(b.input.date) || (a.input.depTime ?? '').localeCompare(b.input.depTime ?? ''));
   const occasions = (tripId && trip?.occasions) || [];
   const reason = occasionReason(occasions);
+  const origin = (await db.drafts.get(draftId))?.source ?? 'screenshot';
+  for (const c of ordered) c.input.fieldSources = Object.fromEntries(['date','from','to','flightNumber','depTime','arrTime','aircraftType','seatNumber'].filter(k => !!c.leg[k as keyof DraftLeg]).map(k => [k, origin]));
   const saved = await addFlights(
     ordered.map((c) => (tripId ? { ...c.input, tripId, tripName: trip!.name.trim(), ...(occasions.length ? { ...occasionFields(occasions), reason: c.input.reason ?? reason } : {}) } : c.input)),
   );

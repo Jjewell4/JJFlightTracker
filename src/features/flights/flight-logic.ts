@@ -118,6 +118,10 @@ export function matchesSearch(text: string, query: string): boolean {
 }
 
 export interface FlightFilters {
+  flown?: string;
+  seat?: string;
+  month?: string;
+  weekday?: string;
   year?: string;
   airline?: string;
   airport?: string;
@@ -131,6 +135,10 @@ export function activeFilterCount(f: FlightFilters): number {
 }
 
 export function matchesFilters(f: Flight, filters: FlightFilters): boolean {
+  if (filters.flown && isUpcoming(f)) return false;
+  if (filters.seat && f.seatType !== filters.seat) return false;
+  if (filters.month && (f.datePrecision === 'year' || Number(f.date.slice(5,7)) !== Number(filters.month))) return false;
+  if (filters.weekday && (f.datePrecision !== 'day' || (new Date(`${f.date}T12:00:00Z`).getUTCDay()+6)%7 !== Number(filters.weekday))) return false;
   if (filters.year && !f.date.startsWith(filters.year)) return false;
   if (filters.airline && airlineKey(f) !== filters.airline) return false;
   if (filters.airport && f.from !== filters.airport && f.to !== filters.airport) return false;

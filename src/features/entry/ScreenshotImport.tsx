@@ -248,7 +248,7 @@ function PrivacyNote({ compact }: { compact?: boolean }) {
       <Icon name="shield" size={16} />
       <span>
         Your screenshot is sent to Google Gemini to read the flight details. Crop out booking codes and personal details first. The image stays on this device
-        until it’s read and isn’t saved in your journal.
+        until you finish reviewing or discard it, and isn’t saved in your journal.
       </span>
     </p>
   );

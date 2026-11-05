@@ -9,7 +9,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Flight } from '@/lib/types';
-import type { RemoteRow, SyncRemote } from './engine';
+import type { RemoteRow, SyncRemote, SyncWrite } from './engine';
 
 const URL_ = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
 const KEY = ((import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) as string | undefined)?.trim();
@@ -96,7 +96,59 @@ async function cloudRequest<T>(request: (signal: AbortSignal) => PromiseLike<T>)
 }
 
 export function supabaseRemote(sb: SupabaseClient, userId: string): SyncRemote {
+  // Older databases already support revision-checked conditional updates through PostgREST.
+  // The optional RPC batches these operations to save requests; correctness is the same.
+  const conditionalExchange = async (writes: SyncWrite[]) => {
+    const out: { accepted: boolean; row: RemoteRow }[] = [];
+    const read = async (id: string) => {
+      const { data, error } = await cloudRequest((signal) =>
+        sb
+          .from('flights')
+          .select('id,data,updated_at,deleted,server_updated_at')
+          .eq('user_id', userId)
+          .eq('id', id)
+          .abortSignal(signal)
+          .maybeSingle(),
+      );
+      if (error) throw error;
+      return data as RemoteRow | null;
+    };
+    for (const w of writes) {
+      const before = await read(w.id);
+      if (before && (!w.expected || before.server_updated_at !== w.expected)) {
+        out.push({ accepted: false, row: before });
+        continue;
+      }
+      if (!before && (w.expected || w.deleted)) throw new Error('Flight revision no longer exists. Sync will retry.');
+      const at = Math.max(Date.now(), (before?.updated_at ?? 0) + 1, w.flight?.updatedAt ?? 0);
+      const patch = w.deleted
+        ? { deleted: true, updated_at: at }
+        : { deleted: false, updated_at: at, data: { ...w.flight!, updatedAt: at } };
+      const query = before
+        ? sb.from('flights').update(patch).eq('user_id', userId).eq('id', w.id).eq('server_updated_at', w.expected!)
+        : sb.from('flights').insert({ ...patch, user_id: userId, id: w.id });
+      const { data, error } = await cloudRequest((signal) =>
+        query.select('id,data,updated_at,deleted,server_updated_at').abortSignal(signal).maybeSingle(),
+      );
+      if (error && error.code !== '23505') throw error;
+      if (data) out.push({ accepted: true, row: data as RemoteRow });
+      else {
+        const current = await read(w.id);
+        if (!current) throw new Error('Flight changed during sync. Retrying.');
+        out.push({ accepted: false, row: current });
+      }
+    }
+    return out;
+  };
   return {
+    async exchange(changes) {
+      const { data, error } = await cloudRequest((signal) => sb.rpc('sync_flight_changes', { changes }).abortSignal(signal));
+      if (error) {
+        if (error.code === 'PGRST202' || error.code === '42883') return conditionalExchange(changes);
+        throw error;
+      }
+      return data as { accepted: boolean; row: RemoteRow }[];
+    },
     async pull(since) {
       // Keyset pagination on (server_updated_at, id): rows edited mid-pull move to the end
       // instead of shifting later pages, so none is skipped at a page boundary.
@@ -131,11 +183,14 @@ export function supabaseRemote(sb: SupabaseClient, userId: string): SyncRemote {
     },
     async markDeleted(ids, at) {
       for (let i = 0; i < ids.length; i += DELETE_CHUNK) {
-        const { error } = await cloudRequest((signal) => sb
-          .from('flights')
-          .update({ deleted: true, updated_at: at })
-          .eq('user_id', userId)
-          .in('id', ids.slice(i, i + DELETE_CHUNK)).abortSignal(signal));
+        const { error } = await cloudRequest((signal) =>
+          sb
+            .from('flights')
+            .update({ deleted: true, updated_at: at })
+            .eq('user_id', userId)
+            .in('id', ids.slice(i, i + DELETE_CHUNK))
+            .abortSignal(signal),
+        );
         if (error) throw error;
       }
     },

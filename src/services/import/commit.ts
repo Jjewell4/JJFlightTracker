@@ -1,5 +1,5 @@
 /** Turning reviewed candidates into a plan, and writing that plan to the database. */
-import { db, saveSettings } from '@/lib/db';
+import { db, saveSettings, writeFlights } from '@/lib/db';
 import type { Flight, Settings } from '@/lib/types';
 import { candidateStatus, type ImportCandidate, type ImportFlight } from './candidates';
 
@@ -59,8 +59,6 @@ function toFlight(f: ImportFlight, index: number, now: number): Flight {
   return compact({ ...f, id: f.id ?? newId(), createdAt: f.createdAt ?? now + index, updatedAt: now + index }) as Flight;
 }
 
-const tick = () => new Promise<void>((r) => setTimeout(r, 0));
-
 export interface CommitOptions {
   /** Delete every existing flight first (backup "replace"). */
   replace?: boolean;
@@ -70,60 +68,27 @@ export interface CommitOptions {
   chunkSize?: number;
 }
 
-/** Writes the plan to IndexedDB in chunks, reporting progress. */
+/** Commits one atomic, recoverable import; reports progress before and after the transaction. */
 export async function commitImport(plan: ImportPlan, opts: CommitOptions = {}): Promise<ImportResult> {
+  if (opts.replace && !plan.add.length) throw new Error('Nothing to restore — your log was left unchanged.');
   const now = Date.now();
   const total = plan.add.length + plan.update.length;
-  const chunk = opts.chunkSize ?? 40;
-  let done = 0;
-  const report = () => opts.onProgress?.(done, total);
-  report();
-
-  let removed = 0;
-  // Never wipe the log for an empty (or entirely unreadable) backup.
-  if (opts.replace && plan.add.length === 0) throw new Error('Nothing to restore — your log was left unchanged.');
-  if (opts.replace) {
-    // One transaction: never leave the log half-replaced.
-    const flights = plan.add.map((f, i) => toFlight(f, i, now));
-    removed = await db.transaction('rw', db.flights, async () => {
-      const n = await db.flights.count();
-      await db.flights.clear();
-      await db.flights.bulkPut(flights);
-      return n;
+  opts.onProgress?.(0,total);
+  const result = await db.transaction('rw',db.flights,db.history,db.kv,db.trips,async () => {
+    const before = await db.flights.toArray();
+    const byId = new Map(before.map(f => [f.id,f]));
+    const added = plan.add.map((f,i) => toFlight(f,i,now));
+    const updated = plan.update.flatMap((u,i) => {
+      const old = byId.get(u.id); if(!old)return [];
+      const incoming = compact({...u.flight});
+      const merged = compact({...old,...incoming,id:old.id,createdAt:old.createdAt,source:old.source,updatedAt:Math.max(now+i,old.updatedAt+1)}) as Flight;
+      return [merged];
     });
-    done = total;
-    report();
-  } else {
-    for (let i = 0; i < plan.add.length; i += chunk) {
-      const flights = plan.add.slice(i, i + chunk).map((f, j) => toFlight(f, i + j, now));
-      await db.flights.bulkPut(flights);
-      done += flights.length;
-      report();
-      await tick();
-    }
-    for (let i = 0; i < plan.update.length; i += chunk) {
-      const part = plan.update.slice(i, i + chunk);
-      const existing = await db.flights.bulkGet(part.map((u) => u.id));
-      const merged: Flight[] = [];
-      part.forEach((u, j) => {
-        const old = existing[j];
-        if (!old) return;
-        const incoming = compact({ ...u.flight }) as Partial<Flight>;
-        merged.push(
-          compact({ ...old, ...incoming, id: old.id, createdAt: old.createdAt, source: old.source, updatedAt: now + i + j }) as Flight,
-        );
-      });
-      await db.flights.bulkPut(merged);
-      done += part.length;
-      report();
-      await tick();
-    }
-  }
-
-  let settingsRestored = false;
-  if (opts.settings && Object.keys(opts.settings).length) {
-    await saveSettings(opts.settings);
-    settingsRestored = true;
-  }
-  return { added: plan.add.length, updated: plan.update.length, removed, settingsRestored };
+    await writeFlights(opts.replace ? 'Replace from backup' : 'Import spreadsheet', [...added,...updated], opts.replace ? before.map(f=>f.id) : []);
+    const settingsRestored = !!opts.settings && Object.keys(opts.settings).length > 0;
+    if(settingsRestored) await saveSettings(opts.settings!);
+    return {added:added.length,updated:updated.length,removed:opts.replace ? before.length : 0,settingsRestored};
+  });
+  opts.onProgress?.(total,total);
+  return result;
 }

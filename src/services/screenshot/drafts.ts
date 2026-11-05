@@ -70,8 +70,8 @@ export async function runDraft(id: string): Promise<void> {
     if (draft.status !== 'reading') await db.drafts.update(id, { status: 'reading', error: undefined, updatedAt: Date.now() });
     try {
       const result = await readScreenshot(draft.image, controller.signal);
-      // The image has done its job; keep only the small preview.
-      await db.drafts.update(id, { status: 'ready', result, image: undefined, error: undefined, handled: [], updatedAt: Date.now() });
+      // Keep the readable source locally until review is completed or discarded.
+      await db.drafts.update(id, { status: 'ready', result, error: undefined, handled: [], updatedAt: Date.now() });
     } catch (e) {
       if (controller.signal.aborted && controller.signal.reason !== 'timeout') return; // cancelled
       const error =

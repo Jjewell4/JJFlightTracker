@@ -1,3 +1,4 @@
+import { readFieldSources } from '@/lib/metadata';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { occasionsOf } from '@/lib/occasions';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -460,6 +461,21 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note, 
     const source = screenshotReview ? 'screenshot' : usedLookup ? 'lookup' : (base?.source ?? 'manual');
     try {
       const input = enrichFlight(valuesToInput(v, { source, base }));
+      const fieldSources = { ...base?.fieldSources };
+      const groups: Record<FillKey, string[]> = {
+        airline: ['airlineIcao', 'airlineIata', 'airlineName'], from: ['from'], to: ['to'],
+        times: ['depTime', 'arrTime', 'arrDayOffset', 'durationMin'],
+        aircraft: ['aircraftType', 'aircraftName'], registration: ['registration'],
+      };
+      for (const [key, value] of Object.entries(input)) {
+        if (JSON.stringify(value) !== JSON.stringify(base?.[key as keyof Flight])) fieldSources[key] = screenshotReview ? 'screenshot' : 'manual';
+      }
+      for (const [group, key] of auto) {
+        if (key === PREFIX) continue;
+        const result = outcome?.results.find(r => r.key === key);
+        for (const field of groups[group]) fieldSources[field] = result?.dateSpecific ? 'schedule' : 'route';
+      }
+      input.fieldSources = readFieldSources(fieldSources);
       if (base) {
         await updateFlight(base.id, input);
         // Occasions belong to the trip: a change on one leg applies to all of them.
@@ -725,7 +741,7 @@ export function FlightForm({ mode, initial, initialEdited, base, flights, note, 
       <ConfirmSheet
         open={confirmDelete}
         title="Delete this flight?"
-        message="It will be removed from your log and stats. This can't be undone."
+        message="It will be removed from your log and stats. Restore it from History & recovery on this device."
         confirmLabel="Delete flight"
         icon="trash"
         danger

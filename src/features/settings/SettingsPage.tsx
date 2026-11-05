@@ -185,6 +185,10 @@ export default function SettingsPage() {
       </Group>
 
       {/* ---------------------------------------------------------------- */}
+      <Group title="Your journal">
+        <Link to="/history" className="list__row srow"><Tile icon="clock" tone="plain" /><RowText title="History & recovery" sub="Undo edits, restore deleted flights and review sync conflicts" /></Link>
+        <Link to="/quality" className="list__row srow"><Tile icon="search" tone="plain" /><RowText title="Check for mistakes" sub="Likely duplicates and implausible durations · no missing-field reminders" /></Link>
+      </Group>
       <Group title="Preferences">
         <div className="list__row srow srow--stack">
           <RowText title="Home country" sub="Decides what counts as domestic or international" />
@@ -440,7 +444,7 @@ export default function SettingsPage() {
         onConfirm={() => void runConfirmed()}
       >
         <p>
-          This permanently removes <strong>{count.toLocaleString()}</strong> {count === 1 ? 'flight' : 'flights'} from this device. It can’t be undone — export a backup first if you might want them back.
+          This permanently removes <strong>{count.toLocaleString()}</strong> {count === 1 ? 'flight' : 'flights'} from this device. Recovery copies remain in History & recovery on this device. Export a backup for a separate copy.
         </p>
         {syncing && <p>Cloud sync is on, so they’ll also be removed from your other devices. The cloud keeps deleted flights as recoverable records.</p>}
       </ConfirmSheet>

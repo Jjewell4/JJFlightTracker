@@ -66,6 +66,8 @@ const complete = {
   registration: 'N123AB', seatNumber: '12A', seatType: 'window', cabinClass: 'business', reason: 'leisure',
   occasion: 'wedding', occasion2: 'vacation', note: '=literal formula-like text, with a comma\nand a newline',
   tripId: 'trip-1', tripName: "'Wedding, weekend", source: 'screenshot', createdAt: 1234567890123, updatedAt: 1234567890999,
+  tripDetails: {id:'trip-original',note:'My trip',updatedAt:10},
+  fieldSources: { seatNumber: 'manual', depTime: 'schedule' },
 } satisfies Required<Flight>;
 
 describe('complete spreadsheet round trips', () => {

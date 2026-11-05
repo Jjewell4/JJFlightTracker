@@ -1,11 +1,10 @@
-# Flight Log
+# Window Seat
 
 A fast, private, installable flight tracker — a calmer, better-looking take on the flight log at
 my.flightradar24.com. Log every flight, see your routes on a map, and explore stats about the miles,
 airports, airlines and aircraft in your history.
 
-**Your data never leaves your device.** There is no server and no account: everything is stored in
-your browser (IndexedDB) and works offline once the app has loaded. You can export a backup at any time.
+**Your flights save on your device first.** Window Seat works offline once loaded. Optional Supabase accounts sync your journal across devices; screenshot and forwarded-email imports use server-side Gemini extraction. Public journals show only the fields you choose to share. Export a backup at any time.
 
 ## Features
 
@@ -28,7 +27,7 @@ your browser (IndexedDB) and works offline once the app has loaded. You can expo
 You can also open the CSV in Excel or Google Sheets first and save it as `.xlsx` — dates and times that
 the spreadsheet converted are understood. Partial dates (`2019-03`, `2019`), unknown `00:00:00` times and
 overnight flights are handled. Review the summary ("254 flights ready · 1 needs attention · 3 duplicates
-skipped"), fix or skip anything flagged, then import. Nothing is uploaded — the file is read in your browser.
+skipped"), fix or skip anything flagged, then import. The file is parsed in your browser; saved flights sync when you are signed in.
 
 Other sources (another tracker, a hand-made spreadsheet) work via **Spreadsheet**: pick the file, confirm
 which column is the date, origin, destination and so on, and continue.
@@ -38,8 +37,8 @@ which column is the date, origin, destination and so on, and continue.
 **More → Export CSV** includes every saved flight field: saved trip IDs and names,
 both occasion tags, airline and aircraft codes/names, seat and cabin details,
 notes, departure/arrival times and arrival-day offset, duration in minutes,
-distance in kilometres, date precision, flight ID, source and timestamps.
-The same complete headers are exported for an empty log, so it can serve as a template.
+distance in kilometres, date precision, flight ID, source, field-level provenance, private trip notes/cover metadata and timestamps.
+The same complete headers are exported for an empty log, so it can serve as a template. Trip covers make CSV cells larger; Excel and other spreadsheet editors have cell-size limits, so use JSON backup to archive journals with photos reliably.
 
 Re-import through **Import flights → CSV or spreadsheet**. Window Seat exports
 are recognized automatically, including after saving as `.xlsx`; the review and
@@ -69,7 +68,9 @@ JSON backup is still the choice for restoring settings along with the flight log
 After installing, open *More → App → Protect my data* so the browser doesn't clear your log when the
 device runs low on space, and export a backup now and then.
 
-## Deploy to GitHub Pages
+## Static-only deployment to GitHub Pages
+
+The complete app is deployed on Vercel; screenshot/email API routes need a server runtime. GitHub Pages supports the static journal but does not run those API routes.
 
 1. Push this repository to GitHub.
 2. In the repo go to **Settings → Pages → Build and deployment → Source: GitHub Actions**.
@@ -123,7 +124,9 @@ Flight Log is an independent project and is not affiliated with Flightradar24.
 
 ## Privacy
 
-- All flights and settings are stored locally in your browser. Nothing is sent to a server.
+- Flights and settings live locally in your browser. When signed in, flights and saved trip journals sync to your Supabase account. Recovery history stays on the device and is not included in exports.
+- Screenshot imports send the chosen image to Google Gemini through the app’s server. The readable image stays in a device-only draft until you finish reviewing or discard it. Forwarded-email imports are processed on the server and delivered to your review inbox.
+- Public journals expose a filtered view of past flights. Notes, trip covers, provenance, recovery history and account identifiers are never shared.
 - Optional lookups (adsbdb, AeroDataBox) send only the flight number / tail number you entered, and can be switched off in *More*.
   An AeroDataBox key, if you add one, is stored only on your device.
 - Airline logos are fetched from pics.avs.io and map tiles from OpenFreeMap; both fall back gracefully offline.
@@ -307,11 +310,11 @@ quotas alone are not a global spend cap.
 
 The browser re-encodes images as JPEG, removes metadata, and limits dimensions
 before upload. Original files are limited to 10 MB; transmitted images are under
-approximately 2.1 MB. The server validates size and signature. Images and extracted
-payloads are not stored or logged by this feature; Google processes the image
+approximately 2.1 MB. The server validates size and signature. The server does not store or log images or extracted
+payloads. The device keeps the draft and readable screenshot until you finish review or discard it. Google processes the image
 under the Gemini API terms applicable to your project. The UI explains this
-before sending and recommends cropping out personal details. No image is added
-to a backup or public journal. Extraction needs internet; reviewed flights save
+before sending and recommends cropping out personal details. Source screenshots are not added
+to a backup or public journal. Separately chosen trip cover photos are included in backups but remain private. Extraction needs internet; reviewed flights save
 locally and sync through the existing background flow.
 
 `npm run dev` runs the frontend only. For end-to-end local server development,
@@ -328,3 +331,22 @@ node scripts/screenshot-smoke.mjs
 The browser test uses synthetic image data and mocked services; it does not
 establish live Gemini extraction accuracy. A configured deployment must be tested
 with representative airline screenshots before relying on its suggestions.
+
+## Editing, recovery and trip journals
+
+- In **Log → Select flights**, choose flights (or all matching the current filters), then **Edit selected**. Assign a trip, split selected legs into a new trip, change occasions, correct an airline, or delete. Trip pages provide the same controls under **Organize legs**. To merge trips, select their legs and move them into one destination trip.
+- **Settings → History & recovery** lists local edits, spreadsheet imports, deleted flights and sync conflicts. Undo restores the earlier state only if the flight has not changed since. It never silently overwrites a later edit. A spreadsheet import is one atomic, recoverable action. Restoring flight records does not restore settings changed by a JSON backup.
+- History is device-local, account-scoped, and survives closing the app. It is not cloud history or a substitute for a downloaded backup. Clearing site storage removes it. Older changes made before this version have no recovery snapshots.
+- Saved trips support private notes and an optional compressed cover photo. Trip documents have their own local table; a copy travels with the legs through the existing sync and export formats. This avoids a new mandatory cloud table. Notes/covers remain private even for public journals. Moving a leg adopts its destination trip; splitting starts a fresh journal.
+- Flight details show field sources for new entries and changes. “Schedule” means a dated schedule, not an actual departure/arrival. Historical entries without provenance retain their original values without inventing a source.
+- Screenshot/email review can compare and update an existing flight. Existing seats and manually corrected fields start unselected. Blank imported fields never erase saved data. Conflicting details require your explicit selection.
+- **Check for mistakes** flags conservative duplicate matches and implausible recorded durations. It does not flag missing seats, aircraft, times or other optional fields. Dismissals persist on this device and are reconsidered if relevant values change.
+
+## Revision-aware cloud sync
+
+Sync uses the server’s `server_updated_at` value as an opaque revision token. A write only succeeds against the version it was based on. Independent field changes are merged using the last synchronized flight; related route/timing, seat and trip values stay together. Same-field conflicts keep a recoverable alternative under **History & recovery**. Old records without a synchronization base use the previous timestamp rule, preserving a losing local version for recovery when needed. Update other devices to the current app for revision checking on their writes too.
+
+The existing Supabase schema works through conditional PostgREST writes. Optionally run
+[`supabase/sync-revisions.sql`](supabase/sync-revisions.sql) **after schema.sql** to batch revision-checked writes in one RPC and reduce network requests. The migration is safe to re-run and respects existing account row-level security. No new environment variables are needed. Local saves do not wait for either transport.
+
+Scheduled/actual time tracking is intentionally unchanged: the current AeroDataBox integration reads scheduled times. Historical actual-time availability depends on provider coverage and account access; scheduled times must not be labeled as actuals.

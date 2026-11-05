@@ -4,6 +4,7 @@ import { fmtInt, fmtPct } from '../format';
 import { arcPath } from './scale';
 
 export interface PartItem {
+  href?: string;
   key: string;
   label: string;
   count: number;
@@ -34,13 +35,13 @@ function Legend({ items, total, active, setActive, unknown, format = fmtInt }: {
             data-dim={(active !== null && active !== it.key) || undefined}
             onClick={() => setActive(active === it.key ? null : it.key)}
             onMouseEnter={() => setActive(it.key)}
-            onMouseLeave={() => setActive(null)}
           >
             <span className={`viz-swatch viz-s${it.slot}`} aria-hidden />
             <span className="viz-legend__label">{it.label}</span>
             <span className="viz-legend__count">{format(it.count)}</span>
             <span className="viz-legend__pct">{fmtPct(total ? it.count / total : 0)}</span>
           </button>
+          {active === it.key && it.href && <a className="btn btn--ghost" href={it.href}>View {it.label.toLowerCase()} flights</a>}
         </li>
       ))}
       {!!unknown && (

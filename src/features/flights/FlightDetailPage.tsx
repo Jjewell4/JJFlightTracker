@@ -1,3 +1,5 @@
+import { fieldLabel } from '@/lib/metadata';
+import '@/features/manage/manage.css';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { formatOccasions, occasionsOf } from '@/lib/occasions';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -26,7 +28,7 @@ import './FlightDetailPage.css';
 const SOURCE_LABEL: Record<FlightSource, string> = {
   manual: 'Logged manually',
   lookup: 'Logged with flight lookup',
-  screenshot: 'Reviewed from a screenshot',
+  screenshot: 'Reviewed from an image or email',
   fr24: 'Imported from Flightradar24',
   csv: 'Imported from CSV',
   backup: 'Restored from backup',
@@ -163,6 +165,7 @@ function FlightDetail({ flight: f, all, settings, onBack }: { flight: Flight; al
             </div>
           </section>
         )}
+      <details className="card manage-card"><summary>Data sources & edit history</summary><p className="manage-hint">Sources describe where details came from; some values are calculated from those inputs. They are not a guarantee of accuracy. Older flights may have no field-level history.</p><dl className="manage-diff">{Object.entries(f.fieldSources ?? {}).filter(([key]) => !['id','updatedAt','createdAt','source'].includes(key)).map(([key,source]) => <div key={key}><dt>{fieldLabel(key)}</dt><dd>{source === 'schedule' ? 'Dated schedule' : source === 'route' ? 'Typical route suggestion' : source}</dd></div>)}</dl><Link to={`/history?flight=${f.id}`}>View changes to this flight</Link></details>
       <TripChip flight={f} all={all} />
       <div className="detail__grid">
         <article className="pass animate-in" aria-label="Boarding pass">

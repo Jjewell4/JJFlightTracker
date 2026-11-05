@@ -201,13 +201,13 @@ describe('planImport + commitImport', () => {
     expect(plan).toMatchObject({ skippedDuplicates: 1, skippedRows: 2, update: [] });
   });
 
-  it('adds new flights in chunks with progress', async () => {
+  it('adds flights atomically with progress', async () => {
     const candidates = Array.from({ length: 95 }, (_, i) => cand(`k${i}`, { note: `n${i}` }));
     const plan = planImport({ candidates, duplicates: new Map(), skipped: new Set(), policy: 'skip' });
     const progress: number[] = [];
     const res = await commitImport(plan, { onProgress: (done) => progress.push(done), chunkSize: 40 });
     expect(res).toMatchObject({ added: 95, updated: 0, removed: 0 });
-    expect(progress).toEqual([0, 40, 80, 95]);
+    expect(progress).toEqual([0, 95]);
     const all = await getAllFlights();
     expect(all).toHaveLength(95);
     expect(new Set(all.map((f) => f.id)).size).toBe(95);

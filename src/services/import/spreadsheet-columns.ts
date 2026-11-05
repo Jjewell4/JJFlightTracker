@@ -10,6 +10,7 @@ export const SPREADSHEET_COLUMNS = {
   seatNumber: 'Seat', seatType: 'Seat type', cabinClass: 'Cabin class', reason: 'Reason',
   occasion: 'Occasion', occasion2: 'Second occasion', note: 'Notes',
   tripId: 'Trip ID', tripName: 'Trip name', datePrecision: 'Date precision',
+  fieldSources: 'Field sources (JSON)', tripDetails: 'Trip journal (JSON)',
   id: 'Flight ID', source: 'Flight source', createdAt: 'Created at (Unix ms)', updatedAt: 'Updated at (Unix ms)',
 } satisfies Record<keyof Flight, string>;
 export const SPREADSHEET_VERSION_HEADER = 'Window Seat export';

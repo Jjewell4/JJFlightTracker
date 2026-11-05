@@ -90,7 +90,7 @@ export function exportSpreadsheetCsv(flights: Flight[]): string {
   const keys = Object.keys(SPREADSHEET_COLUMNS) as (keyof Flight)[];
   const data = sorted.map(f => [...keys.map(key => {
     const value = key === 'date' ? (f.datePrecision === 'year' ? f.date.slice(0, 4) : f.datePrecision === 'month' ? f.date.slice(0, 7) : f.date) : f[key];
-    return typeof value === 'string' ? escapeSpreadsheetText(value) : value ?? '';
+    return typeof value === 'object' ? JSON.stringify(value) : typeof value === 'string' ? escapeSpreadsheetText(value) : value ?? '';
   }), SPREADSHEET_VERSION]);
   return Papa.unparse({ fields: [...Object.values(SPREADSHEET_COLUMNS), SPREADSHEET_VERSION_HEADER], data }, { newline: '\r\n' });
 }

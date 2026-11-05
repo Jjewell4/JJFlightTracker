@@ -230,8 +230,8 @@ describe('Excel-mangled FR24 CSV', () => {
 
   it('produces the same flights as the clean export for the shared rows', () => {
     const strip = (c: ImportCandidate) => {
-      const { note, ...rest } = c.flight;
-      void note;
+      const { note, fieldSources, ...rest } = c.flight;
+      void note; void fieldSources;
       return rest;
     };
     const match = (date: string, from: string, to: string, dep?: string) =>

@@ -1,3 +1,8 @@
+import '@/features/manage/manage.css';
+import { compareYears } from './comparison';
+import { todayLocal } from '@/lib/time';
+import { STATS_SECTIONS } from './layout';
+import { STATS_METRIC_EVENT } from './Hero';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
@@ -83,6 +88,9 @@ interface DashboardProps {
 
 function StatsDashboard({ flights, upcoming, unit, clock, homeCountry, readOnly, fields, params, layout, embedded }: DashboardProps) {
   const [arranging, setArranging] = useState(false);
+  const [expanded, setExpanded] = useState(new Set<string>(['highlights']));
+  const expand = (id: string) => setExpanded(prev => new Set([...prev,id]));
+  useEffect(() => { const show = () => expand('patterns'); window.addEventListener(STATS_METRIC_EVENT,show); return () => window.removeEventListener(STATS_METRIC_EVENT,show); }, []);
   const years = useMemo(() => availableYears(flights), [flights]);
   const [scope, setScope] = useScope(years, params);
   const scoped = useMemo(() => filterByYear(flights, scope), [flights, scope]);
@@ -129,7 +137,7 @@ function StatsDashboard({ flights, upcoming, unit, clock, homeCountry, readOnly,
       ) : null,
     patterns: <TimeCharts stats={stats} scope={scope} unit={unit} clock={clock} currentYear={currentYear} sections={sections} readOnly={readOnly} />,
     calendar: sections.calendar ? <TravelCalendar flights={flights} scope={scope} readOnly={readOnly} /> : null,
-    mix: <Breakdowns stats={stats} unit={unit} sections={sections} readOnly={readOnly} />,
+    mix: <Breakdowns year={scope} stats={stats} unit={unit} sections={sections} readOnly={readOnly} />,
     occasions: sections.occasion ? <Occasions stats={stats} unit={unit} readOnly={readOnly} /> : null,
     records: <Records stats={stats} unit={unit} sections={sections} readOnly={readOnly} />,
     favorites: <TopLists stats={stats} unit={unit} sections={sections} readOnly={readOnly} />,
@@ -139,6 +147,8 @@ function StatsDashboard({ flights, upcoming, unit, clock, homeCountry, readOnly,
   };
   const shown = resolveLayout(layout).filter((s) => !s.hidden && blocks[s.id]);
   const t = stats.totals;
+  const comparisonYear = scope === 'all' ? currentYear : scope;
+  const comparison = compareYears(flights, comparisonYear, todayLocal());
 
   return (
     <div className={`stats${embedded ? ' stats--embedded' : ''}`}>
@@ -166,7 +176,7 @@ function StatsDashboard({ flights, upcoming, unit, clock, homeCountry, readOnly,
 
       <nav className="stats-jump" aria-label="Statistics sections">
         {[{ id: 'summary', label: 'Summary' }, ...shown.map((sec) => ({ id: sec.id, label: sectionNav(sec.id) }))].map(({ id, label }) => (
-          <button key={id} type="button" onClick={() => document.getElementById(`stats-sec-${id}`)?.scrollIntoView({ block: 'start' })}>
+          <button key={id} type="button" onClick={() => { expand(id); requestAnimationFrame(() => document.getElementById(`stats-sec-${id}`)?.scrollIntoView({ block: 'start' })); }}>
             {label}
           </button>
         ))}
@@ -176,10 +186,13 @@ function StatsDashboard({ flights, upcoming, unit, clock, homeCountry, readOnly,
           <Hero stats={stats} scope={scope} unit={unit} prev={prev} firstYear={years[years.length - 1]} timeEstimated={sections.timeEstimated} lifetimeKm={lifetimeKm} />
         </div>
 
+        {(!readOnly || fields.exactDates || !comparison.partial) && <article className="card manage-card stats-comparison"><h2>{comparisonYear} vs {comparisonYear - 1}</h2><p>{comparison.partial ? `Through ${todayLocal().slice(5)} in both years · exact dates only` : 'Full calendar years'}</p><div className="manage-actions"><strong>{comparison.current.count} flights</strong><span>vs {comparison.previous.count}</span><span className="badge">{comparison.current.count - comparison.previous.count >= 0 ? '+' : ''}{comparison.current.count - comparison.previous.count} flights</span></div></article>}
+        <div className="manage-actions"><button className="btn btn--ghost" onClick={() => setExpanded(new Set(shown.map(s => s.id)))}>Expand all sections</button><button className="btn btn--ghost" onClick={() => setExpanded(new Set(['highlights']))}>Compact view</button></div>
         {shown.map((sec) => (
-          <div key={sec.id} id={`stats-sec-${sec.id}`} className="stats-block">
+          <details key={sec.id} id={`stats-sec-${sec.id}`} open={expanded.has(sec.id)} onToggle={e => { const open=e.currentTarget.open; setExpanded(prev => {if(prev.has(sec.id) === open) return prev; const next=new Set(prev); if(open) next.add(sec.id); else next.delete(sec.id); return next;}); }} className="stats-block stats-disclosure">
+            <summary>{STATS_SECTIONS.find(s => s.id === sec.id)?.title}<span>Explore</span></summary>
             {blocks[sec.id]}
-          </div>
+          </details>
         ))}
 
         <footer className="stats-notes">

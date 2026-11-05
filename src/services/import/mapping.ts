@@ -27,7 +27,7 @@ export const MAPPING_FIELDS = [
   'reason',
   'occasion',
   'note',
-  'tripId', 'tripName', 'occasion2', 'datePrecision', 'arrDayOffset', 'durationMin', 'distanceKm',
+  'tripDetails', 'fieldSources', 'tripId', 'tripName', 'occasion2', 'datePrecision', 'arrDayOffset', 'durationMin', 'distanceKm',
   'airlineIcao', 'airlineIata', 'airlineName', 'aircraftType', 'aircraftName', 'id', 'source', 'createdAt', 'updatedAt',
 ] as const;
 
@@ -54,6 +54,8 @@ export const FIELD_LABELS: Record<MappingField, { label: string; hint?: string; 
   reason: { label: 'Reason', hint: 'leisure, business, …' },
   occasion: { label: 'Occasion', hint: 'vacation, wedding, conference, …' },
   note: { label: 'Notes' },
+  tripDetails: { label: 'Trip journal (JSON)' },
+  fieldSources: { label: 'Field sources (JSON)' },
   tripId: { label: 'Trip ID', hint: 'Shared by every leg in a saved trip' },
   tripName: { label: 'Trip name' }, occasion2: { label: 'Second occasion' },
   datePrecision: { label: 'Date precision', hint: 'day / month / year' },
@@ -92,6 +94,7 @@ const SYNONYMS: Record<MappingField, string[]> = {
   reason: ['flight_reason', 'reason', 'purpose', 'trip_type', 'trip_purpose', 'flight_purpose', 'trip_reason'],
   occasion: ['occasion', 'trip_occasion', 'category', 'trip_category', 'tag', 'tags'],
   note: ['note', 'notes', 'comment', 'comments', 'remarks', 'memo', 'description', 'details'],
+  fieldSources: ['field_sources_json'], tripDetails: ['trip_journal_json'],
   tripId: ['trip_id', 'tripid'], tripName: ['trip_name', 'trip', 'journey', 'journey_name'],
   occasion2: ['second_occasion', 'occasion_2', 'occasion2'], datePrecision: ['date_precision', 'dateprecision'],
   arrDayOffset: ['arrival_day_offset', 'arr_day_offset', 'arrdayoffset'],

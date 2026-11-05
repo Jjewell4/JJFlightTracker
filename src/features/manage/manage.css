@@ -1,0 +1,106 @@
+.manage {
+  display: grid;
+  gap: var(--space-4);
+  max-width: 760px;
+  margin: 0 auto;
+}
+.manage-card {
+  padding: var(--space-5);
+  display: grid;
+  gap: var(--space-3);
+}
+.manage-card h2,
+.manage-card p {
+  margin: 0;
+}
+.manage-card p,
+.manage-hint {
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+.manage-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.manage-actions .btn {
+  min-height: 44px;
+}
+.manage-field {
+  display: grid;
+  gap: var(--space-2);
+  margin-block: var(--space-3);
+}
+.manage-select {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-left: var(--space-3);
+}
+.manage-select > input {
+  width: 44px;
+  height: 44px;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+.manage-select > .frow {
+  flex: 1;
+  min-width: 0;
+}
+.manage-toolbar {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 5;
+  background: var(--surface);
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  margin-block: var(--space-3);
+}
+.manage-undo {
+  position: fixed;
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + var(--space-4));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(92vw, 440px);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  box-shadow: var(--shadow-lg);
+  z-index: 95;
+}
+.manage-undo span {
+  flex: 1;
+}
+.manage-diff {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.manage-diff dt {
+  color: var(--text-2);
+}
+.manage-diff dd {
+  margin: 0;
+}
+.manage-source {
+  width: 100%;
+  max-height: 65vh;
+  object-fit: contain;
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+}
+@media (min-width: 960px) {
+  .manage-undo {
+    bottom: var(--space-6);
+  }
+}
+
+label.manage-actions {
+  min-height: 44px;
+}

@@ -1,3 +1,4 @@
+import { UpdateDraft } from './UpdateDraft';
 import { useId, useMemo, useState } from 'react';
 import { OccasionPicker } from '@/features/trips/OccasionPicker';
 import { Link } from 'react-router-dom';
@@ -132,6 +133,7 @@ export function DraftReview({
   onSaved: (result: SavedLegs) => void;
 }) {
   const id = useId();
+  const [updating, setUpdating] = useState<LegCheck>();
   const defaults = useMemo(getEntryDefaults, []);
   const checks = useMemo(() => checkLegs(draft.result?.flights ?? [], flights, { defaults, handled: draft.handled }), [draft.result, draft.handled, flights, defaults]);
   // Until the user picks, the selection follows the checks (duplicates are known once the log loads).
@@ -197,9 +199,11 @@ export function DraftReview({
         </ul>
       )}
 
+      {(draft.thumb || draft.image) && <details className="card manage-card"><summary>Compare with the original screenshot</summary><img className="manage-source" src={draft.image ?? draft.thumb} alt="Original flight information for comparison" /></details>}
+      {updating && <UpdateDraft check={updating} draftId={draft.id} origin={draft.source} onClose={() => setUpdating(undefined)} />}
       <ul className="dlegs">
         {checks.map((c) => (
-          <LegRow key={c.index} check={c} clock={clock} selected={selected.has(c.index) && !!c.input && !c.handled} onToggle={() => toggle(c.index)} onEdit={() => onEdit(c)} />
+          <LegRow key={c.index} check={c} clock={clock} selected={selected.has(c.index) && !!c.input && !c.handled} onToggle={() => toggle(c.index)} onEdit={() => onEdit(c)} onUpdate={() => setUpdating(c)} />
         ))}
       </ul>
 
@@ -262,7 +266,7 @@ export function DraftReview({
   );
 }
 
-function LegRow({ check: c, clock, selected, onToggle, onEdit }: { check: LegCheck; clock: '12h' | '24h'; selected: boolean; onToggle: () => void; onEdit: () => void }) {
+function LegRow({ check: c, clock, selected, onToggle, onEdit, onUpdate }: { onUpdate: () => void; check: LegCheck; clock: '12h' | '24h'; selected: boolean; onToggle: () => void; onEdit: () => void }) {
   const f = c.leg;
   const from = getAirport(f.from);
   const to = getAirport(f.to);
@@ -301,6 +305,7 @@ function LegRow({ check: c, clock, selected, onToggle, onEdit }: { check: LegChe
           )}
         </span>
       </label>
+      {!c.handled && c.duplicate && c.input && <button type="button" className="btn dleg__compare" onClick={onUpdate}>Compare & update</button>}
       {!c.handled && (
         <button type="button" className={`dleg__edit${blocked ? ' is-fix' : ''}`} onClick={onEdit}>
           {blocked ? 'Fix' : 'Edit'}

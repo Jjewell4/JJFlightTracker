@@ -36,6 +36,11 @@ Forwarded booking emails (`docs/email-import.md`: Cloudflare Email Worker → `a
 - `src/lib/db.ts` — Dexie DB + repository functions + hooks (`useFlights`, `useFlight`, `useSettings`).
 - `src/lib/trips.ts` — trip detection (`detectTrips`), automatic names (`suggestTripName`, `tripTitle`),
   `tripFromLegs` for naming unsaved legs. Saved trips are a shared `tripId`/`tripName` on each leg.
+  Private `TripDocument` notes/covers live in `db.trips` and travel with legs as `tripDetails`.
+- `src/features/manage` — bulk edits, device-local recovery history, conservative quality checks.
+  Use `writeFlights`/repository helpers for mutations so changes are recoverable.
+- `supabase/sync-revisions.sql` — optional batched compare-and-set RPC; existing schemas use
+  conditional PostgREST updates. Sync metadata retains a base for three-way merges.
 - `src/data/reference.ts` — airport/airline/aircraft datasets, sync lookups after `loadReference()`,
   ranked search (`searchAirports`, `searchAirlines`, `searchAircraftTypes`), `useReferenceReady()`.
 - `src/lib/geo.ts` (distance, great-circle arcs), `src/lib/time.ts` (tz-aware durations, formatting),

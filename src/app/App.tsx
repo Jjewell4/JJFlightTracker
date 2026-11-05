@@ -1,3 +1,4 @@
+import { UndoNotice } from '@/features/manage/UndoNotice';
 import { lazy, Suspense } from 'react';
 import { HashRouter, Route, Routes } from 'react-router-dom';
 import { AirlineLogoPrefs } from '@/components/airline-logo-prefs';
@@ -10,6 +11,8 @@ import { publicHandleFromPath } from '@/features/public/profile';
 import { FlightsPage } from '@/features/flights/FlightsPage';
 
 // Heavier screens are code-split; the flights list is the landing screen.
+const HistoryPage = lazy(() => import('@/features/manage/HistoryPage'));
+const QualityPage = lazy(() => import('@/features/manage/QualityPage'));
 const PublicProfilePage = lazy(() => import('@/features/public/PublicProfilePage'));
 const FlightDetailPage = lazy(() => import('@/features/flights/FlightDetailPage'));
 const FlightFormPage = lazy(() => import('@/features/entry/FlightFormPage'));
@@ -34,6 +37,7 @@ export function App() {
       <AirlineLogoPrefs />
       <PwaPrompts />
       <AppShell>
+        <UndoNotice />
         <RouteErrorBoundary>
           <Suspense fallback={<PageLoader />}>
             <Routes>
@@ -43,6 +47,8 @@ export function App() {
               <Route path="/flights/:id" element={<FlightDetailPage />} />
               <Route path="/flights/:id/edit" element={<FlightFormPage />} />
               <Route path="/trips/:id" element={<TripPage />} />
+              <Route path="/history" element={<HistoryPage />} />
+              <Route path="/quality" element={<QualityPage />} />
               <Route path="/review" element={<ReviewPage />} />
               <Route path="/review/:id" element={<ReviewPage />} />
               <Route path="/airports/:ident" element={<AirportPage />} />

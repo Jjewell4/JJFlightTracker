@@ -24,7 +24,11 @@ export type FlightOccasion =
   | 'other';
 export type FlightSource = 'manual' | 'lookup' | 'screenshot' | 'fr24' | 'csv' | 'backup';
 
+export interface TripDocument { id: string; note: string; cover?: string; updatedAt: number }
+
 export interface Flight {
+  /** Trip document transported with saved legs for existing sync/backup compatibility. */
+  tripDetails?: TripDocument;
   /** Stable unique id (crypto.randomUUID). */
   id: string;
   /** Local departure date, YYYY-MM-DD. With precision month/year the unknown parts are 01. */
@@ -78,6 +82,8 @@ export interface Flight {
   /** Saved trip name, repeated on each leg so it syncs with the flights. */
   tripName?: string;
 
+  /** Origin of individual values; absent on older records. */
+  fieldSources?: Record<string, 'manual' | 'schedule' | 'route' | 'screenshot' | 'email' | 'csv' | 'fr24' | 'estimated' | 'backup'>;
   source: FlightSource;
   createdAt: number;
   updatedAt: number;
