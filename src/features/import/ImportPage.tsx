@@ -113,9 +113,9 @@ export default function ImportPage() {
         setStep('mapping');
         return;
       }
-      if (a.format === 'fr24' && mappingIsComplete(a.mapping)) {
-        setNotice(source === 'generic' ? 'Flightradar24 format detected — columns matched automatically.' : undefined);
-        setCandidates(candidatesFromSheet(loaded.sheet, a.mapping, { source: 'fr24', dateOrder: a.dateOrder }));
+      if ((a.format === 'fr24' || a.format === 'window-seat') && mappingIsComplete(a.mapping)) {
+        setNotice(a.format === 'window-seat' ? 'Window Seat export detected — all flight fields and saved trips matched automatically.' : source === 'generic' ? 'Flightradar24 format detected — columns matched automatically.' : undefined);
+        setCandidates(candidatesFromSheet(loaded.sheet, a.mapping, { source: a.format === 'fr24' ? 'fr24' : 'csv', dateOrder: a.dateOrder }));
         setStep('review');
         return;
       }
@@ -274,7 +274,7 @@ export default function ImportPage() {
           notice={notice}
           error={error}
           fileName={table?.fileName ?? backup?.fileName}
-          formatLabel={backup ? 'Flight Log backup' : table?.format === 'fr24' ? 'Flightradar24 export' : table?.xlsx ? 'Excel spreadsheet' : 'Spreadsheet'}
+          formatLabel={backup ? 'Flight Log backup' : table?.format === 'window-seat' ? 'Window Seat spreadsheet' : table?.format === 'fr24' ? 'Flightradar24 export' : table?.xlsx ? 'Excel spreadsheet' : 'Spreadsheet'}
           onChangeColumns={table && !isBackup ? () => setStep('mapping') : undefined}
           backup={backup ? { data: backup.data, replace, onReplace: setReplace, restoreSettings, onRestoreSettings: setRestoreSettings, currentCount: existing?.length ?? 0, onDownloadCurrent: downloadCurrent } : undefined}
         />

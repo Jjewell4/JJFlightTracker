@@ -15,7 +15,7 @@ your browser (IndexedDB) and works offline once the app has loaded. You can expo
 - **Stats**: distance, time in the air, top airports / airlines / aircraft, countries, records, yearly charts.
 - **Import** from Flightradar24 (CSV or Excel), any spreadsheet (with a column-matching step) or a Flight Log backup.
   Duplicates are detected, problems can be fixed inline before anything is saved.
-- **Export** a JSON backup (flights + settings) or a Flightradar24-compatible CSV.
+- **Export** a full-field spreadsheet CSV, a JSON backup (flights + settings), or a separate Flightradar24-compatible CSV.
 - **Installable PWA**, offline-first, dark-first "night flight" design with a light theme.
 
 ## Import from Flightradar24
@@ -32,6 +32,33 @@ skipped"), fix or skip anything flagged, then import. Nothing is uploaded — th
 
 Other sources (another tracker, a hand-made spreadsheet) work via **Spreadsheet**: pick the file, confirm
 which column is the date, origin, destination and so on, and continue.
+
+### Full-field spreadsheet round trips
+
+**More → Export CSV** includes every saved flight field: saved trip IDs and names,
+both occasion tags, airline and aircraft codes/names, seat and cabin details,
+notes, departure/arrival times and arrival-day offset, duration in minutes,
+distance in kilometres, date precision, flight ID, source and timestamps.
+The same complete headers are exported for an empty log, so it can serve as a template.
+
+Re-import through **Import flights → CSV or spreadsheet**. Window Seat exports
+are recognized automatically, including after saving as `.xlsx`; the review and
+duplicate controls still apply. Keep the `Window Seat export` version column so
+escaped formula-like text and literal apostrophes can be restored correctly.
+For a new row copied from another flight, clear its Flight ID (or supply a new unique
+one). Repeated IDs in one file are flagged instead of overwriting a flight.
+
+Every leg of a saved trip shares a Trip ID. Different IDs remain separate even if
+the names match. Hand-made spreadsheets can supply just a Trip name: rows with
+that exact name are grouped into a new trip within that import. Exported trips
+are saved groups; automatically suggested, unsaved trips are not persisted.
+
+On import, existing duplicate flights are skipped unless you choose to update them.
+Updates retain their existing identity, creation time and source; imported changes
+receive a fresh Updated at timestamp so normal cloud sync picks them up. Blank
+optional cells do not erase existing values when updating duplicates.
+JSON backup is still the choice for restoring settings along with the flight log.
+**Export for Flightradar24** retains its legacy columns and omits trips/occasions.
 
 ## Install on your phone
 

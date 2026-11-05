@@ -177,10 +177,10 @@ export default function SettingsPage() {
         </button>
         <button type="button" className="list__row srow" onClick={() => void exportCsv()}>
           <Tile icon="file" tone="amber" />
-          <RowText title="Export CSV" sub="Readable columns for Excel, Sheets and other apps" />
+          <RowText title="Export CSV" sub="All flight fields, trips and occasions · Excel/Sheets ready" />
         </button>
         <button type="button" className="list__row srow" onClick={() => void exportCsv(true)}>
-          <Tile icon="file" tone="plain" /><RowText title="Export for Flightradar24" sub="Compatibility format for existing tracker workflows" />
+          <Tile icon="file" tone="plain" /><RowText title="Export for Flightradar24" sub="Legacy columns only · excludes trips and occasions" />
         </button>
       </Group>
 

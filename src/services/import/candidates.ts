@@ -21,7 +21,8 @@ import {
   type Cell,
   type DateOrder,
 } from './cells';
-import type { ColumnMapping, MappingField } from './mapping';
+import { headerKey, type ColumnMapping, type MappingField } from './mapping';
+import { SPREADSHEET_VERSION_HEADER, SPREADSHEET_VERSION, unescapeSpreadsheetText } from './spreadsheet-columns';
 import { parseAircraftRef, parseAirlineRef, parseAirportRef, resolveAirline, resolveAirport } from './refs';
 import type { Sheet } from './sheet';
 
@@ -69,6 +70,7 @@ export function candidateStatus(c: ImportCandidate): CandidateStatus {
 export interface BuildOptions {
   source: FlightSource;
   dateOrder?: DateOrder;
+  native?: boolean;
 }
 
 type RawFields = Partial<Record<MappingField, Cell>>;
@@ -103,7 +105,16 @@ function addMinutes(date: string, dep: number, add: number, fromTz?: string, toT
 
 /** Builds a candidate from raw field cells. */
 export function candidateFromFields(raw: RawFields, rowNumber: number, opts: BuildOptions): ImportCandidate {
+  if (opts.native) raw = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, typeof v === 'string' ? unescapeSpreadsheetText(v) : v]));
   const issues: ImportIssue[] = [];
+  const text = (field: MappingField) => opts.native && typeof raw[field] === 'string' ? raw[field] as string : cellText(raw[field]);
+  const number = (field: MappingField, min = 0, max = Number.MAX_VALUE, integer = false) => {
+    if (isBlank(raw[field])) return undefined;
+    const value = typeof raw[field] === 'number' ? raw[field] : Number(cellText(raw[field]));
+    if (Number.isFinite(value) && value >= min && value <= max && (!integer || Number.isInteger(value))) return value;
+    issues.push({ level: 'warn', field: 'flight', message: `Ignored invalid ${field}: “${cellText(raw[field])}”` });
+    return undefined;
+  };
   const dateOrder = opts.dateOrder ?? 'mdy';
 
   // ---- date
@@ -117,8 +128,12 @@ export function candidateFromFields(raw: RawFields, rowNumber: number, opts: Bui
   } else if (pd.note) {
     issues.push({ level: 'info', field: 'date', message: pd.note });
   }
-  const date = pd?.date ?? '';
-  const precision = pd?.precision ?? 'day';
+  let date = pd?.date ?? '';
+  const precisionCell = cellText(raw.datePrecision);
+  const precision = precisionCell === 'day' || precisionCell === 'month' || precisionCell === 'year' ? precisionCell : pd?.precision ?? 'day';
+  if (precision === 'year' && date) date = `${date.slice(0, 4)}-01-01`;
+  if (precision === 'month' && date) date = `${date.slice(0, 7)}-01`;
+  if (precisionCell && !['day', 'month', 'year'].includes(precisionCell)) issues.push({ level: 'warn', field: 'date', message: `Unknown date precision “${precisionCell}” — inferred from date` });
 
   // ---- airports
   let fromCell = raw.from;
@@ -145,7 +160,7 @@ export function candidateFromFields(raw: RawFields, rowNumber: number, opts: Bui
   // ---- times
   let dep = parseTimeOfDay(raw.depTime);
   let arr = parseTimeOfDay(raw.arrTime);
-  let dur = parseDurationMinutes(raw.duration);
+  let dur = !isBlank(raw.durationMin) ? number('durationMin') : parseDurationMinutes(raw.duration);
   if (pd?.minutes !== undefined && dep === undefined) dep = pd.minutes;
   if (dep === null) {
     issues.push({ level: 'warn', field: 'depTime', message: `Can't read departure time “${cellText(raw.depTime)}”` });
@@ -159,24 +174,24 @@ export function candidateFromFields(raw: RawFields, rowNumber: number, opts: Bui
     issues.push({ level: 'warn', field: 'duration', message: `Can't read duration “${cellText(raw.duration)}”` });
     dur = undefined;
   }
-  if (dur !== undefined && dur <= 0) dur = undefined;
-  if (dur !== undefined && dur > MAX_IMPORT_DURATION_MIN) {
+  if (dur !== undefined && dur <= 0 && isBlank(raw.durationMin)) dur = undefined;
+  if (dur !== undefined && dur > MAX_IMPORT_DURATION_MIN && isBlank(raw.durationMin)) {
     issues.push({ level: 'warn', field: 'duration', message: `Ignored duration “${cellText(raw.duration)}” — longer than 24 hours` });
     dur = undefined;
   }
 
   // Flightradar24 writes 00:00:00 for "unknown" (both times, and often just the arrival).
-  if (dep === 0 && arr === 0) {
+  if (opts.source === 'fr24' && dep === 0 && arr === 0) {
     dep = undefined;
     arr = undefined;
   }
   const fromAirport = from?.airport ?? getAirport(from?.ident);
   const toAirport = to?.airport ?? getAirport(to?.ident);
-  let arrDayOffset: number | undefined;
+  let arrDayOffset = number('arrDayOffset', -2, 3, true);
   let derivedArrival = false;
   // A lone 00:00 arrival is FR24's "unknown" when the row also has a duration (work the arrival
   // out from that instead); with no duration value at all it's a genuine midnight arrival.
-  if (arr === 0 && dep !== undefined && dep !== 0 && !isBlank(raw.duration)) {
+  if (opts.source === 'fr24' && arr === 0 && dep !== undefined && dep !== 0 && !isBlank(raw.duration)) {
     arr = undefined;
     if (dur !== undefined && pd && precision === 'day') {
       const d = addMinutes(date, dep, dur, fromAirport?.tz, toAirport?.tz);
@@ -204,11 +219,11 @@ export function candidateFromFields(raw: RawFields, rowNumber: number, opts: Bui
 
   // ---- flight number, airline, aircraft
   const flightNumber = normalizeFlightNumber(cellText(raw.flightNumber) || undefined);
-  const airlineRef = parseAirlineRef(raw.airline);
+  const airlineRef = parseAirlineRef(raw.airline ?? raw.airlineName ?? raw.airlineIcao ?? raw.airlineIata);
   const airline = resolveAirline(airlineRef);
-  const aircraftRef = parseAircraftRef(raw.aircraft);
-  let aircraftType = aircraftRef?.icao;
-  const aircraftName = aircraftRef?.name;
+  const aircraftRef = parseAircraftRef(raw.aircraft ?? raw.aircraftType ?? raw.aircraftName);
+  let aircraftType = text('aircraftType') || aircraftRef?.icao;
+  const aircraftName = text('aircraftName') || aircraftRef?.name;
   if (!aircraftType && aircraftName) {
     const hit = searchAircraftTypes(aircraftName, 1)[0];
     if (hit && normalize(hit.name) === normalize(aircraftName)) aircraftType = hit.icao;
@@ -216,12 +231,13 @@ export function candidateFromFields(raw: RawFields, rowNumber: number, opts: Bui
   const registration = cellText(raw.registration).toUpperCase().replace(/\s+/g, '') || undefined;
 
   const flight: ImportFlight = {
+    id: text('id') || undefined,
     date,
     datePrecision: precision,
     flightNumber,
-    airlineIcao: airlineRef?.icao ?? airline?.icao,
-    airlineIata: airlineRef?.iata ?? (airline?.iata || undefined),
-    airlineName: airlineRef?.name ?? airline?.name,
+    airlineIcao: text('airlineIcao') || airlineRef?.icao || airline?.icao,
+    airlineIata: text('airlineIata') || airlineRef?.iata || airline?.iata || undefined,
+    airlineName: text('airlineName') || airlineRef?.name || airline?.name,
     from: from?.ident ?? '',
     to: to?.ident ?? '',
     depTime: dep !== undefined ? minutesToHHmm(dep) : undefined,
@@ -235,14 +251,19 @@ export function candidateFromFields(raw: RawFields, rowNumber: number, opts: Bui
     seatType: parseSeatType(raw.seatType),
     cabinClass: parseCabinClass(raw.cabinClass),
     reason: parseFlightReason(raw.reason),
-    ...occasionFields(parseOccasions(cellText(raw.occasion))),
-    note: cellText(raw.note) || undefined,
-    source: opts.source,
+    ...occasionFields(parseOccasions([cellText(raw.occasion), cellText(raw.occasion2)].filter(Boolean).join(', '))),
+    note: text('note') || undefined,
+    tripId: text('tripId') || undefined, tripName: text('tripName') || undefined,
+    source: ['manual', 'lookup', 'screenshot', 'fr24', 'csv', 'backup'].includes(cellText(raw.source)) ? cellText(raw.source) as FlightSource : opts.source,
+    createdAt: number('createdAt'), updatedAt: number('updatedAt'),
+    distanceKm: number('distanceKm'),
   };
 
   let enriched = enrichFlight(flight) as ImportFlight;
   // The file's own duration is the source of truth when present.
   if (dur !== undefined) enriched = { ...enriched, durationMin: dur };
+  if (flight.distanceKm !== undefined) enriched.distanceKm = flight.distanceKm;
+  if (arrDayOffset !== undefined) enriched.arrDayOffset = arrDayOffset;
   if (derivedArrival) issues.push({ level: 'info', field: 'arrTime', message: 'Arrival time worked out from the duration' });
 
   return {
@@ -263,9 +284,25 @@ function stripUndefined<T extends object>(o: T): T {
 /** Builds candidates for every non-empty row of a sheet. */
 export function candidatesFromSheet(sheet: Sheet, mapping: ColumnMapping, opts: BuildOptions): ImportCandidate[] {
   const out: ImportCandidate[] = [];
+  const versionCol = sheet.headers.findIndex(h => headerKey(h) === headerKey(SPREADSHEET_VERSION_HEADER));
+  const namedTrips = new Map<string, string>();
+  const seenIds = new Set<string>();
   sheet.rows.forEach((row, i) => {
     if (row.every((c) => isBlank(c))) return;
-    out.push(candidateFromFields(rawFieldsFromRow(row, mapping), i + 1, opts));
+    const native = versionCol >= 0 && (isBlank(row[versionCol]) || cellText(row[versionCol]) === SPREADSHEET_VERSION);
+    const candidate = candidateFromFields(rawFieldsFromRow(row, mapping), i + 1, { ...opts, native });
+    if (versionCol >= 0 && !native) candidate.issues.push({ level: 'error', field: 'flight', message: 'Unsupported spreadsheet version. Update the app or check the export version column.' });
+    const f = candidate.flight;
+    if (f.id && seenIds.has(f.id)) candidate.issues.push({ level: 'error', field: 'flight', message: 'Repeated Flight ID in this file. Remove the duplicate row or give the new flight a different ID.' });
+    if (f.id) seenIds.add(f.id);
+    // User-authored spreadsheets may name trips without supplying internal IDs.
+    // Explicit IDs always win, keeping separate trips with the same title separate.
+    if (!f.tripId && f.tripName) {
+      let id = namedTrips.get(f.tripName);
+      if (!id) { id = crypto.randomUUID(); namedTrips.set(f.tripName, id); }
+      f.tripId = id;
+    }
+    out.push(candidate);
   });
   return out;
 }

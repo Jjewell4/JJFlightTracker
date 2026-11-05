@@ -7,6 +7,7 @@ import { getAirport } from '@/data/reference';
 import { detectDateOrder, cellText, type Cell, type DateOrder } from './cells';
 import { parseAirportRef } from './refs';
 import type { Sheet } from './sheet';
+import { SPREADSHEET_COLUMNS, SPREADSHEET_VERSION_HEADER } from './spreadsheet-columns';
 
 export const MAPPING_FIELDS = [
   'date',
@@ -26,6 +27,8 @@ export const MAPPING_FIELDS = [
   'reason',
   'occasion',
   'note',
+  'tripId', 'tripName', 'occasion2', 'datePrecision', 'arrDayOffset', 'durationMin', 'distanceKm',
+  'airlineIcao', 'airlineIata', 'airlineName', 'aircraftType', 'aircraftName', 'id', 'source', 'createdAt', 'updatedAt',
 ] as const;
 
 export type MappingField = (typeof MAPPING_FIELDS)[number];
@@ -51,6 +54,15 @@ export const FIELD_LABELS: Record<MappingField, { label: string; hint?: string; 
   reason: { label: 'Reason', hint: 'leisure, business, …' },
   occasion: { label: 'Occasion', hint: 'vacation, wedding, conference, …' },
   note: { label: 'Notes' },
+  tripId: { label: 'Trip ID', hint: 'Shared by every leg in a saved trip' },
+  tripName: { label: 'Trip name' }, occasion2: { label: 'Second occasion' },
+  datePrecision: { label: 'Date precision', hint: 'day / month / year' },
+  arrDayOffset: { label: 'Arrival day offset', hint: '0 = same day, 1 = next day, -1 = previous day' },
+  durationMin: { label: 'Duration (minutes)' }, distanceKm: { label: 'Distance (km)' },
+  airlineIcao: { label: 'Airline ICAO' }, airlineIata: { label: 'Airline IATA' }, airlineName: { label: 'Airline name' },
+  aircraftType: { label: 'Aircraft ICAO' }, aircraftName: { label: 'Aircraft name' },
+  id: { label: 'Flight ID' }, source: { label: 'Original source' },
+  createdAt: { label: 'Created at (Unix milliseconds)' }, updatedAt: { label: 'Updated at (Unix milliseconds)' },
 };
 
 /** Lowercase, punctuation → single underscore. */
@@ -70,9 +82,9 @@ const SYNONYMS: Record<MappingField, string[]> = {
   route: ['route', 'routing', 'sector', 'segment', 'leg'],
   depTime: ['dep_time', 'departure_time', 'depart_time', 'time_departure', 'std', 'atd', 'off_block', 'dep_time_local', 'departure_time_local', 'takeoff_time', 'time'],
   arrTime: ['arr_time', 'arrival_time', 'arrive_time', 'time_arrival', 'sta', 'ata', 'on_block', 'arr_time_local', 'arrival_time_local', 'landing_time'],
-  duration: ['duration', 'flight_time', 'block_time', 'elapsed', 'air_time', 'flight_duration', 'duration_min', 'duration_minutes', 'total_time'],
-  airline: ['airline', 'carrier', 'operator', 'airline_name', 'operating_carrier', 'airline_code', 'marketing_carrier'],
-  aircraft: ['aircraft', 'aircraft_type', 'plane', 'equipment', 'type', 'aircraft_model', 'plane_type', 'aircraft_name', 'model'],
+  duration: ['duration', 'flight_time', 'block_time', 'elapsed', 'air_time', 'flight_duration', 'total_time'],
+  airline: ['airline', 'carrier', 'operator', 'operating_carrier', 'airline_code', 'marketing_carrier'],
+  aircraft: ['aircraft', 'aircraft_type', 'plane', 'equipment', 'type', 'aircraft_model', 'plane_type', 'model'],
   registration: ['registration', 'reg', 'tail', 'tail_number', 'tail_no', 'tailnumber', 'tail_', 'aircraft_registration', 'n_number', 'reg_no'],
   seatNumber: ['seat_number', 'seat', 'seat_no', 'seat_nr', 'seat_assignment'],
   seatType: ['seat_type', 'seat_position', 'seat_location', 'window_aisle'],
@@ -80,18 +92,26 @@ const SYNONYMS: Record<MappingField, string[]> = {
   reason: ['flight_reason', 'reason', 'purpose', 'trip_type', 'trip_purpose', 'flight_purpose', 'trip_reason'],
   occasion: ['occasion', 'trip_occasion', 'category', 'trip_category', 'tag', 'tags'],
   note: ['note', 'notes', 'comment', 'comments', 'remarks', 'memo', 'description', 'details'],
+  tripId: ['trip_id', 'tripid'], tripName: ['trip_name', 'trip', 'journey', 'journey_name'],
+  occasion2: ['second_occasion', 'occasion_2', 'occasion2'], datePrecision: ['date_precision', 'dateprecision'],
+  arrDayOffset: ['arrival_day_offset', 'arr_day_offset', 'arrdayoffset'],
+  durationMin: ['duration_minutes', 'duration_min', 'durationmin'], distanceKm: ['distance_km', 'distancekm'],
+  airlineIcao: ['airline_icao', 'airlineicao'], airlineIata: ['airline_iata', 'airlineiata'], airlineName: ['airline_name'],
+  aircraftType: ['aircraft_icao'], aircraftName: ['aircraft_name'],
+  id: ['flight_id'], source: ['flight_source', 'source'], createdAt: ['created_at_unix_ms', 'createdat'], updatedAt: ['updated_at_unix_ms', 'updatedat'],
 };
 
 /** Header names that mark a Flightradar24 export. */
 const FR24_KEYS = ['flight_number', 'dep_time', 'arr_time', 'seat_number', 'seat_type', 'flight_class', 'flight_reason', 'dep_id', 'arr_id', 'airline_id', 'aircraft_id'];
 
-export type SheetFormat = 'fr24' | 'generic';
+export type SheetFormat = 'fr24' | 'generic' | 'window-seat';
 
 /** True when the headers look like a my.flightradar24.com export. */
 export function detectFormat(headers: string[]): SheetFormat {
   const keys = new Set(headers.map(headerKey));
+  if (keys.has(headerKey(SPREADSHEET_VERSION_HEADER))) return 'window-seat';
   const hits = FR24_KEYS.filter((k) => keys.has(k)).length;
-  return keys.has('date') && keys.has('from') && keys.has('to') && hits >= 4 ? 'fr24' : 'generic';
+  return keys.has('date') && keys.has('from') && keys.has('to') && hits >= 4 && (keys.has('flight_class') || keys.has('dep_id') || keys.has('aircraft_id')) ? 'fr24' : 'generic';
 }
 
 function looksLikeAirportColumn(sheet: Sheet, col: number): boolean {
@@ -118,8 +138,14 @@ export function detectMapping(sheet: Sheet, isDate?: (c: Cell) => unknown): Colu
   const mapping: ColumnMapping = {};
   const used = new Set<number>();
 
+  for (const [field, header] of Object.entries(SPREADSHEET_COLUMNS)) {
+    const idx = keys.indexOf(headerKey(header));
+    if (idx >= 0) { mapping[field as MappingField] = idx; used.add(idx); }
+  }
+
   // Pass 1: exact header names, in each field's synonym priority.
   for (const field of MAPPING_FIELDS) {
+    if (mapping[field] !== undefined) continue;
     for (const syn of SYNONYMS[field]) {
       const idx = keys.findIndex((k, i) => k === syn && !used.has(i));
       if (idx >= 0) {

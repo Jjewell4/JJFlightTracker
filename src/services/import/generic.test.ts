@@ -167,7 +167,7 @@ describe('generic parsing', () => {
     const p = parseSheet(parseCsvText('Date,From,To,Dep time,Arr time\n2019-03-14,LAX,SFO,22:40,00:00'));
     expect(p.candidates[0].flight).toMatchObject({ depTime: '22:40', arrTime: '00:00', arrDayOffset: 1, durationMin: 80 });
     // With a duration column, 00:00 is Flightradar24's "unknown" and the arrival comes from the duration.
-    const q = parseSheet(parseCsvText('Date,From,To,Dep time,Arr time,Duration\n2019-03-14,LAX,SFO,10:00,00:00,01:20'));
+    const q = parseSheet(parseCsvText('Date,From,To,Dep time,Arr time,Duration\n2019-03-14,LAX,SFO,10:00,00:00,01:20'), { source: 'fr24' });
     expect(q.candidates[0].flight).toMatchObject({ depTime: '10:00', arrTime: '11:20', durationMin: 80 });
   });
 
@@ -219,5 +219,24 @@ describe('fixCandidate', () => {
     expect(still.issues.some((i) => i.field === 'to')).toBe(true);
     const cleared = fixCandidate(p.candidates[0], { from: '' });
     expect(cleared.issues.find((i) => i.field === 'from')?.level).toBe('error');
+  });
+});
+
+describe('new spreadsheet fields', () => {
+  it('imports named trips and two occasions from an ordinary spreadsheet', () => {
+    const parsed = parseSheet(parseCsvText('Date,From,To,Trip,Occasion,Second occasion\n2026-01-02,SAN,LAX,Wedding,wedding,vacation\n2026-01-03,LAX,SAN,Wedding,wedding,vacation'));
+    expect(parsed.candidates[0].flight).toMatchObject({ tripName: 'Wedding', occasion: 'wedding', occasion2: 'vacation' });
+    expect(parsed.candidates[0].flight.tripId).toBeTruthy();
+    expect(parsed.candidates[1].flight.tripId).toBe(parsed.candidates[0].flight.tripId);
+  });
+  it('keeps generic midnight values and explicit numeric units without FR24 heuristics', () => {
+    const parsed = parseSheet(parseCsvText('Date,From,To,Departure time,Arrival time,Arrival day offset,Duration minutes,Distance km\n2026-01-01,SAN,LAX,00:00,00:00,1,1440,177.25'));
+    expect(parsed.candidates[0].flight).toMatchObject({ depTime: '00:00', arrTime: '00:00', arrDayOffset: 1, durationMin: 1440, distanceKm: 177.25 });
+  });
+  it('warns on invalid numeric metadata rather than writing NaN or Infinity', () => {
+    const parsed = parseSheet(parseCsvText('Date,From,To,Arrival day offset,Duration minutes,Distance km\n2026-01-01,SAN,LAX,abc,Infinity,-50'));
+    expect(parsed.candidates[0].issues.filter(i => i.level === 'warn')).toHaveLength(3);
+    expect(parsed.candidates[0].flight.arrDayOffset).toBeUndefined();
+    expect(Number.isFinite(parsed.candidates[0].flight.distanceKm)).toBe(true);
   });
 });

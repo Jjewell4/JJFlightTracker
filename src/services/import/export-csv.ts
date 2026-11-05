@@ -1,5 +1,5 @@
 /** Export flights as a Flightradar24-compatible CSV (importable again by this app or FR24 tools). */
-import { occasionsOf } from '@/lib/occasions';
+import { SPREADSHEET_COLUMNS, SPREADSHEET_VERSION, SPREADSHEET_VERSION_HEADER, escapeSpreadsheetText } from './spreadsheet-columns';
 import Papa from 'papaparse';
 import { getAircraftType, getAirline, getAirport } from '@/data/reference';
 import type { Flight } from '@/lib/types';
@@ -84,18 +84,13 @@ export function csvFileName(now: Date = new Date()): string {
   return `flight-log-${now.toISOString().slice(0, 10)}.csv`;
 }
 
-/** Portable, readable columns; JSON remains the lossless backup format. */
+/** Full, editable spreadsheet. JSON additionally backs up settings and future unknown fields. */
 export function exportSpreadsheetCsv(flights: Flight[]): string {
   const sorted = [...flights].sort((a, b) => a.date.localeCompare(b.date) || (a.depTime ?? '').localeCompare(b.depTime ?? ''));
-  if (!sorted.length) return 'Date,From,To,Flight number,Airline,Departure time,Arrival time,Duration,Aircraft,Registration,Seat,Seat type,Cabin class,Reason,Occasion,Notes';
-  return Papa.unparse(sorted.map((f) => ({
-    Date: f.datePrecision === 'year' ? f.date.slice(0, 4) : f.datePrecision === 'month' ? f.date.slice(0, 7) : f.date,
-    From: f.from, To: f.to, 'Flight number': f.flightNumber ?? '',
-    Airline: f.airlineName || f.airlineIcao || f.airlineIata || '',
-    'Departure time': f.depTime ?? '', 'Arrival time': f.arrTime ?? '',
-    Duration: f.durationMin ? `${pad(f.durationMin / 60)}:${pad(f.durationMin % 60)}` : '',
-    Aircraft: f.aircraftType || f.aircraftName || '', Registration: f.registration ?? '',
-    Seat: f.seatNumber ?? '', 'Seat type': f.seatType ?? '',
-    'Cabin class': f.cabinClass ?? '', Reason: f.reason ?? '', Occasion: occasionsOf(f).join(', '), Notes: f.note ?? '',
-  })), { newline: '\r\n', escapeFormulae: true, columns: ['Date','From','To','Flight number','Airline','Departure time','Arrival time','Duration','Aircraft','Registration','Seat','Seat type','Cabin class','Reason','Occasion','Notes'] });
+  const keys = Object.keys(SPREADSHEET_COLUMNS) as (keyof Flight)[];
+  const data = sorted.map(f => [...keys.map(key => {
+    const value = key === 'date' ? (f.datePrecision === 'year' ? f.date.slice(0, 4) : f.datePrecision === 'month' ? f.date.slice(0, 7) : f.date) : f[key];
+    return typeof value === 'string' ? escapeSpreadsheetText(value) : value ?? '';
+  }), SPREADSHEET_VERSION]);
+  return Papa.unparse({ fields: [...Object.values(SPREADSHEET_COLUMNS), SPREADSHEET_VERSION_HEADER], data }, { newline: '\r\n' });
 }

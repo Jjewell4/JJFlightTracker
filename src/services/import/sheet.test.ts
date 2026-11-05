@@ -3,6 +3,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { installReference } from '@/test/reference-fixture';
 import { candidateStatus } from './candidates';
 import { parseSheet } from './parse';
+import { exportSpreadsheetCsv } from './export-csv';
+import type { Flight } from '@/lib/types';
 import { loadImportFile, loadImportText } from './read';
 import { decodeBytes, findHeaderRow, parseCsvText, readXlsx } from './sheet';
 
@@ -76,7 +78,7 @@ function buildXlsx(rows: (XCell | null)[][], sheetNames = ['Flights']): Uint8Arr
     if (i < 0) i = strings.push(s) - 1;
     return i;
   };
-  const col = (i: number) => String.fromCharCode(65 + i);
+  const col = (i: number): string => i < 26 ? String.fromCharCode(65 + i) : col(Math.floor(i / 26) - 1) + String.fromCharCode(65 + i % 26);
   const sheetXml = (data: (XCell | null)[][]) =>
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${data
       .map(
@@ -154,4 +156,22 @@ describe('xlsx import (real read-excel-file)', () => {
     const xls = new File([new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0, 0]) as BlobPart], 'old.xls');
     await expect(loadImportFile(xls)).rejects.toThrow(/\.xls/);
   });
+});
+
+
+it('reads a full exported spreadsheet saved as XLSX, including columns beyond Z', async () => {
+  const flight: Flight = { id: 'excel-id', date: '2026-01-02', datePrecision: 'day', from: 'KSAN', to: 'KLAX',
+    depTime: '00:00', arrTime: '01:30', arrDayOffset: -1, durationMin: 90, distanceKm: 177.5,
+    tripId: 'excel-trip', tripName: 'Winter trip', occasion: 'family', occasion2: 'holiday',
+    note: '=literal', source: 'screenshot', createdAt: 1234567890123, updatedAt: 1234567890124 };
+  const csv = parseCsvText(exportSpreadsheetCsv([flight]));
+  const numeric = new Set(['Arrival day offset', 'Duration minutes', 'Distance km', 'Created at (Unix ms)', 'Updated at (Unix ms)']);
+  const rows = [csv.headers.map(v => ({ v })), ...csv.rows.map(row => row.map((c, i) => ({ v: numeric.has(csv.headers[i]) && c !== '' ? Number(c) : String(c ?? '') })))];
+  const bytes = buildXlsx(rows);
+  const loaded = await loadImportFile(new File([bytes as BlobPart], 'edited.xlsx'));
+  expect(loaded.kind).toBe('table');
+  if (loaded.kind !== 'table') throw new Error('Expected spreadsheet');
+  const parsed = parseSheet(loaded.sheet);
+  expect(parsed.format).toBe('window-seat');
+  expect(parsed.candidates[0].flight).toMatchObject(flight);
 });
