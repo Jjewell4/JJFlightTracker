@@ -2,19 +2,24 @@ import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 're
 
 const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
-/** Live `prefers-reduced-motion: reduce`. */
-export function usePrefersReducedMotion(): boolean {
-  const query = '(prefers-reduced-motion: reduce)';
+/** Live result of a CSS media query (false where matchMedia is unavailable). */
+export function useMediaQuery(query: string): boolean {
   const get = () => typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia(query).matches;
-  const [reduced, setReduced] = useState(get);
+  const [matches, setMatches] = useState(get);
   useEffect(() => {
     if (!window.matchMedia) return;
     const mq = window.matchMedia(query);
-    const on = () => setReduced(mq.matches);
+    const on = () => setMatches(mq.matches);
+    on();
     mq.addEventListener?.('change', on);
     return () => mq.removeEventListener?.('change', on);
-  }, []);
-  return reduced;
+  }, [query]);
+  return matches;
+}
+
+/** Live `prefers-reduced-motion: reduce`. */
+export function usePrefersReducedMotion(): boolean {
+  return useMediaQuery('(prefers-reduced-motion: reduce)');
 }
 
 /** Element content-box width, kept in sync with a ResizeObserver. */

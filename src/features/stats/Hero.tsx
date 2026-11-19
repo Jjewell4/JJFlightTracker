@@ -6,6 +6,7 @@ import { TrendBars } from './charts/TrendBars';
 import { trendData } from './trend';
 import { ARC_PATH, EARTH_LAP_KM, MOON_KM, journeyModel, pointOnArc } from './journey';
 import { CountUp } from './parts';
+import { useMediaQuery } from './hooks';
 import {
   fmt1,
   fmtInt,
@@ -62,6 +63,8 @@ export function Hero({ stats, scope, unit, prev, firstYear, timeEstimated = fals
   const mins = Math.round(t.durationMin % 60);
   const topAirline = stats.airlines[0];
   const topAircraft = stats.aircraft[0];
+  // Desktop: the hero sits beside the 2×3 tiles, so its chart takes the room they give it.
+  const wide = useMediaQuery('(min-width: 960px)');
 
   return (
     <>
@@ -104,7 +107,7 @@ export function Hero({ stats, scope, unit, prev, firstYear, timeEstimated = fals
               formatValue={(v) => `${fmtInt(v)} ${plural(v, 'flight')}`}
               label={trendLabel}
               caption={perYear ? 'flights per year' : 'flights per month'}
-              height={52}
+              height={wide ? 116 : 52}
             />
           </div>
         )}

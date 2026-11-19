@@ -984,16 +984,23 @@
   .stats-scope__track {
     padding: 0;
   }
+  /* Hero beside a compact 2×3 of tiles; the Earth/Moon card runs full width underneath, so the
+     tiles only need the height of their own content. */
   .stats-top {
     grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
     grid-template-areas:
       'hero tiles'
-      'journey tiles';
+      'journey journey';
     gap: var(--space-4);
   }
   .stats-hero {
     grid-area: hero;
+    display: flex;
+    flex-direction: column;
     padding: var(--space-6);
+  }
+  .stats-hero__trend {
+    margin-top: auto;
   }
   .stats-tiles {
     grid-area: tiles;
@@ -1011,6 +1018,57 @@
   }
   .stats-journey {
     grid-area: journey;
+  }
+  /* Wide banner: the numbers and progress on the left, the Earth-to-Moon arc on the right. */
+  .celestial-journey {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+    grid-template-areas:
+      'heading art'
+      'numbers art'
+      'milestone art'
+      'progress art'
+      'context art'
+      'note art';
+    grid-template-rows: auto auto 1fr auto auto auto;
+    column-gap: var(--space-8);
+    padding: var(--space-6);
+  }
+  .celestial-journey__heading {
+    grid-area: heading;
+  }
+  .celestial-journey__numbers {
+    grid-area: numbers;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: var(--space-3) var(--space-8);
+  }
+  /* Side by side when the column allows, stacked when it doesn't; captions stay on one line. */
+  .celestial-journey__numbers > div:last-child {
+    text-align: left;
+  }
+  .celestial-journey__numbers span {
+    white-space: nowrap;
+  }
+  .celestial-journey__milestone {
+    grid-area: milestone;
+    align-self: end;
+    padding-top: var(--space-4);
+  }
+  .celestial-journey__progress {
+    grid-area: progress;
+  }
+  .celestial-journey__context {
+    grid-area: context;
+  }
+  .celestial-journey__note {
+    grid-area: note;
+  }
+  .celestial-journey__art {
+    grid-area: art;
+    align-self: center;
+    max-height: 240px;
+    margin: 0;
   }
   .stats-insights {
     grid-auto-flow: row;
